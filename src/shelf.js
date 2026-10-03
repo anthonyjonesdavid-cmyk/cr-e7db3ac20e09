@@ -49,6 +49,12 @@ function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#ta
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
 function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
 $('#libBack').addEventListener('click',unscope);
+// series page: tiny Kindle shortcut — try the app (kindle://), fall back to the web library if we're still here ~1s later
+const kindleNav=u=>{ if(window.__crNav) window.__crNav(u); else location.href=u; };
+function openKindle(){ let left=false; const vis=()=>{ if(document.hidden) left=true; }; document.addEventListener('visibilitychange',vis); addEventListener('pagehide',vis,{once:true});
+  setTimeout(()=>{ document.removeEventListener('visibilitychange',vis); if(!left&&!document.hidden) kindleNav('https://read.amazon.com/kindle-library'); },1100);
+  kindleNav('kindle://'); }
+$('#kindleBtn').addEventListener('click',openKindle);
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.tab==='library'&&ui.series!=null){ ui.series=null; renderLibrary(); } setTab(b.dataset.tab); });
 
 const coverBox=c=>`<div class="cvr"><img src="${cover(c)}" alt="" decoding="async" loading="lazy" draggable="false">${isDone(c)?`<span class="done" aria-label="Finished">${IC.check}</span>`:''}</div>${inProg(c)?`<div class="pl"><i style="width:${Math.max(2,pctOf(c))}%"></i></div>`:'<div class="pl none"></div>'}`;

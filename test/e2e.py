@@ -122,6 +122,7 @@ with sync_playwright() as p:
     pg.wait_for_function(f'document.querySelectorAll(".lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=(400000 if BIG else 90000))
     ok(f'import {len(FILES)} PDFs',True,f'{time.time()-t0:.1f}s'); pg.wait_for_timeout(600)
     heads=pg.eval_on_selector_all('.row-h h2','els=>els.map(e=>e.textContent)')
+    ok('no Kindle shortcut on Home',not pg.is_visible('#kindleBtn'))
     ok('home rows: Recently Added + auto-detected series rows',heads[0]=='Recently Added' and all(s in heads for s in ['Nightfall','Iron Tide','Starlight Ronin','The Hollow','Twin Moon']),json.dumps(heads))
     ok('see-all tile ends each row',pg.locator('.row').first.locator('.seeall').count()==1)
     ok('row cards show title under cover',pg.locator('.rc .t').first.inner_text()!='')
@@ -269,8 +270,18 @@ with sync_playwright() as p:
     ok('series page: no search / sort / series chip / Rename / Merge / filter chips',not any(cl[k] for k in ('search','sort','chips','scope','rename','merge','filters','az')),json.dumps(cl))
     ok('series page: top bar keeps Home/Library + "+", back chevron replaces the gear',cl['seg'] and cl['plus'] and cl['back'] and not cl['gear'],json.dumps(cl))
     ok('series page: carousel sits right under the top bar, grid below',abs(cl['heroTop']-cl['tbBottom'])<=1 and cl['gridBelow'],json.dumps(cl))
+    kb=pg.evaluate("(()=>{const b=document.querySelector('#kindleBtn'), r=b.getBoundingClientRect(), g=b.querySelector('svg').getBoundingClientRect(), p=document.querySelector('#importBtn').getBoundingClientRect(); return {w:r.width,h:r.height,gw:g.width,gh:g.height,right:r.right,plusLeft:p.left,vis:getComputedStyle(b).display!=='none'}})()")
+    ok('series page: tiny Kindle shortcut next to +, 40px tap target, small glyph',kb['vis'] and kb['w']>=40 and kb['h']>=40 and kb['gw']<=20 and kb['right']<=kb['plusLeft']+2,json.dumps(kb))
+    pg.evaluate("window.__navs=[]; window.__crNav=u=>window.__navs.push([u,performance.now()]); 0"); pg.click('#kindleBtn'); pg.wait_for_timeout(1500)
+    nv=pg.evaluate('window.__navs')
+    ok('Kindle: opens kindle:// first, then falls back to read.amazon.com/kindle-library after ~1s',len(nv)==2 and nv[0][0]=='kindle://' and nv[1][0]=='https://read.amazon.com/kindle-library' and 900<=nv[1][1]-nv[0][1]<=1600,json.dumps(nv))
+    pg.evaluate("""window.__navs=[]; window.__crNav=u=>{ window.__navs.push([u,performance.now()]); if(u==='kindle://'){ Object.defineProperty(document,'hidden',{configurable:true,get:()=>true}); document.dispatchEvent(new Event('visibilitychange')); } }; 0""")
+    pg.click('#kindleBtn'); pg.wait_for_timeout(1500); nv=pg.evaluate('window.__navs')
+    pg.evaluate("delete document.hidden; delete window.__crNav")
+    ok('Kindle: no web fallback when the app opened (page went hidden)',[x[0] for x in nv]==['kindle://'],json.dumps(nv))
     shot(pg,'59-series-page-clean')
     pg.click('#libBack'); pg.wait_for_timeout(200)
+    ok('Kindle shortcut only on series pages (hidden in full Library)',not pg.is_visible('#kindleBtn'))
     ok('back chevron returns to the full Library (search/sort/filters back, gear back)',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q') and pg.is_visible('#sortBtn') and pg.locator('#chips [data-act=filter]').count()==4 and pg.is_visible('#settingsBtn') and not pg.is_visible('#libBack') and pg.locator('#scf').count()==0)
     tab(pg,'home'); pg.locator('.row-h',has_text='The Hollow').click(); pg.wait_for_timeout(300); tab(pg,'library'); pg.wait_for_timeout(200)
     ok('Library tab from a series page shows the full Library',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q'))
@@ -312,7 +323,7 @@ with sync_playwright() as p:
         center:v.left+v.width/2, halves:[...document.querySelectorAll('.flip .face.half')].map(e=>e.dataset.p+e.dataset.half+(e.classList.contains('front')?'*':'')), halfw:fl&&parseFloat(fl.style.width), pagew:v.width}})()"""
     pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
     # ---- PORTRAIT HALF PAGES (default for fold comics): one half at a time, standard page turn ----
-    HS="(()=>{const R=__cr.R, el=document.querySelector('.view .pg'), r=el.getBoundingClientRect(), st=document.querySelector('#stage').getBoundingClientRect(); return {half:R.half,n:R.views.length,sheets:R.n,vi:R.vi,s:R.views[R.vi][0],h:R.vh[R.vi]||null,dh:el.dataset.half||null,pw:r.width,ph:r.height,sw:st.width,sh:st.height,ar:R.aspects[1],txt:document.querySelector('#pgText').textContent,max:+document.querySelector('#scrub').max}})()"
+    HS="(()=>{const R=__cr.R, el=document.querySelector('.view .pg'), r=el.getBoundingClientRect(), st=document.querySelector('#stage').getBoundingClientRect(); return {half:R.half,n:R.views.length-1,sheets:R.n,vi:R.vi,s:R.views[R.vi][0],h:R.vh[R.vi]||null,dh:el.dataset.half||null,pw:r.width,ph:r.height,sw:st.width,sh:st.height,ar:R.aspects[1],txt:document.querySelector('#pgText').textContent,max:+document.querySelector('#scrub').max}})()"
     open_comic(pg,'Twin Moon 01'); pg.wait_for_timeout(400); h=pg.evaluate(HS)
     ok('fold comic in portrait opens in half-page mode, cover sheet shows only the cover half',h['half'] and h['vi']==0 and h['s']==0 and h['h']=='R' and h['dh']=='R' and h['n']==1+2*(h['sheets']-1),json.dumps(h))
     lum=pg.evaluate("(()=>{const c=document.querySelector('.view .pg canvas'); const x=c.getContext('2d').getImageData(0,0,c.width,c.height).data; let t=0; for(let i=0;i<x.length;i+=4*97) t+=x[i]+x[i+1]+x[i+2]; return t/(x.length/(4*97))/3})()")
@@ -452,6 +463,70 @@ with sync_playwright() as p:
     stable('fold landscape turn after rotating twice')
     stable('fold landscape turn with slow renders (500ms)',slow=500); pg.wait_for_timeout(2500)
     back(pg); pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
+    # ---- end of comic: next-issue card / End page ----
+    CARD="""(()=>{ const R=__cr.R, d=document.querySelector('.view .pg[data-p="'+R.n+'"]'); if(!d) return null; const c=d.querySelector('canvas'); if(!c) return {loading:true};
+      const x=c.getContext('2d'), W=c.width, H=c.height, im=x.getImageData(0,0,W,H).data, bg=[im[0],im[1],im[2]];
+      const diff=(i)=>Math.abs(im[i]-bg[0])+Math.abs(im[i+1]-bg[1])+Math.abs(im[i+2]-bg[2])>30;
+      const rows=[]; for(let y=0;y<H;y++){ let n=0,l=W,r=-1,run=0,best=0; for(let xx=0;xx<W;xx++){ if(diff((y*W+xx)*4)){ n++; run++; if(run>best) best=run; if(xx<l) l=xx; r=xx; } else run=0; } rows.push([n,l,r,best]); }
+      let t=-1,b=-1; for(let y=0;y<H;y++) if(rows[y][3]>Math.min(W,H)*0.3){ if(t<0) t=y; b=y; }       // cover = wide rows of content
+      let gap=-1; for(let y=b+1;y<H;y++) if(rows[y][0]>0){ gap=y-b; break; }
+      let cap=0, capL=W, capR=0; for(let y=b+2;y<H;y++) if(rows[y][0]>0){ cap++; capL=Math.min(capL,rows[y][1]); capR=Math.max(capR,rows[y][2]); }
+      const r=c.getBoundingClientRect(), st=document.querySelector('#stage').getBoundingClientRect();
+      return {gap,W,H,cssW:r.width,cssH:r.height,dpr:devicePixelRatio,bg,coverTop:t/H,coverBottom:b/H,coverH:(b-t)/H,capRows:cap,capL:capL/W,capR:capR/W,
+        inView:r.left>=st.left-1&&r.right<=st.right+1&&r.top>=st.top-1&&r.bottom<=st.bottom+1,next:R.next&&R.next.title,view:R.views[R.vi],last:R.vi===R.views.length-1,n:R.n,pg:document.querySelector('#pgText').textContent}; })()"""
+    def card(wait=True):
+        if wait: pg.wait_for_function('(()=>{const d=document.querySelector(\'.view .pg[data-p="\'+__cr.R.n+\'"]\'); return !!(d&&d.querySelector("canvas"))})()',timeout=20000); pg.wait_for_timeout(300)
+        return pg.evaluate(CARD)
+    def to_end(title):
+        open_comic(pg,title); pg.evaluate('__cr.jumpTo(__cr.R.n)'); return card()
+    pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(300)
+    c=to_end('Iron Tide 04')
+    ok('end card (landscape 2-up): last page on the left, next-issue card on the right',c and c['last'] and c['view']==[c['n']-1,c['n']] and c['next']=='Iron Tide 05',json.dumps(c and {k:c[k] for k in ('view','n','next','last')}))
+    ok('end card: cover large + sharp, caption under it, all on screen',c['coverH']>0.7 and c['capRows']>10 and c['coverBottom']<0.95 and c['inView'] and abs(c['W']-round(c['cssW']*c['dpr']))<=2,json.dumps(c))
+    ok('end card: page counter ignores the card',c['pg'].endswith(f"{c['n']} / {c['n']}") and str(c['n']+1) not in c['pg'],c['pg'])
+    pg.evaluate('__cr.go(1)'); pg.wait_for_timeout(900); ok('can turn back from the card',state(pg)['vi']==pg.evaluate('__cr.R.views.length')-2)
+    pg.evaluate('__cr.go(-1)'); pg.wait_for_timeout(900); pg.evaluate('__cr.go(-1)')
+    pg.wait_for_function("document.querySelector('#rTitle').textContent==='Iron Tide 05' && __cr.R.views.length>0",timeout=20000); wait_render(pg)
+    ok('turning past the card opens the next issue at page 1',state(pg)['first']==0 and state(pg)['vi']==0,json.dumps(state(pg)))
+    back(pg); tab(pg,'library'); pg.click('.chip[data-f=finished]'); pg.wait_for_timeout(200)
+    ok('reaching the card marks the comic finished',pg.locator('.lc[data-title="Iron Tide 04"]').count()==1)
+    pg.click('.chip[data-f=all]'); pg.wait_for_timeout(100)
+    # End page (no later issue)
+    c=to_end('Iron Tide 05')
+    ok('End page when there is no next issue',c['next'] is None and pg.evaluate('!!__cr.R.endBtn') and c['coverH']<0.2,json.dumps(c))
+    bx=pg.evaluate("(()=>{const c=document.querySelector('.view .pg[data-p=\"'+__cr.R.n+'\"] canvas').getBoundingClientRect(), b=__cr.R.endBtn; return [c.left+(b.x+b.w/2)*c.width, c.top+(b.y+b.h/2)*c.height]})()")
+    pg.mouse.click(*bx); pg.wait_for_selector('#shelf:not(.hidden)',timeout=5000); ok('End page: Back to Library returns to the shelf',pg.is_visible('#shelf'))
+    pg.wait_for_timeout(300)
+    # portrait: the card is a page of its own
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
+    c=to_end('Iron Tide 04')
+    ok('end card (portrait): its own page after the last page, cover centred',c['view']==[c['n']] and c['next']=='Iron Tide 05' and c['coverH']>0.7 and c['inView'] and abs((c['capL']+c['capR'])/2-0.5)<0.06,json.dumps(c))
+    pg.evaluate('__cr.go(1)'); pg.wait_for_timeout(900); ok('portrait: page before the card is the last page',state(pg)['first']==c['n']-1)
+    back(pg)
+    # fold comics: landscape (wide sheets) + portrait halves
+    pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(300)
+    c=to_end('Twin Moon 01')
+    ok('fold comic (landscape): card after the last sheet, next = Twin Moon 02',c['view']==[c['n']] and c['next']=='Twin Moon 02' and c['coverH']>0.7 and c['inView'],json.dumps(c))
+    pg.evaluate('__cr.go(1)'); pg.wait_for_timeout(1000); pg.evaluate('__cr.go(-1)'); pg.wait_for_timeout(1000)
+    ok('fold comic: fold turn onto the card lands on it',pg.evaluate('__cr.R.vi===__cr.R.views.length-1'))
+    back(pg); pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
+    c=to_end('Twin Moon 01')
+    ok('fold comic (portrait halves): card is its own page after the last half',c['view']==[c['n']] and pg.evaluate('__cr.R.half') and c['coverH']>0.7,json.dumps(c))
+    pg.evaluate('__cr.go(-1)'); pg.wait_for_function("document.querySelector('#rTitle').textContent==='Twin Moon 02'",timeout=20000); wait_render(pg)
+    ok('fold comic: turning past the card opens Twin Moon 02 at the start',state(pg)['first']==0)
+    back(pg)
+    # design checklist: iPad Pro landscape/portrait + iPhone
+    for (vw,vh,nm) in ((1366,1024,'ipad-landscape'),(1024,1366,'ipad-portrait'),(390,844,'iphone')):
+        pg.set_viewport_size({'width':vw,'height':vh}); pg.wait_for_timeout(300); pg.evaluate("document.documentElement.style.setProperty('--sat','24px')")
+        c=to_end('Iron Tide 04'); pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(500); shot(pg,f'60-end-card-{nm}')
+        sb=pg.evaluate("(()=>{const r=document.querySelector('#stage').getBoundingClientRect(); return r.top})()")
+        good=(c['inView'] and c['coverH']>(0.6 if nm=='iphone' else 0.7) and c['capRows']>10 and c['gap']>=8 and c['capL']>0.02 and c['capR']<0.98 and abs(c['W']-round(c['cssW']*c['dpr']))<=2
+              and (c['bg']==[11,11,11] if c['view']==[c['n']-1,c['n']] else c['bg']==[0,0,0]))
+        ok(f'design checklist {nm} {vw}x{vh}: sharp canvas, cover dominant, caption under cover unclipped, dark bg, on screen',good,json.dumps(c))
+        px=pg.evaluate("(async()=>{ const top=getComputedStyle(document.querySelector('#reader'),'::before'); return [top.backgroundColor,top.height]; })()")
+        ok(f'design checklist {nm}: solid black status-bar strip over the reader',px[0] in ('rgb(0, 0, 0)','rgba(0, 0, 0, 1)'),json.dumps(px))
+        back(pg); pg.evaluate("document.documentElement.style.removeProperty('--sat')")
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
     if BIG:
         t0=time.time(); open_comic(pg,'Atlas Omnibus'); ok('big PDF opens',True,f'{time.time()-t0:.1f}s, {state(pg)["n"]} pages, {os.path.getsize(T+"/Atlas_Omnibus.pdf")//1048576} MB')
         t0=time.time(); pg.evaluate('__cr.jumpTo(150)'); wait_render(pg,60000); ok('big PDF random-access page 151',state(pg)['first']==150,f'{time.time()-t0:.2f}s')

@@ -308,6 +308,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 #reader::before{content:"";position:absolute;left:0;right:0;top:0;height:var(--sat);background:#000;z-index:21;pointer-events:none}
 #libBack{display:none}#shelf.scoped #libBack{display:inline-flex}#shelf.scoped #settingsBtn{display:none}
 #shelf.scoped .libbar,#shelf.scoped #azIndex{display:none!important}
+.tb-r{position:relative;display:flex;justify-content:flex-end;align-items:center}
+#kindleBtn{display:none;position:absolute;right:40px;top:50%;margin-top:-20px;color:#ffffffa6}
+#kindleBtn .ki{width:17px;height:17px;stroke-width:1.6}
+#shelf.scoped #kindleBtn{display:inline-flex}
 </style>
 </head>
 <body>
@@ -317,7 +321,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <button class="icbtn" id="libBack" aria-label="Back to Library"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     <div class="segctl" role="tablist" id="tabs"><button role="tab" data-tab="home" class="on">Home</button><button role="tab" data-tab="library">Library</button></div>
-    <button class="icbtn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <div class="tb-r"><button class="icbtn" id="kindleBtn" aria-label="Open Kindle" title="Kindle"><svg class="i ki" viewBox="0 0 24 24"><rect x="6.5" y="3" width="11" height="18" rx="2"/><path d="M9.5 7.5h5M9.5 10.5h5M9.5 13.5h3"/></svg></button>
+    <button class="icbtn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
     <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden>
   </div></header>
   <main id="home" class="tabview"><div class="scrollv" id="homeScroll"></div></main>
@@ -554,6 +559,12 @@ function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#ta
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
 function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
 $('#libBack').addEventListener('click',unscope);
+// series page: tiny Kindle shortcut — try the app (kindle://), fall back to the web library if we're still here ~1s later
+const kindleNav=u=>{ if(window.__crNav) window.__crNav(u); else location.href=u; };
+function openKindle(){ let left=false; const vis=()=>{ if(document.hidden) left=true; }; document.addEventListener('visibilitychange',vis); addEventListener('pagehide',vis,{once:true});
+  setTimeout(()=>{ document.removeEventListener('visibilitychange',vis); if(!left&&!document.hidden) kindleNav('https://read.amazon.com/kindle-library'); },1100);
+  kindleNav('kindle://'); }
+$('#kindleBtn').addEventListener('click',openKindle);
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.tab==='library'&&ui.series!=null){ ui.series=null; renderLibrary(); } setTab(b.dataset.tab); });
 
 const coverBox=c=>`<div class="cvr"><img src="${cover(c)}" alt="" decoding="async" loading="lazy" draggable="false">${isDone(c)?`<span class="done" aria-label="Finished">${IC.check}</span>`:''}</div>${inProg(c)?`<div class="pl"><i style="width:${Math.max(2,pctOf(c))}%"></i></div>`:'<div class="pl none"></div>'}`;
@@ -1195,7 +1206,7 @@ function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
     vis.forEach((p,j)=>{ if(p==null) return; want.add(p); requestPage(p,hv?g[j].w*2:g[j].w,g[j].h,1+k).catch(()=>{}); }); });   // adjacent halves share their sheet's render
   dropJobs(j=>(j.kind==='page'&&!want.has(j.page))||j.kind==='hi'); }
 function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ps[0]+1, b=ps[ps.length-1]+1, N=R.n;
-  if(R.half){ a=b=R.vi+1; N=R.views.length; }   // portrait half pages: counter + scrubber count halves
+  if(R.half){ N=R.views.length-1; a=b=Math.min(R.vi+1,N); }   // the end card isn't counted   // portrait half pages: counter + scrubber count halves
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+N;
   const s=$('#scrub'); s.max=N; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(N>1?(b-1)/(N-1)*100:100)+'%');
   $('#rRtl').classList.toggle('on',R.rtl); $('#rRtl').setAttribute('aria-pressed',R.rtl);
@@ -1441,7 +1452,7 @@ function thumb(i,prio){ const u=R.thumbs.get(i); if(u){ R.thumbs.delete(i); R.th
   return enqueue('t|'+i,'thumb',i,prio,async()=>{ const page=await doc.getPage(i+1); const c=await renderToCanvas(page,110,165,2,80000); page.cleanup(); const b=await toBlob(c,.7); freeCanvas(c);
     const url=URL.createObjectURL(b); R.thumbs.set(i,url); while(R.thumbs.size>400){ const [k,v]=R.thumbs.entries().next().value; URL.revokeObjectURL(v); R.thumbs.delete(k); } return url; }); }
 const scrub=$('#scrub'), bubble=$('#bubble');
-function showBubble(){ const v=+scrub.value, n=R.half?R.views.length:R.n, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
+function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.n, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
   bubble.classList.remove('hidden'); bubble.style.left=clamp(x,56,w-40)+'px'; bubble.querySelector('span').textContent=`Page ${v}`;
   const sh=R.half?((R.views[v-1]||[0])[0]):v-1;   // half pages: thumbnail of that half's sheet
   scrub.style.setProperty('--pct',frac*100+'%'); const img=bubble.querySelector('img'); img.dataset.p=sh; const u=R.thumbs.get(sh);
@@ -1472,12 +1483,12 @@ async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.
 const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
 async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
   const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
-  if(n){ const capH=Math.round(Math.max(64,Math.min(96,h*.1))*k), pad=Math.round(Math.max(14,h*.03)*k), mw=Math.round(W*.86), mh=H-capH-pad;
+  if(n){ const capH=Math.round(Math.max(84,Math.min(104,h*.1))*k), pad=Math.round(Math.max(14,h*.03)*k), mw=Math.round(W*.86), mh=H-capH-pad;
     let img=null; try{ img=await nextCover(n,mw,mh); }catch(e){ console.warn(e); }
-    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; cy=pad+(mh-ch); } }
+    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; cy=Math.max(pad,Math.round((H-ch-capH)/2)); } }   /* width-limited (phones): cover + caption centred as a group */
     const cx=(W-cw)/2; if(img) x.drawImage(img,Math.round(cx),Math.round(cy),Math.round(cw),Math.round(ch)); else { x.fillStyle='#1a1a1a'; x.fillRect(cx,cy,cw,ch); }
     x.strokeStyle='rgba(255,255,255,.07)'; x.lineWidth=k; x.strokeRect(Math.round(cx)+.5*k,Math.round(cy)+.5*k,Math.round(cw)-k,Math.round(ch)-k);
-    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, ty=cy+ch+capH*.46;
+    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, cb=cy+ch, ty=cb+Math.round(48*k);   /* fixed rhythm under the cover: NEXT / title / hint */
     x.font=`500 ${Math.round(12*k)}px ${F}`; x.fillStyle='#8c8c8c'; x.letterSpacing=`${1.6*k}px`; x.fillText('NEXT',W/2,ty-Math.round(22*k)); x.letterSpacing='0px';
     x.font=`600 ${Math.round(17*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,label,W*.9),W/2,ty);
     x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(22*k));

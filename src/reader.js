@@ -99,7 +99,7 @@ function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
     vis.forEach((p,j)=>{ if(p==null) return; want.add(p); requestPage(p,hv?g[j].w*2:g[j].w,g[j].h,1+k).catch(()=>{}); }); });   // adjacent halves share their sheet's render
   dropJobs(j=>(j.kind==='page'&&!want.has(j.page))||j.kind==='hi'); }
 function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ps[0]+1, b=ps[ps.length-1]+1, N=R.n;
-  if(R.half){ a=b=R.vi+1; N=R.views.length; }   // portrait half pages: counter + scrubber count halves
+  if(R.half){ N=R.views.length-1; a=b=Math.min(R.vi+1,N); }   // the end card isn't counted   // portrait half pages: counter + scrubber count halves
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+N;
   const s=$('#scrub'); s.max=N; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(N>1?(b-1)/(N-1)*100:100)+'%');
   $('#rRtl').classList.toggle('on',R.rtl); $('#rRtl').setAttribute('aria-pressed',R.rtl);
@@ -345,7 +345,7 @@ function thumb(i,prio){ const u=R.thumbs.get(i); if(u){ R.thumbs.delete(i); R.th
   return enqueue('t|'+i,'thumb',i,prio,async()=>{ const page=await doc.getPage(i+1); const c=await renderToCanvas(page,110,165,2,80000); page.cleanup(); const b=await toBlob(c,.7); freeCanvas(c);
     const url=URL.createObjectURL(b); R.thumbs.set(i,url); while(R.thumbs.size>400){ const [k,v]=R.thumbs.entries().next().value; URL.revokeObjectURL(v); R.thumbs.delete(k); } return url; }); }
 const scrub=$('#scrub'), bubble=$('#bubble');
-function showBubble(){ const v=+scrub.value, n=R.half?R.views.length:R.n, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
+function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.n, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
   bubble.classList.remove('hidden'); bubble.style.left=clamp(x,56,w-40)+'px'; bubble.querySelector('span').textContent=`Page ${v}`;
   const sh=R.half?((R.views[v-1]||[0])[0]):v-1;   // half pages: thumbnail of that half's sheet
   scrub.style.setProperty('--pct',frac*100+'%'); const img=bubble.querySelector('img'); img.dataset.p=sh; const u=R.thumbs.get(sh);
@@ -376,12 +376,12 @@ async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.
 const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
 async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
   const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
-  if(n){ const capH=Math.round(Math.max(64,Math.min(96,h*.1))*k), pad=Math.round(Math.max(14,h*.03)*k), mw=Math.round(W*.86), mh=H-capH-pad;
+  if(n){ const capH=Math.round(Math.max(84,Math.min(104,h*.1))*k), pad=Math.round(Math.max(14,h*.03)*k), mw=Math.round(W*.86), mh=H-capH-pad;
     let img=null; try{ img=await nextCover(n,mw,mh); }catch(e){ console.warn(e); }
-    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; cy=pad+(mh-ch); } }
+    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; cy=Math.max(pad,Math.round((H-ch-capH)/2)); } }   /* width-limited (phones): cover + caption centred as a group */
     const cx=(W-cw)/2; if(img) x.drawImage(img,Math.round(cx),Math.round(cy),Math.round(cw),Math.round(ch)); else { x.fillStyle='#1a1a1a'; x.fillRect(cx,cy,cw,ch); }
     x.strokeStyle='rgba(255,255,255,.07)'; x.lineWidth=k; x.strokeRect(Math.round(cx)+.5*k,Math.round(cy)+.5*k,Math.round(cw)-k,Math.round(ch)-k);
-    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, ty=cy+ch+capH*.46;
+    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, cb=cy+ch, ty=cb+Math.round(48*k);   /* fixed rhythm under the cover: NEXT / title / hint */
     x.font=`500 ${Math.round(12*k)}px ${F}`; x.fillStyle='#8c8c8c'; x.letterSpacing=`${1.6*k}px`; x.fillText('NEXT',W/2,ty-Math.round(22*k)); x.letterSpacing='0px';
     x.font=`600 ${Math.round(17*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,label,W*.9),W/2,ty);
     x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(22*k));
