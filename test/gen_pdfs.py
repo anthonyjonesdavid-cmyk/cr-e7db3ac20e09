@@ -57,6 +57,7 @@ SERIES = {
  'The Hollow':     dict(top='#0d1210', bot='#4b5a4e', glowc='#f6e7b0', accent='#f2d27a', title='#e9efe6', font='barlowb', motif='forest', tag='SOMETHING IS LISTENING IN THE TREES.', jp=False),
  'Glass Harbor':   dict(top='#04161a', bot='#3e8e8a', glowc='#c8fff4', accent='#7ff0dd', title='#f0fffb', font='anton', motif='sea2', tag='A ONE-SHOT', jp=False),
  'Ember Road':     dict(top='#1a0905', bot='#c2412b', glowc='#ffc58a', accent='#ff8a4c', title='#fff1e6', font='anton', motif='sea2', tag='THE LAST CARAVAN HEADS WEST.', jp=False),
+ 'Twin Moon':      dict(top='#050d1c', bot='#3a5fa0', glowc='#e8f0ff', accent='#9fc3ff', title='#f4f8ff', font='bebas', motif='city', tag='TWO MOONS. ONE NIGHT LEFT.', jp=False),
  'Atlas Omnibus':  dict(top='#120d05', bot='#8a6a2c', glowc='#ffe7a6', accent='#ffd166', title='#fff8e6', font='bebas', motif='city', tag='THE COMPLETE SAGA', jp=False),
 }
 NAMES = ['M. Okafor','R. Lindqvist','J. Moreau','S. Takeda','A. Varga','L. Castellanos','K. Whitfield','D. Achterberg']
@@ -167,6 +168,21 @@ def make(fname, series, label, n, seed, big=False, wide=None):
         interior(c, i, n, series, rnd, img)
     c.save(); print(fname, os.path.getsize(os.path.join(OUT, fname))//1024, 'KB', flush=True)
 
+def make_wide(fname, series, label, sheets, seed):
+    # scanner-style: every PDF page is a wide sheet holding two comic pages side by side (cover sheet: black back cover + cover)
+    make_path = os.path.join(OUT, fname); rnd = random.Random(seed); c = canvas.Canvas(make_path, pagesize=(2*W, H)); c.setTitle(f'{series} {label}')
+    c.setFillColor(black); c.rect(0, 0, 2*W, H, fill=1, stroke=0); c.setFillColor(HexColor('#5a5a5a')); c.setFont('Helvetica', 6)
+    c.drawCentredString(W/2, 26, f'{series.upper()} {label} · ORIGINAL TEST FIXTURE'); c.drawImage(cover(series, seed, label, rnd), W, 0, W, H); c.showPage()
+    real = c.showPage; n = 1 + sheets*2
+    for k in range(sheets):
+        c.setPageSize((2*W, H))
+        for half in (0, 1):
+            c.saveState(); c.translate(half*W, 0); c.showPage = lambda: None
+            interior(c, 1 + k*2 + half, n, series, rnd, None); c.showPage = real; c.restoreState()
+        c.setStrokeColor(HexColor('#00000033')); c.setLineWidth(1); c.line(W, 0, W, H)   # gutter
+        c.showPage()
+    c.save(); print(fname, os.path.getsize(make_path)//1024, 'KB', flush=True)
+
 def drive_fixtures():
     # served by the throttled mock-Drive server in e2e.py: a multi-chunk (~22 MB) PDF + a broken "PDF"
     global OUT
@@ -188,4 +204,6 @@ if __name__ == '__main__':
     make('Glass_Harbor.pdf', 'Glass Harbor', 'ONE-SHOT', 40, 99)
     # wide two-page-spread first pages (black left half) — with/without letterbox bands
     for k, band in [(1, 70), (2, 0), (3, 110)]: make(f'Ember_Road_{k:02d}.pdf', 'Ember Road', f'#{k}', 28, 60+k, wide=band)
+    # every page a two-page spread scan -> "fold in middle" page turns
+    for k in (1, 2): make_wide(f'Twin_Moon_{k:02d}.pdf', 'Twin Moon', f'#{k}', 12, 80+k)
     if '--big' in sys.argv: make('Atlas_Omnibus.pdf', 'Atlas Omnibus', 'COMPLETE', 220, 7, big=True)

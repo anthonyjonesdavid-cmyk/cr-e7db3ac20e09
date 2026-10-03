@@ -189,13 +189,15 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
     <label class="fld"><span>Title</span><input type="text" id="eTitle" value="${esc(c.title)}" maxlength="140"></label>
     <label class="fld"><span>Series</span><input type="text" id="eSeries" value="${esc(c.series||'')}" list="seriesList" placeholder="None" maxlength="80"><datalist id="seriesList">${series.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></label>
     <div class="fld"><span>Cover</span><div class="seg4" id="eCover" role="radiogroup">${[['auto','Auto'],['right','Right half'],['left','Left half'],['full','Full page']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.coverMode||'auto')===v}" class="${(c.coverMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div></div>
+    <div class="fld"><span>Page turn</span><div class="seg4 seg3" id="eTurn" role="radiogroup">${[['auto','Auto'],['standard','Standard'],['fold','Fold in middle']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.turnMode||'auto')===v}" class="${(c.turnMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div>
+      <small class="fhint">Fold in middle: for PDFs with two comic pages side by side on each page. Auto detects them${typeof c.foldAuto==='boolean'?` (detected: ${c.foldAuto?'fold in middle':'standard'})`:''}.</small></div>
     <label class="tgl"><input type="checkbox" id="eRtl" ${c.rtl?'checked':''}><span>Right-to-left (manga)<small>Reverses page order and swipe direction</small></span></label>
     <div class="mstat">${esc(c.fileName)} · ${fmtBytes(c.size)} · ${c.pages} pages</div>
   </div><div class="mf"><button class="btn ghost" data-r="delete" id="eDelete" style="color:#ff453a">Delete</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="eSave">Save</button></div>`,
-  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v});
-       w.querySelector('#eCover').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll('#eCover button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); });
+  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v});
+       ['#eCover','#eTurn'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); }));
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; await dbPut(c); renderShelf();
+  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; await dbPut(c); renderShelf();
     if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 async function deleteComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;

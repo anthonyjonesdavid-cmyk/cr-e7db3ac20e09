@@ -298,6 +298,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .seg4{display:grid;grid-template-columns:repeat(4,1fr);background:var(--el2);border-radius:9px;padding:2px;gap:2px}
 .seg4 button{height:32px;border-radius:7px;font-size:13px;font-weight:600;color:#ebebf5cc}
 .seg4 button.on{background:#636366;color:#fff}
+.seg4.seg3{grid-template-columns:repeat(3,1fr)}
+.fld .fhint{display:block;margin-top:6px;color:var(--mut);font-size:12px;line-height:1.35}
 </style>
 </head>
 <body>
@@ -477,6 +479,18 @@ async function coverMeta(doc,mode='auto'){
   let aspect=vp.width/vp.height;
   if(cv.wide&&doc.numPages>1){ try{ const p2=await doc.getPage(2); const v2=p2.getViewport({scale:1}); aspect=v2.width/v2.height; p2.cleanup(); }catch(e){} }
   return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect}; }
+
+/* ================= page-turn style: fold in the middle for wide two-page scans ================= */
+// a page is "wide" if width > height*1.15 once black letterbox bands are ignored
+async function pageIsWide(page){ const vp=page.getViewport({scale:1}), a=vp.width/vp.height; if(a>1.15) return true; if(a<=0.95) return false;
+  const c=await renderToCanvas(page,96,96,1,12000); const W=c.width,H=c.height, d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data; freeCanvas(c);
+  const [,t,,b]=trimBlack(d,W,0,0,W,H,false); return vp.width>vp.height*((b-t)/H)*1.15; }
+// Auto: sample pages 2-6; most wide -> fold. Result cached on the record (turnMode 'standard'/'fold' override it).
+async function turnIsFold(doc,c){ const m=c.turnMode||'auto'; if(m==='fold') return true; if(m==='standard') return false;
+  if(typeof c.foldAuto==='boolean') return c.foldAuto;
+  const idx=[]; for(let i=1;i<=5&&i<doc.numPages;i++) idx.push(i); let wide=0;
+  for(const i of idx){ const pg=await doc.getPage(i+1); try{ if(await pageIsWide(pg)) wide++; } finally{ pg.cleanup(); } }
+  c.foldAuto=idx.length>0&&wide>idx.length/2; dbPut(c).catch(()=>{}); return c.foldAuto; }
 
 /* ================= Shelf: Home (coverflow + rows) and Library (grid) ================= */
 let comics=[]; const coverURL=new Map();
@@ -668,13 +682,15 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
     <label class="fld"><span>Title</span><input type="text" id="eTitle" value="${esc(c.title)}" maxlength="140"></label>
     <label class="fld"><span>Series</span><input type="text" id="eSeries" value="${esc(c.series||'')}" list="seriesList" placeholder="None" maxlength="80"><datalist id="seriesList">${series.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></label>
     <div class="fld"><span>Cover</span><div class="seg4" id="eCover" role="radiogroup">${[['auto','Auto'],['right','Right half'],['left','Left half'],['full','Full page']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.coverMode||'auto')===v}" class="${(c.coverMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div></div>
+    <div class="fld"><span>Page turn</span><div class="seg4 seg3" id="eTurn" role="radiogroup">${[['auto','Auto'],['standard','Standard'],['fold','Fold in middle']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.turnMode||'auto')===v}" class="${(c.turnMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div>
+      <small class="fhint">Fold in middle: for PDFs with two comic pages side by side on each page. Auto detects them${typeof c.foldAuto==='boolean'?` (detected: ${c.foldAuto?'fold in middle':'standard'})`:''}.</small></div>
     <label class="tgl"><input type="checkbox" id="eRtl" ${c.rtl?'checked':''}><span>Right-to-left (manga)<small>Reverses page order and swipe direction</small></span></label>
     <div class="mstat">${esc(c.fileName)} · ${fmtBytes(c.size)} · ${c.pages} pages</div>
   </div><div class="mf"><button class="btn ghost" data-r="delete" id="eDelete" style="color:#ff453a">Delete</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="eSave">Save</button></div>`,
-  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v});
-       w.querySelector('#eCover').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll('#eCover button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); });
+  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v});
+       ['#eCover','#eTurn'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); }));
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; await dbPut(c); renderShelf();
+  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; await dbPut(c); renderShelf();
     if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 async function deleteComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
@@ -940,7 +956,7 @@ function importMenu(anchor){ Drive.preload();
 $('#importBtn').onclick=e=>importMenu(e.currentTarget);
 /* ================= Reader ================= */
 const readerEl=$('#reader'), stage=$('#stage'), zoomer=$('#zoomer');
-const R={ comic:null, doc:null, n:0, views:[], vi:0, spread:false, rtl:false, aspects:[], viewEl:null, thumbs:new Map(), gen:0, uiT:0 };
+const R={ comic:null, doc:null, n:0, views:[], vi:0, spread:false, fold:false, rtl:false, aspects:[], viewEl:null, thumbs:new Map(), gen:0, uiT:0 };
 const Z={s:1,tx:0,ty:0};
 let flip=null, animating=false, anim=null, drag=null, pinch=null, scrubbing=false;
 
@@ -981,7 +997,7 @@ function geom(v){ const W=stage.clientWidth,H=stage.clientHeight, ar=aspectOf(v)
   if(v.length===2){ const sw=Math.floor(Math.min(W/2,H*ar)), sh=Math.floor(sw/ar), x0=Math.round((W-2*sw)/2), y0=Math.round((H-sh)/2); return [{x:x0,y:y0,w:sw,h:sh},{x:x0+sw,y:y0,w:sw,h:sh}]; }
   const sw=Math.floor(Math.min(W,H*ar)), sh=Math.floor(sw/ar); return [{x:Math.round((W-sw)/2),y:Math.round((H-sh)/2),w:sw,h:sh}]; }
 const isLandscape=()=>stage.clientWidth>stage.clientHeight*1.05;
-const wantSpread=()=>isLandscape()&&stage.clientWidth>=560&&!store.get('singleLandscape',false)&&R.n>1;
+const wantSpread=()=>isLandscape()&&stage.clientWidth>=560&&!store.get('singleLandscape',false)&&R.n>1&&!R.fold;   // fold-in-middle comics: one wide page at a time
 
 /* ---- page elements ---- */
 function placeCanvas(cv,w,h,align){ const ar=cv.width/cv.height; let cw=w,ch=w/ar; if(ch>h){ ch=h; cw=h*ar; }
@@ -1011,7 +1027,7 @@ function updateChrome(){ const ps=pagesOf(R.views[R.vi]); const a=ps[0]+1, b=ps[
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+R.n;
   const s=$('#scrub'); s.max=R.n; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(R.n>1?(b-1)/(R.n-1)*100:100)+'%');
   $('#rRtl').classList.toggle('on',R.rtl); $('#rRtl').setAttribute('aria-pressed',R.rtl);
-  const sp=$('#rSpread'); sp.classList.toggle('hidden',!isLandscape()||R.n<2); sp.classList.toggle('on',R.spread); $('#rSpreadTxt').textContent=R.spread?'2-up':'1-up'; }
+  const sp=$('#rSpread'); sp.classList.toggle('hidden',!isLandscape()||R.n<2||R.fold); sp.classList.toggle('on',R.spread); $('#rSpreadTxt').textContent=R.spread?'2-up':'1-up'; }
 
 /* ---- progress ---- */
 let saveT=0;
@@ -1028,6 +1044,7 @@ async function openReader(id,{push=true}={}){
   let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); }catch(err){ console.warn(err); toast('Could not open this comic: '+(err.message||err)); closeReader(); return; }
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
+  R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
   R.spread=wantSpread(); buildViews(); R.vi=clamp(viewOfPage(c.page||0),0,R.views.length-1); renderView();
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
@@ -1044,6 +1061,17 @@ let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayo
 
 /* ================= Flip engine: real 3D page turn, finger-tracked, with shading ================= */
 function face(i,r,align,extra){ const d=pageEl(i,r,align,'face'+(extra?' '+extra:'')); const s=document.createElement('div'); s.className='shade'; d.appendChild(s); d._s=s; return d; }
+// fold-in-middle: one half of a wide page (the bitmap is the full page's cached render; only that half is copied)
+function halfFace(i,full,half,extra){ const lw=Math.floor(full.w/2), r={x:half==='R'?full.x+lw:full.x,y:full.y,w:half==='R'?full.w-lw:lw,h:full.h};
+  const d=document.createElement('div'); d.className='face half'+(extra?' '+extra:''); d.style.width=r.w+'px'; d.style.height=r.h+'px'; d._r=r; d.dataset.p=i; d.dataset.half=half;
+  const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas').forEach(x=>x.remove());
+    const sw=ent.canvas.width, sh=ent.canvas.height, hw=Math.ceil(sw/2), c=document.createElement('canvas'); c.width=hw; c.height=sh;
+    c.getContext('2d',{alpha:false}).drawImage(ent.canvas,half==='R'?sw-hw:0,0,hw,sh,0,0,hw,sh);
+    const ar=sw/sh; let cw=full.w,ch=full.w/ar; if(ch>full.h){ ch=full.h; cw=full.h*ar; } const css=cw*hw/sw;
+    c.style.width=css+'px'; c.style.height=ch+'px'; c.style.top=((full.h-ch)/2)+'px'; c.style.left=(half==='R'?(full.w/2-lw):(full.w/2-css))+'px'; d.prepend(c); };
+  if(i==null) d.classList.add('blank');
+  else { const e=cacheGet(keyFor(i,full.w,full.h)); if(e) show(e); else { d.classList.add('loading'); requestPage(i,full.w,full.h,0).then(ent=>{ if(d.isConnected) show(ent); }).catch(()=>{}); } }
+  const s=document.createElement('div'); s.className='shade'; d.appendChild(s); d._s=s; return d; }
 function place(d,r){ d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; }
 const grad=(deg,a,b)=>`linear-gradient(${deg}deg,rgba(0,0,0,${a}),rgba(0,0,0,${b}))`;
 // vdir: -1 = the page sweeps leftwards (swipe left / tap right), +1 = sweeps rightwards
@@ -1054,8 +1082,20 @@ function startFlip(vdir){
   const wrap=document.createElement('div'); wrap.className='flip';
   const flipper=document.createElement('div'); flipper.className='flipper';
   let front,back,under=[],covered=null,angle,frontR,spine;
-  const single=cv.length===1;
-  if(!single){
+  const single=cv.length===1&&!R.fold;
+  if(R.fold){
+    // wide two-page scans fold at the centre of the sheet, like a book (mirrored automatically for RTL via vdir)
+    const gc=geom(cv)[0], gt=geom(tv)[0], ci=cv[0], ti=tv[0];
+    if(vdir<0){ // right half lifts and folds over onto the left half; next sheet's right half is revealed underneath
+      const uL=halfFace(ci,gc,'L'), uR=halfFace(ti,gt,'R'); place(uL,uL._r); place(uR,uR._r); under=[uR]; covered=uL; wrap.append(uL,uR);
+      front=halfFace(ci,gc,'R','front'); back=halfFace(ti,gt,'L','back'); frontR=front._r; flipper.style.transformOrigin='0 50%'; angle=p=>-180*p; spine=frontR.x;
+      uR._s.style.background=grad(90,.6,.04); uL._s.style.background=grad(270,.5,.05); front._s.style.background=grad(90,.04,.45); back._s.style.background=grad(270,.04,.45);
+    } else {    // left half lifts and folds over onto the right half
+      const uL=halfFace(ti,gt,'L'), uR=halfFace(ci,gc,'R'); place(uL,uL._r); place(uR,uR._r); under=[uL]; covered=uR; wrap.append(uL,uR);
+      front=halfFace(ci,gc,'L','front'); back=halfFace(ti,gt,'R','back'); frontR=front._r; flipper.style.transformOrigin='100% 50%'; angle=p=>180*p; spine=frontR.x+frontR.w;
+      uL._s.style.background=grad(270,.6,.04); uR._s.style.background=grad(90,.5,.05); front._s.style.background=grad(270,.04,.45); back._s.style.background=grad(90,.04,.45);
+    }
+  } else if(!single){
     const g=geom(cv), [cL,cR]=visualPages(cv), [tL,tR]=visualPages(tv);
     if(vdir<0){ // right page turns over the spine to the left
       const uL=face(cL,g[0],'r'), uR=face(tR,g[1],'l'); place(uL,g[0]); place(uR,g[1]); under=[uR]; covered=uL; wrap.append(uL,uR);
@@ -1084,7 +1124,7 @@ function startFlip(vdir){
   // finger tracking: keep the sheet's free edge under the finger (edge x = w*cos(angle))
   const fw=frontR.w, k=single?1.15:1;
   const track=travel=>{ const e=clamp(travel*k/fw,0,2); return (single&&!fwd)? 1-Math.acos(clamp(e,-1,1))/Math.PI : Math.acos(clamp(1-e,-1,1))/Math.PI; };
-  flip={vdir,fwd,t,wrap,p:-1,track,setP(p){ p=clamp(p,0,1); this.p=p; const a=angle(p), aa=Math.abs(a);
+  flip={vdir,fwd,t,wrap,p:-1,track,mode:R.fold?'fold':single?'single':'spread',setP(p){ p=clamp(p,0,1); this.p=p; const a=angle(p), aa=Math.abs(a);
     flipper.style.transform=`rotateY(${a.toFixed(2)}deg)`; const showFront=aa<90;
     front.style.visibility=showFront?'visible':'hidden'; back.style.visibility=showFront?'hidden':'visible';
     front._s.style.opacity=showFront?(aa/90)*.85:0; gl.style.opacity=showFront?Math.sin(aa/90*Math.PI)*.55:0;

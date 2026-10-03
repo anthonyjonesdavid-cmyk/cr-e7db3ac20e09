@@ -119,3 +119,15 @@ async function coverMeta(doc,mode='auto'){
   let aspect=vp.width/vp.height;
   if(cv.wide&&doc.numPages>1){ try{ const p2=await doc.getPage(2); const v2=p2.getViewport({scale:1}); aspect=v2.width/v2.height; p2.cleanup(); }catch(e){} }
   return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect}; }
+
+/* ================= page-turn style: fold in the middle for wide two-page scans ================= */
+// a page is "wide" if width > height*1.15 once black letterbox bands are ignored
+async function pageIsWide(page){ const vp=page.getViewport({scale:1}), a=vp.width/vp.height; if(a>1.15) return true; if(a<=0.95) return false;
+  const c=await renderToCanvas(page,96,96,1,12000); const W=c.width,H=c.height, d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data; freeCanvas(c);
+  const [,t,,b]=trimBlack(d,W,0,0,W,H,false); return vp.width>vp.height*((b-t)/H)*1.15; }
+// Auto: sample pages 2-6; most wide -> fold. Result cached on the record (turnMode 'standard'/'fold' override it).
+async function turnIsFold(doc,c){ const m=c.turnMode||'auto'; if(m==='fold') return true; if(m==='standard') return false;
+  if(typeof c.foldAuto==='boolean') return c.foldAuto;
+  const idx=[]; for(let i=1;i<=5&&i<doc.numPages;i++) idx.push(i); let wide=0;
+  for(const i of idx){ const pg=await doc.getPage(i+1); try{ if(await pageIsWide(pg)) wide++; } finally{ pg.cleanup(); } }
+  c.foldAuto=idx.length>0&&wide>idx.length/2; dbPut(c).catch(()=>{}); return c.foldAuto; }

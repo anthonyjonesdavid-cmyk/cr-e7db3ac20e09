@@ -110,7 +110,7 @@ with sync_playwright() as p:
     pg.wait_for_function(f'document.querySelectorAll(".lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=(400000 if BIG else 90000))
     ok(f'import {len(FILES)} PDFs',True,f'{time.time()-t0:.1f}s'); pg.wait_for_timeout(600)
     heads=pg.eval_on_selector_all('.row-h h2','els=>els.map(e=>e.textContent)')
-    ok('home rows: Recently Added + auto-detected series rows',heads[0]=='Recently Added' and all(s in heads for s in ['Nightfall','Iron Tide','Starlight Ronin','The Hollow']),json.dumps(heads))
+    ok('home rows: Recently Added + auto-detected series rows',heads[0]=='Recently Added' and all(s in heads for s in ['Nightfall','Iron Tide','Starlight Ronin','The Hollow','Twin Moon']),json.dumps(heads))
     ok('see-all tile ends each row',pg.locator('.row').first.locator('.seeall').count()==1)
     ok('row cards show title under cover',pg.locator('.rc .t').first.inner_text()!='')
     # edit via long-press/context sheet
@@ -234,6 +234,59 @@ with sync_playwright() as p:
     r=pg.evaluate(GEST,{'x':300,'y':500,'pts':[[5,0,15],[10,0,15],[15,0,15],[20,0,15]],'hold':0,'noup':False}); s=state(pg); ok('RTL single page: flick right goes forward',s['first']==6 and s['rtl'],json.dumps(r))
     r=pg.evaluate(GEST,{'x':200,'y':500,'pts':[[41*i,0,30] for i in range(1,8)],'hold':0,'noup':True}); pg.wait_for_timeout(120); shot(pg,'19-rtl-portrait-mid-turn'); pg.evaluate(UP,[500,500]); pg.wait_for_timeout(900)
     back(pg)
+    # ---- FOLD IN THE MIDDLE: wide two-page scans hinge at the centre of the sheet ----
+    FOLDINFO="""(()=>{const f=__cr.flip, fl=document.querySelector('.flip .flipper'), st=document.querySelector('#stage').getBoundingClientRect(), v=document.querySelector('.view .pg').getBoundingClientRect();
+      return {mode:f&&f.mode,p:f&&f.p,origin:fl&&fl.style.transformOrigin,hinge:fl&&(fl.style.transformOrigin.startsWith('0')?parseFloat(fl.style.left):parseFloat(fl.style.left)+parseFloat(fl.style.width))+st.left,
+        center:v.left+v.width/2, halves:[...document.querySelectorAll('.flip .face.half')].map(e=>e.dataset.p+e.dataset.half+(e.classList.contains('front')?'*':'')), halfw:fl&&parseFloat(fl.style.width), pagew:v.width}})()"""
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
+    open_comic(pg,'Twin Moon 01'); s=state(pg)
+    ok('Auto: wide two-page scans -> Fold in middle',pg.evaluate('__cr.R.fold')==True and s['len']==1 and not s['spread'],json.dumps(s))
+    pg.evaluate('__cr.jumpTo(2)'); wait_render(pg); pg.wait_for_timeout(300)
+    fit=pg.evaluate("(()=>{const st=document.querySelector('#stage').getBoundingClientRect(),p=document.querySelector('.view .pg').getBoundingClientRect();return {sw:st.width,pw:p.width,ph:p.height,cy:(p.top+p.bottom)/2,scy:(st.top+st.bottom)/2}})()")
+    ok('fold mode portrait: full wide page fitted to screen',abs(fit['pw']-fit['sw'])<=2 and fit['pw']>fit['ph']*1.2 and abs(fit['cy']-fit['scy'])<=2,json.dumps(fit))
+    x0,y0,W,H=geo(pg)
+    r=pg.evaluate(GEST,{'x':x0+W*0.92,'y':y0+H*0.5,'pts':[[-W*0.045*i,0,30] for i in range(1,8)],'hold':0,'noup':True}); pg.wait_for_timeout(150)
+    fi=pg.evaluate(FOLDINFO); shot(pg,'40-fold-mid-portrait')
+    ok('mid-fold (portrait): right half lifts, hinge at the centre of the wide page',fi['mode']=='fold' and fi['origin'].startswith('0') and abs(fi['hinge']-fi['center'])<=1.5 and 0.15<fi['p']<0.95 and abs(fi['halfw']-fi['pagew']/2)<=1,json.dumps(fi))
+    ok('fold faces: current L stays, current R turns (front), next sheet R underneath, next L on the back',sorted(fi['halves'])==sorted(['2L','3R','2R*','3L']),json.dumps(fi['halves']))
+    pg.evaluate(UP,[x0+W*0.3,y0+H*0.5]); pg.wait_for_timeout(900); ok('fold completes to next sheet',state(pg)['first']==3)
+    flicks(pg,'fold portrait')
+    # zoomed: no turns
+    z=pg.evaluate(PINCH,{'cx':x0+W/2,'cy':y0+H/2,'d0':100,'d1':260}); b4=state(pg)['first']
+    r=pg.evaluate(GEST,{'x':x0+W*0.6,'y':y0+H*0.45,'pts':[[-5,0,15],[-10,0,15],[-15,0,15],[-20,0,15]],'hold':0,'noup':False})
+    ok('fold mode: no page turn while zoomed',z>1.5 and state(pg)['first']==b4,f'z={z:.2f}'); pg.evaluate(TAP,{'x':x0+W*0.5,'y':y0+H*0.5,'n':2}); pg.wait_for_timeout(500)
+    # landscape: still one wide sheet, no 2-up toggle
+    pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(500); wait_render(pg); s=state(pg)
+    pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(200); hid=pg.evaluate("document.querySelector('#rSpread').classList.contains('hidden')"); pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(250)
+    fit=pg.evaluate("(()=>{const st=document.querySelector('#stage').getBoundingClientRect(),p=document.querySelector('.view .pg').getBoundingClientRect();return {sh:st.height,sw:st.width,pw:p.width,ph:p.height,cx:(p.left+p.right)/2,scx:(st.left+st.right)/2}})()")
+    ok('fold mode landscape: one wide sheet fitted to screen, 2-up toggle hidden',s['len']==1 and not s['spread'] and hid and (abs(fit['ph']-fit['sh'])<=2 or abs(fit['pw']-fit['sw'])<=2) and abs(fit['cx']-fit['scx'])<=2,json.dumps([s,fit,hid]))
+    x0,y0,W,H=geo(pg); b4=state(pg)['first']
+    r=pg.evaluate(GEST,{'x':x0+W*0.8,'y':y0+H*0.5,'pts':[[-W*0.04*i,0,30] for i in range(1,8)],'hold':0,'noup':True}); pg.wait_for_timeout(150)
+    fi=pg.evaluate(FOLDINFO); shot(pg,'41-fold-mid-landscape')
+    ok('mid-fold (landscape): hinge at the centre of the wide page',fi['mode']=='fold' and abs(fi['hinge']-fi['center'])<=1.5 and 0.15<fi['p']<0.95,json.dumps(fi))
+    pg.evaluate(UP,[x0+W*0.3,y0+H*0.5]); pg.wait_for_timeout(900); ok('landscape fold completes',state(pg)['first']==b4+1)
+    flicks(pg,'fold landscape')
+    # RTL: hinge mirrored (left half lifts going forward = swipe right)
+    pg.evaluate('__cr.toggleUI(true)'); pg.click('#rRtl'); pg.wait_for_timeout(300); pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(250)
+    b4=state(pg)['first']; r=pg.evaluate(GEST,{'x':x0+W*0.2,'y':y0+H*0.5,'pts':[[W*0.04*i,0,30] for i in range(1,8)],'hold':0,'noup':True}); pg.wait_for_timeout(150)
+    fi=pg.evaluate(FOLDINFO); shot(pg,'42-fold-mid-rtl')
+    ok('RTL fold: left half lifts (hinge mirrored) going forward',fi['mode']=='fold' and fi['origin'].startswith('100%') and abs(fi['hinge']-fi['center'])<=1.5 and f"{b4}L*" in fi['halves'],json.dumps(fi))
+    pg.evaluate(UP,[x0+W*0.8,y0+H*0.5]); pg.wait_for_timeout(900); ok('RTL fold goes forward',state(pg)['first']==b4+1)
+    pg.evaluate('__cr.toggleUI(true)'); pg.click('#rRtl'); pg.wait_for_timeout(300); back(pg)
+    # standard comics are untouched; Edit sheet override
+    open_comic(pg,'Nightfall 03'); ok('portrait-page comic: Auto -> Standard turn',pg.evaluate('__cr.R.fold')==False and state(pg)['spread'],json.dumps(state(pg)))
+    x0,y0,W,H=geo(pg); r=pg.evaluate(GEST,{'x':x0+W*0.85,'y':y0+H*0.5,'pts':[[-W*0.06*i,0,30] for i in range(1,8)],'hold':0,'noup':True}); pg.wait_for_timeout(120)
+    ok('standard comic still uses the spread turn',pg.evaluate('__cr.flip&&__cr.flip.mode')=='spread'); pg.evaluate(UP,[x0+W*0.4,y0+H*0.5]); pg.wait_for_timeout(900); back(pg)
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
+    sheet(pg,'Twin Moon 01','aEdit'); pg.wait_for_selector('#eTurn')
+    ok('Edit sheet: Page turn Auto / Standard / Fold in middle',pg.eval_on_selector_all('#eTurn button','b=>b.map(x=>x.textContent)')==['Auto','Standard','Fold in middle'] and pg.locator('#eTurn button.on').text_content()=='Auto' and 'detected: fold in middle' in pg.inner_text('.fhint'))
+    pg.click('#eTurn [data-v=standard]'); shot(pg,'43-edit-page-turn'); pg.click('#eSave'); pg.wait_for_timeout(300)
+    open_comic(pg,'Twin Moon 01'); ok('Page turn = Standard overrides Auto',pg.evaluate('__cr.R.fold')==False); back(pg)
+    sheet(pg,'Nightfall 05','aEdit'); pg.click('#eTurn [data-v=fold]'); pg.click('#eSave'); pg.wait_for_timeout(300)
+    open_comic(pg,'Nightfall 05'); ok('Page turn = Fold in middle forces fold',pg.evaluate('__cr.R.fold')==True); back(pg)
+    for t in ('Twin Moon 01','Nightfall 05'):
+        sheet(pg,t,'aEdit'); pg.click('#eTurn [data-v=auto]'); pg.click('#eSave'); pg.wait_for_timeout(250)
+    open_comic(pg,'Twin Moon 01'); ok('back to Auto -> fold',pg.evaluate('__cr.R.fold')==True); back(pg)
     if BIG:
         t0=time.time(); open_comic(pg,'Atlas Omnibus'); ok('big PDF opens',True,f'{time.time()-t0:.1f}s, {state(pg)["n"]} pages, {os.path.getsize(T+"/Atlas_Omnibus.pdf")//1048576} MB')
         t0=time.time(); pg.evaluate('__cr.jumpTo(150)'); wait_render(pg,60000); ok('big PDF random-access page 151',state(pg)['first']==150,f'{time.time()-t0:.2f}s')
