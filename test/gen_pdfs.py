@@ -56,6 +56,7 @@ SERIES = {
  'Starlight Ronin':dict(top='#12052a', bot='#7a1f6e', glowc='#ff9ed8', accent='#ff6fb5', title='#ffffff', font='staat', motif='ronin', tag='ONE BLADE. TEN THOUSAND STARS.', jp=True),
  'The Hollow':     dict(top='#0d1210', bot='#4b5a4e', glowc='#f6e7b0', accent='#f2d27a', title='#e9efe6', font='barlowb', motif='forest', tag='SOMETHING IS LISTENING IN THE TREES.', jp=False),
  'Glass Harbor':   dict(top='#04161a', bot='#3e8e8a', glowc='#c8fff4', accent='#7ff0dd', title='#f0fffb', font='anton', motif='sea2', tag='A ONE-SHOT', jp=False),
+ 'Ember Road':     dict(top='#1a0905', bot='#c2412b', glowc='#ffc58a', accent='#ff8a4c', title='#fff1e6', font='anton', motif='sea2', tag='THE LAST CARAVAN HEADS WEST.', jp=False),
  'Atlas Omnibus':  dict(top='#120d05', bot='#8a6a2c', glowc='#ffe7a6', accent='#ffd166', title='#fff8e6', font='bebas', motif='city', tag='THE COMPLETE SAGA', jp=False),
 }
 NAMES = ['M. Okafor','R. Lindqvist','J. Moreau','S. Takeda','A. Varga','L. Castellanos','K. Whitfield','D. Achterberg']
@@ -148,9 +149,16 @@ def interior(c, i, n, series, rnd, img=None):
     c.setFillColor(black); c.setFont('Helvetica-Bold', 30); c.drawCentredString(W/2, 24, f'{i+1} / {n}')
     c.showPage()
 
-def make(fname, series, label, n, seed, big=False):
+def make(fname, series, label, n, seed, big=False, wide=None):
     rnd = random.Random(seed); c = canvas.Canvas(os.path.join(OUT, fname), pagesize=(W, H)); c.setTitle(f'{series} {label}')
-    c.drawImage(cover(series, seed, label, rnd), 0, 0, W, H); c.showPage()
+    if wide is not None:
+        # scanner-style first page: two-page spread, black back cover on the left (tiny legal line), cover on the right,
+        # optional black letterbox bands top/bottom
+        band = wide; c.setPageSize((2*W, H+2*band)); c.setFillColor(black); c.rect(0, 0, 2*W, H+2*band, fill=1, stroke=0)
+        c.setFillColor(HexColor('#5a5a5a')); c.setFont('Helvetica', 6); c.drawCentredString(W/2, band+26, f'{series.upper()} {label} · ALL CHARACTERS FICTIONAL · TEST FIXTURE · PRINTED NOWHERE')
+        c.drawImage(cover(series, seed, label, rnd), W, band, W, H); c.showPage(); c.setPageSize((W, H))
+    else:
+        c.drawImage(cover(series, seed, label, rnd), 0, 0, W, H); c.showPage()
     for i in range(1, n):
         img = None
         if big:
@@ -178,4 +186,6 @@ if __name__ == '__main__':
     for series, count, lab, fn, pages in plan:
         for k in range(1, count+1): seed += 1; make(fn.format(k), series, lab.format(k), pages + (k % 3)*4, seed)
     make('Glass_Harbor.pdf', 'Glass Harbor', 'ONE-SHOT', 40, 99)
+    # wide two-page-spread first pages (black left half) — with/without letterbox bands
+    for k, band in [(1, 70), (2, 0), (3, 110)]: make(f'Ember_Road_{k:02d}.pdf', 'Ember Road', f'#{k}', 28, 60+k, wide=band)
     if '--big' in sys.argv: make('Atlas_Omnibus.pdf', 'Atlas Omnibus', 'COMPLETE', 220, 7, big=True)

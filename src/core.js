@@ -43,8 +43,18 @@ class IDBSource{
     return out.buffer; }
 }
 let sharedWorker=null;
+// WebKit/iPadOS: images on the FIRST pdf.js document of a session may not paint (blank covers / pages). Rendering a tiny
+// built-in PDF (a JPEG + a Flate image + text) once per session warms pdf.js up so real comics render fully.
+const WARM_PDF='JVBERi0xLjMKJZOMi54gUmVwb3J0TGFiIEdlbmVyYXRlZCBQREYgZG9jdW1lbnQgKG9wZW5zb3VyY2UpCjEgMCBvYmoKPDwKL0YxIDIgMCBSCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9CYXNlRm9udCAvSGVsdmV0aWNhIC9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nIC9OYW1lIC9GMSAvU3VidHlwZSAvVHlwZTEgL1R5cGUgL0ZvbnQKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL0JpdHNQZXJDb21wb25lbnQgOCAvQ29sb3JTcGFjZSAvRGV2aWNlUkdCIC9GaWx0ZXIgWyAvQVNDSUk4NURlY29kZSAvRENURGVjb2RlIF0gL0hlaWdodCA4IC9MZW5ndGggNzg4IC9TdWJ0eXBlIC9JbWFnZSAKICAvVHlwZSAvWE9iamVjdCAvV2lkdGggOAo+PgpzdHJlYW0KczRJQTAhIl9hbDhPYFtcITw8KiMhISonInM0W05AISJdTUglTGBbVSVMaW1cJkosVG0tbE5wPCgpU2JOLG9uQnAxSGRpXDFINzxZODZlblQ2cnVmOTMpRkhoPSdvRUxCUDBNJ0VIdU02R1srZm1BLGs5YDZOSWMzJmY7PyMwLGJgXkBtVy5BQHEwIllAcTAiWUBxMCJZQHEwIllAcTAiWUBxMCJZQHEwIllAcTAiWUBxMCJZQHEwIllAcTAiWUBxMCJZQHE1UFMhImZKOiNRUCw0IT9xTEYmSE10RyFXVSg8KnJsOUEiVFxXKSE8RTMkeiEhISEiIVdyUS8icFlEPyQ0SG1QITQ8QDwhV2BCKiFYJlQvIlUici4hIS5LSyFXckUqJkhyZGowZ1EhVzsuMFxSRT4xMFpPZUUlKjZGIj9BO1VPdFoxTGJCViNtcUZhKGA9NTwtNzoyai5QcyJAMmBOZlk2VVhANDduPzNEO2NIYXQ9Jy9VL0BxOS5fQjR1IW9GKilQSkdCZUNaSzducjVMUFVlRVAqOyxxUUMhdSxSXEhSUVY1Qy9oV04qODFbJ2Q/T1xASzJmX28wTzZhMmxCRmRhUV5yZiU4Ui1nPlYmT2pRNU9la2lxQyZvKDJNSHBAbkBYcVoiSjYqcnU/RCE8RTMlITxFMyUhPDwqIiEhISEiIVdyUS8icFlEPyQ0SG1QITQ8Qz0hV2A/KiI5U2MzIlUici4hPFJIRiE8Tj84IjlmcicicWo0ISNAVlRjK3U0XVQnTElxVVosJF9rMUsqXVdAV0tqJygqa2BxLTFNY2cpJmFoTC1uLVcnMkUqVFUzXlo7KDdScCFAOGxKXGg8YGBDKz4lOylTQW5QZGtDMytLPkcnQTFWSEBnZCZLbmJBPU0ySUlbUGEuUSRSJGpEO1VTT2BgVmw2U3BaRXBwR1teV2NXXSMpQSdgUSNzPmFpYCZcZUNFLiVmXCwhPGo1Zj1ha05NMHFvKDJNSHBAbkBYcVojN0wkai1NMSFZR01IISdeSixVNUNJV3FJQlFZfj5lbmRzdHJlYW0KZW5kb2JqCjQgMCBvYmoKPDwKL0JpdHNQZXJDb21wb25lbnQgOCAvQ29sb3JTcGFjZSAvRGV2aWNlUkdCIC9GaWx0ZXIgWyAvQVNDSUk4NURlY29kZSAvRmxhdGVEZWNvZGUgXSAvSGVpZ2h0IDggL0xlbmd0aCAyMCAvU3VidHlwZSAvSW1hZ2UgCiAgL1R5cGUgL1hPYmplY3QgL1dpZHRoIDgKPj4Kc3RyZWFtCkdiITVCVHFPMyomSEhCMzdLRX4+ZW5kc3RyZWFtCmVuZG9iago1IDAgb2JqCjw8Ci9Db250ZW50cyA5IDAgUiAvTWVkaWFCb3ggWyAwIDAgMTYgMTYgXSAvUGFyZW50IDggMCBSIC9SZXNvdXJjZXMgPDwKL0ZvbnQgMSAwIFIgL1Byb2NTZXQgWyAvUERGIC9UZXh0IC9JbWFnZUIgL0ltYWdlQyAvSW1hZ2VJIF0gL1hPYmplY3QgPDwKL0Zvcm1Yb2IuYWI3ZTUzNWE3OWY5MmRhNDZkYzIwOTc4YmRmMzE1NmYgMyAwIFIgL0Zvcm1Yb2IuZTRhZTQxZWUwYzMxMDYzMDg2NmJlZmI0OTdkOGJjOWUgNCAwIFIKPj4KPj4gL1JvdGF0ZSAwIC9UcmFucyA8PAoKPj4gCiAgL1R5cGUgL1BhZ2UKPj4KZW5kb2JqCjYgMCBvYmoKPDwKL1BhZ2VNb2RlIC9Vc2VOb25lIC9QYWdlcyA4IDAgUiAvVHlwZSAvQ2F0YWxvZwo+PgplbmRvYmoKNyAwIG9iago8PAovQXV0aG9yIChhbm9ueW1vdXMpIC9DcmVhdGlvbkRhdGUgKEQ6MjAyNjEwMDMwNjMwMTctMDUnMDAnKSAvQ3JlYXRvciAoYW5vbnltb3VzKSAvS2V5d29yZHMgKCkgL01vZERhdGUgKEQ6MjAyNjEwMDMwNjMwMTctMDUnMDAnKSAvUHJvZHVjZXIgKFJlcG9ydExhYiBQREYgTGlicmFyeSAtIFwob3BlbnNvdXJjZVwpKSAKICAvU3ViamVjdCAodW5zcGVjaWZpZWQpIC9UaXRsZSAodW50aXRsZWQpIC9UcmFwcGVkIC9GYWxzZQo+PgplbmRvYmoKOCAwIG9iago8PAovQ291bnQgMSAvS2lkcyBbIDUgMCBSIF0gL1R5cGUgL1BhZ2VzCj4+CmVuZG9iago5IDAgb2JqCjw8Ci9GaWx0ZXIgWyAvQVNDSUk4NURlY29kZSAvRmxhdGVEZWNvZGUgXSAvTGVuZ3RoIDE5OQo+PgpzdHJlYW0KR2FxS2hdKzJcMyRxOW88YD5zTidgL1U4LE1QKFVqOz9rXTcjR2VBT0wjOGRbKTYsMzRZalteNyQkJD5oMUpQWyhqI2RzUUxUX2lnKSNmUGIoTjNga05icUwxKnA6bEFTNzxBMC4+Jk9qRVJqX0JZZzA1N2NJZU1iVS1WamNCQ1hYRUNcRS83Om1hazs4V2hMcD4tMjs2T2UnVFAtPEwxb29BV2MuNDU2aiYvW1loTDhHRUxIbWgsTyZJcDI6UDU+XGdIKT9+PmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDEwCjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDA2MSAwMDAwMCBuIAowMDAwMDAwMDkyIDAwMDAwIG4gCjAwMDAwMDAxOTkgMDAwMDAgbiAKMDAwMDAwMTE3MSAwMDAwMCBuIAowMDAwMDAxMzc2IDAwMDAwIG4gCjAwMDAwMDE2NzggMDAwMDAgbiAKMDAwMDAwMTc0NiAwMDAwMCBuIAowMDAwMDAyMDA3IDAwMDAwIG4gCjAwMDAwMDIwNjYgMDAwMDAgbiAKdHJhaWxlcgo8PAovSUQgCls8MjE2YmExYTQ1MGQyODg2NDc3Y2NkZmEzYmI4N2ZhOWI+PDIxNmJhMWE0NTBkMjg4NjQ3N2NjZGZhM2JiODdmYTliPl0KJSBSZXBvcnRMYWIgZ2VuZXJhdGVkIFBERiBkb2N1bWVudCAtLSBkaWdlc3QgKG9wZW5zb3VyY2UpCgovSW5mbyA3IDAgUgovUm9vdCA2IDAgUgovU2l6ZSAxMAo+PgpzdGFydHhyZWYKMjM1NQolJUVPRgo=';
+let warmP=null;
+function warmPdf(){ if(!warmP) warmP=(async()=>{ try{ const bin=atob(WARM_PDF), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    const doc=await pdfjsLib.getDocument({data:u8,worker:sharedWorker,isEvalSupported:false,standardFontDataUrl:VENDOR+'standard_fonts/',verbosity:0}).promise;
+    const page=await doc.getPage(1); const c=document.createElement('canvas'); c.width=16; c.height=16;
+    await page.render({canvasContext:c.getContext('2d'),viewport:page.getViewport({scale:1})}).promise; freeCanvas(c); await doc.destroy(); }catch(e){ console.warn('pdf warm-up skipped',e); } })();
+  return warmP; }
 async function openPdf(src){
   if(!sharedWorker) sharedWorker=new pdfjsLib.PDFWorker({name:'cr'});
+  await warmPdf();
   const first=await src.read(0,Math.min(src.size,65536));
   class T extends pdfjsLib.PDFDataRangeTransport{ requestDataRange(a,b){ src.read(a,b).then(buf=>this.onDataRange(a,new Uint8Array(buf))).catch(e=>console.warn('range read failed',e)); } }
   const transport=new T(src.size,new Uint8Array(first));
@@ -63,3 +73,49 @@ async function renderToCanvas(page,maxW,maxH,dpr,maxPx){
 const toBlob=(c,q=.8)=>new Promise(r=>c.toBlob(b=>r(b),'image/jpeg',q));
 const freeCanvas=c=>{ if(c){ c.width=0; c.height=0; } };
 
+
+/* ================= covers: wide-spread detection, half pick, black-margin trim ================= */
+const COVER_V=2;
+// stats of a region of a small RGBA sample: mean luminance, std-dev, share of "ink" (non-near-black/non-near-white) pixels
+function regionStats(d,W,x0,y0,x1,y1){ let n=0,s=0,s2=0,ink=0;
+  for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const i=(y*W+x)*4, l=.299*d[i]+.587*d[i+1]+.114*d[i+2]; n++; s+=l; s2+=l*l; if(l>40&&l<235) ink++; }
+  const m=s/Math.max(1,n); return {mean:m,std:Math.sqrt(Math.max(0,s2/Math.max(1,n)-m*m)),ink:ink/Math.max(1,n)}; }
+const isBlank=st=>(st.mean<45&&st.std<28)||(st.mean>225&&st.std<22)||st.ink<0.04;
+// find near-black bands at the edges of [x0,x1)x[y0,y1) in the sample; returns trimmed box (sample coords)
+function trimBlack(d,W,x0,y0,x1,y1,cols=true){
+  // letterbox = rows/cols that are essentially pure black (scanner bands), not just dark artwork
+  const rowDark=y=>{ let lit=0,sum=0; for(let x=x0;x<x1;x++){ const i=(y*W+x)*4, v=d[i]+d[i+1]+d[i+2]; sum+=v; if(v>3*30) lit++; } return lit/(x1-x0)<0.01&&sum/(x1-x0)<3*9; };
+  const colDark=x=>{ let lit=0,sum=0; for(let y=y0;y<y1;y++){ const i=(y*W+x)*4, v=d[i]+d[i+1]+d[i+2]; sum+=v; if(v>3*30) lit++; } return lit/(y1-y0)<0.01&&sum/(y1-y0)<3*9; };
+  const mh=Math.floor((y1-y0)*0.3), mw=cols?Math.floor((x1-x0)*0.15):0; let t=y0,b=y1,l=x0,r=x1;
+  while(t-y0<mh&&rowDark(t)) t++; while(y1-b<mh&&rowDark(b-1)) b--;
+  while(l-x0<mw&&colDark(l)) l++; while(x1-r<mw&&colDark(r-1)) r--;
+  if((r-l)<(x1-x0)*0.4||(b-t)<(y1-y0)*0.4) return [x0,y0,x1,y1];   // mostly black: don't trim
+  return [l,t,r,b]; }
+// mode: auto | right | left | full.  Returns {cover:ArrayBuffer(jpeg), crop:{mode,side,x,y,w,h} (fractions of page 1)}
+async function makeCover(page,mode='auto'){
+  const vp1=page.getViewport({scale:1}), maybe=vp1.width>vp1.height*0.95;
+  const big=await renderToCanvas(page,maybe?820:420,640,1,maybe?900000:500000);
+  const SW=maybe?128:64, SH=Math.max(8,Math.round(SW*big.height/big.width));
+  const sm=document.createElement('canvas'); sm.width=SW; sm.height=SH; const sx=sm.getContext('2d',{willReadFrequently:true}); try{ big.getContext('2d').getImageData(0,0,1,1); }catch(e){}   // WebKit: force the rendered canvas to flush before copying it
+  sx.drawImage(big,0,0,SW,SH);
+  const d=sx.getImageData(0,0,SW,SH).data; freeCanvas(sm);
+  // "wide" = a two-page spread scan: judged on the content after removing black letterbox bands
+  const [,ty,,by]=trimBlack(d,SW,0,0,SW,SH,false); const wide=maybe&&vp1.width>vp1.height*((by-ty)/SH)*1.15;
+  let side='full';
+  if(mode==='right'||mode==='left') side=mode;
+  else if(mode==='auto'&&wide){ const L=regionStats(d,SW,0,0,SW>>1,SH), Rr=regionStats(d,SW,SW>>1,0,SW,SH);
+    side=(isBlank(Rr)&&!isBlank(L))?'left':'right'; }          // left usually the blank back cover; default right
+  let x0=side==='right'?SW>>1:0, x1=side==='left'?SW>>1:SW;
+  const [l,t,r,b]=trimBlack(d,SW,x0,0,x1,SH,side!=='full');
+  const crop={mode,side,x:l/SW,y:t/SH,w:(r-l)/SW,h:(b-t)/SH};
+  const px=crop.x*big.width, py=crop.y*big.height, pw=crop.w*big.width, ph=crop.h*big.height;
+  const s=Math.min(1,360/pw,540/ph), out=document.createElement('canvas'); out.width=Math.max(1,Math.round(pw*s)); out.height=Math.max(1,Math.round(ph*s));
+  out.getContext('2d',{alpha:false}).drawImage(big,px,py,pw,ph,0,0,out.width,out.height); freeCanvas(big);
+  const cover=await (await toBlob(out,.82)).arrayBuffer(); freeCanvas(out);   // bytes (Blobs in IDB fail in some WebKit modes)
+  return {cover,crop,wide}; }
+// page-1 metadata for a new record; aspect comes from page 2 when page 1 is a wide spread scan
+async function coverMeta(doc,mode='auto'){
+  const page=await doc.getPage(1); const vp=page.getViewport({scale:1}); const cv=await makeCover(page,mode); page.cleanup();
+  let aspect=vp.width/vp.height;
+  if(cv.wide&&doc.numPages>1){ try{ const p2=await doc.getPage(2); const v2=p2.getViewport({scale:1}); aspect=v2.width/v2.height; p2.cleanup(); }catch(e){} }
+  return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect}; }

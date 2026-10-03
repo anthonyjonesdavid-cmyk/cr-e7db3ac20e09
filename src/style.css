@@ -272,3 +272,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .ckt b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ckt small{font-size:12px;color:var(--mut)}
 .ckr.dup .ckt b{color:var(--mut)}
+
+/* edit sheet: cover mode */
+.seg4{display:grid;grid-template-columns:repeat(4,1fr);background:var(--el2);border-radius:9px;padding:2px;gap:2px}
+.seg4 button{height:32px;border-radius:7px;font-size:13px;font-weight:600;color:#ebebf5cc}
+.seg4 button.on{background:#636366;color:#fff}

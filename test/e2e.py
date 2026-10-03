@@ -168,7 +168,7 @@ with sync_playwright() as p:
     ok('now-reading pill shows last comic + %',pg.is_visible('#nowPill') and 'Nightfall 01' in pg.inner_text('#nowPill') and '%' in pg.inner_text('#nowPill'))
     shot(pg,'10-home-portrait')
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=520"); pg.wait_for_timeout(300); shot(pg,'11-home-rows-portrait')
-    sx=pg.evaluate("(()=>{const r=document.querySelectorAll('.row-s')[1]; r.scrollLeft=300; return r.scrollLeft})()"); ok('rows scroll horizontally (free scroll)',sx>0,str(sx))
+    sx=pg.evaluate("(()=>{const r=document.querySelectorAll('.row-s')[0]; r.scrollLeft=300; return r.scrollLeft})()"); ok('rows scroll horizontally (free scroll)',sx>0,str(sx))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
     # carousel: swipe with momentum + snap, mid-swipe, tap side, tap center
     t1=pg.evaluate(CFSWIPE,{'dx':-150,'steps':6,'dt':16,'noup':False}); pos=pg.evaluate('__cr.CF.pos')
@@ -196,7 +196,7 @@ with sync_playwright() as p:
     pg.click('.chip[data-f=all]'); pg.fill('#q','hollow'); pg.wait_for_timeout(100); ok('search filters',pg.locator('.lc').count()==3); pg.fill('#q',''); pg.wait_for_timeout(100)
     pg.click('#sortBtn'); pg.click('.menu button:has-text("Title")'); pg.wait_for_timeout(200)
     ok('A-Z index shown for title sort',pg.is_visible('#azIndex'))
-    first=pg.locator('.lc').first.get_attribute('data-title'); ok('title sort A→Z',first.startswith('Atlas' if BIG else 'Glass'),first)
+    first=pg.locator('.lc').first.get_attribute('data-title'); ok('title sort A→Z',first.startswith('Atlas' if BIG else 'Ember'),first)
     zb=pg.locator('#azIndex span[data-l="T"]').bounding_box(); pg.mouse.click(zb['x']+zb['width']/2,zb['y']+zb['height']/2); pg.wait_for_timeout(300)
     st=pg.evaluate("(()=>{const s=document.querySelector('#libScroll'),t=document.querySelector('#libGrid [data-letter=T]');return [s.scrollTop,Math.min(t.offsetTop-8,s.scrollHeight-s.clientHeight)]})()"); shot(pg,'14-library-az'); ok('A-Z index jumps to letter',st[0]>0 and abs(st[0]-st[1])<=2,str(st))
     pg.click('#sortBtn'); pg.click('.menu button:has-text("Recent")'); pg.wait_for_timeout(100)
@@ -303,6 +303,35 @@ with sync_playwright() as p:
     ok('cancel stops download, cleans partial chunks, skips the rest',r['ok']==0 and sts==['cancel','cancel'] and chunks2==rec['n'] and 'cancelled' in pg.inner_text('#dlHead').lower(),f'{r} {sts} ids={chunks2}')
     shot(pg,'29-drive-cancelled'); pg.click('#dlDone')
     sheet(pg,'Drive Annual','aDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(300)
+
+    # ---- wide two-page-spread first pages: cropped covers, Edit > Cover, migration ----
+    RECS='''(async()=>{const r=indexedDB.open('comic-reader');await new Promise(x=>r.onsuccess=x);const all=await new Promise(x=>{const q=r.result.transaction('comics').objectStore('comics').getAll();q.onsuccess=()=>x(q.result)});
+      const out={}; for(const c of all){ const b=new Blob([c.cover],{type:'image/jpeg'}); const bm=await createImageBitmap(b); out[c.title]={crop:c.coverCrop,mode:c.coverMode,v:c.coverV,aspect:c.aspect,cw:bm.width,ch:bm.height,id:c.id}; bm.close&&bm.close(); } return out;})()'''
+    recs=pg.evaluate(RECS); e1,e2,e3=recs.get('Ember Road 01'),recs.get('Ember Road 02'),recs.get('Ember Road 03')
+    ok('wide first page -> right half used',all(e and e['crop']['side']=='right' for e in (e1,e2,e3)),json.dumps([e and e['crop'] for e in (e1,e2,e3)]))
+    ok('letterbox bands trimmed (top/bottom)',e1['crop']['y']>0.03 and e1['crop']['h']<0.94 and e3['crop']['y']>0.06 and e2['crop']['y']<0.02,json.dumps([e1['crop'],e2['crop'],e3['crop']]))
+    ok('cropped cover thumbnail is portrait (~comic ratio)',all(0.55<e['cw']/e['ch']<0.75 for e in (e1,e2,e3)),json.dumps([(e['cw'],e['ch']) for e in (e1,e2,e3)]))
+    ok('reader page aspect taken from page 2 for wide covers',0.6<e1['aspect']<0.7,str(e1['aspect']))
+    n1=recs['Nightfall 01']; ok('normal portrait cover stays full page',n1['crop']['side']=='full' and n1['crop']['w']>0.95,json.dumps(n1['crop']))
+    # Edit sheet: Cover = Full page, then back to Auto
+    sheet(pg,'Ember Road 01','aEdit'); pg.wait_for_selector('#eCover'); ok('Edit sheet has Cover: Auto / Right half / Left half / Full page',pg.eval_on_selector_all('#eCover button','b=>b.map(x=>x.textContent)')==['Auto','Right half','Left half','Full page'] and pg.locator('#eCover button.on').text_content()=='Auto')
+    pg.click('#eCover [data-v=full]'); shot(pg,'34-edit-cover-mode'); pg.click('#eSave'); pg.wait_for_function("document.querySelector('.toast')&&document.querySelector('.toast').textContent.includes('Cover updated')",timeout=20000)
+    r1=pg.evaluate(RECS)['Ember Road 01']; ok('Cover = Full page regenerates a wide thumbnail',r1['mode']=='full' and r1['crop']['side']=='full' and r1['crop']['w']>0.99 and r1['cw']>r1['ch'],json.dumps(r1))
+    pg.wait_for_timeout(2700); sheet(pg,'Ember Road 01','aEdit'); pg.click('#eCover [data-v=left]'); pg.click('#eSave'); pg.wait_for_function("document.querySelector('.toast')&&document.querySelector('.toast').textContent.includes('Cover updated')",timeout=20000)
+    r1=pg.evaluate(RECS)['Ember Road 01']; ok('Cover = Left half',r1['crop']['side']=='left' and r1['crop']['x']+r1['crop']['w']<=0.5001,json.dumps(r1['crop']))
+    pg.wait_for_timeout(2700); sheet(pg,'Ember Road 01','aEdit'); pg.click('#eCover [data-v=auto]'); pg.click('#eSave'); pg.wait_for_function("document.querySelector('.toast')&&document.querySelector('.toast').textContent.includes('Cover updated')",timeout=20000)
+    r1=pg.evaluate(RECS)['Ember Road 01']; ok('Cover = Auto again -> right half',r1['crop']['side']=='right' and r1['mode']=='auto')
+    # migration: an old-style record (no crop info, coverV<2) is regenerated on next launch
+    pg.evaluate('''(id)=>new Promise(res=>{const r=indexedDB.open('comic-reader');r.onsuccess=()=>{const st=r.result.transaction('comics','readwrite').objectStore('comics');const g=st.get(id);g.onsuccess=()=>{const c=g.result;delete c.coverCrop;delete c.coverV;delete c.coverMode;st.put(c).onsuccess=()=>res(1);};};})''',e3['id'])
+    pg.reload(); pg.wait_for_selector('html[data-ready]')
+    pg.wait_for_function(f'''(async()=>{{const r=indexedDB.open('comic-reader');await new Promise(x=>r.onsuccess=x);const c=await new Promise(x=>{{const q=r.result.transaction('comics').objectStore('comics').get('{e3['id']}');q.onsuccess=()=>x(q.result)}});return c.coverV===2&&c.coverCrop&&c.coverCrop.side==='right'}})()''',timeout=30000,polling=500)
+    ok('old covers re-generated on next launch (migration)',pg.evaluate("localStorage.getItem('cr.coverMig')")=='2')
+    # screenshots: carousel + rows with the cropped wide covers, library grid
+    open_comic(pg,'Ember Road 02'); back(pg); open_comic(pg,'Ember Road 01'); back(pg)
+    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(700); shot(pg,'32-home-wide-covers')
+    pg.evaluate("(()=>{const h=[...document.querySelectorAll('.row-h h2')].find(e=>e.textContent==='Ember Road'); const sc=document.querySelector('#homeScroll'); sc.scrollTop=h.closest('.row').offsetTop-80;})()"); pg.wait_for_timeout(400); shot(pg,'33-home-ember-row')
+    tab(pg,'library'); pg.click('#sortBtn'); pg.click('.menu button:has-text("Title")'); pg.wait_for_timeout(300); pg.evaluate("document.querySelector('#libScroll').scrollTop=0"); pg.wait_for_timeout(300); shot(pg,'35-library-wide-covers')
+    pg.click('#sortBtn'); pg.click('.menu button:has-text("Recent")'); pg.wait_for_timeout(200)
 
     # ---- delete + settings ----
     pg.set_viewport_size({'width':820,'height':1180}); tab(pg,'library'); n0=pg.locator('.lc').count()

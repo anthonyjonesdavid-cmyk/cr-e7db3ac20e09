@@ -173,10 +173,9 @@ const Drive=(()=>{
         const got=await streamToChunks(id,resp,n=>{ r.got=n; r.msg=`${fmtBytes(n)}${r.size?' of '+fmtBytes(r.size):''}`; paint(); },signal);
         r.size=got; r.st='proc'; r.msg='Preparing cover…'; paint(true);
         doc=await openPdf(new IDBSource(id,got));
-        const page=await doc.getPage(1); const vp=page.getViewport({scale:1});
-        const cc=await renderToCanvas(page,360,540,1,400000); const coverBlob=await (await toBlob(cc,.82)).arrayBuffer(); freeCanvas(cc); page.cleanup();
+        const meta=await coverMeta(doc);
         const pages=doc.numPages; await doc.destroy(); doc=null;
-        const t0=titleFromName(r.name); const rec={id,title:t0,series:r.series||seriesGuess(t0),fileName:r.name,size:got,pages,aspect:vp.width/vp.height,cover:coverBlob,added:Date.now()+r.k,lastRead:0,page:0,progress:0,rtl:false,driveId:r.id,source:'drive'};
+        const t0=titleFromName(r.name); const rec={id,title:t0,series:r.series||seriesGuess(t0),fileName:r.name,size:got,pages,...meta,added:Date.now()+r.k,lastRead:0,page:0,progress:0,rtl:false,driveId:r.id,source:'drive'};
         await dbPut(rec); comics.push(rec); ok++; r.st='done'; r.msg=`${pages} pages · ${fmtBytes(got)}`; renderShelf();
       }catch(err){ try{ if(doc) await doc.destroy(); }catch(e){} try{ await dbDelete(id); }catch(e){}
         if(signal.aborted||err.name==='AbortError'){ r.st='cancel'; r.msg='Cancelled'; }

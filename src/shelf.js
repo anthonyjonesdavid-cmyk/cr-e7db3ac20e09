@@ -21,7 +21,17 @@ const byTitle=(a,b)=>a.title.localeCompare(b.title,undefined,{numeric:true,sensi
 function seriesGuess(t){ const s=t.replace(/[([].*?[)\]]/g,' ').replace(/\s+/g,' ').trim();
   const m=s.match(/^(.*?)[\s,_-]*(?:#|no\.?\s*|issue\s*|vol(?:ume)?\.?\s*|v|ch(?:apter)?\.?\s*|book\s*)?(\d{1,4})(?:\s*of\s*\d+)?$/i);
   return m&&m[1].trim().length>=2&&/[a-z]/i.test(m[1])? m[1].replace(/[\s,_#-]+$/,'').trim() : ''; }
-async function loadLibrary(){ comics=await dbAll(); renderShelf(); }
+async function loadLibrary(){ comics=await dbAll(); renderShelf(); setTimeout(migrateCovers,400); }
+/* regenerate a comic's cover thumbnail from its stored PDF (cover mode change, or migration) */
+let coverJob=Promise.resolve();
+function recover(c,mode){ return coverJob=coverJob.then(async()=>{ const doc=await openPdf(new IDBSource(c.id,c.size));
+  try{ const m=await coverMeta(doc,mode||c.coverMode||'auto'); Object.assign(c,m); if(!c.coverMode||mode) c.coverMode=m.coverMode; } finally{ await doc.destroy(); }
+  await dbPut(c); const u=coverURL.get(c.id); if(u){ URL.revokeObjectURL(u); coverURL.delete(c.id); } renderShelf(); }).catch(e=>{ throw e; }); }
+// one-time (per COVER_V) background migration: older imports get cropped covers + crop info
+async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_V); if(!todo.length){ store.set('coverMig',COVER_V); return; }
+  for(const c of todo){ if(!comics.includes(c)) continue; while(R&&R.comic) await new Promise(r=>setTimeout(r,1500));   // don't compete with the reader
+    try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
+  store.set('coverMig',COVER_V); }
 function renderShelf(){ renderHome(); renderLibrary(); renderPill(); setTab(ui.tab); }
 function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); if(t==='home') CF.size(); }
@@ -178,12 +188,15 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   const {r,vals}=await modal(`<div class="mh"><h3>Edit Comic</h3></div><div class="mb">
     <label class="fld"><span>Title</span><input type="text" id="eTitle" value="${esc(c.title)}" maxlength="140"></label>
     <label class="fld"><span>Series</span><input type="text" id="eSeries" value="${esc(c.series||'')}" list="seriesList" placeholder="None" maxlength="80"><datalist id="seriesList">${series.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></label>
+    <div class="fld"><span>Cover</span><div class="seg4" id="eCover" role="radiogroup">${[['auto','Auto'],['right','Right half'],['left','Left half'],['full','Full page']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.coverMode||'auto')===v}" class="${(c.coverMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div></div>
     <label class="tgl"><input type="checkbox" id="eRtl" ${c.rtl?'checked':''}><span>Right-to-left (manga)<small>Reverses page order and swipe direction</small></span></label>
     <div class="mstat">${esc(c.fileName)} · ${fmtBytes(c.size)} · ${c.pages} pages</div>
   </div><div class="mf"><button class="btn ghost" data-r="delete" id="eDelete" style="color:#ff453a">Delete</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="eSave">Save</button></div>`,
-  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked});
+  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v});
+       w.querySelector('#eCover').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll('#eCover button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); });
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; await dbPut(c); renderShelf(); }
+  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; await dbPut(c); renderShelf();
+    if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 async function deleteComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   if(!await confirmBox('Delete Comic?',`“${c.title}” and its stored PDF (${fmtBytes(c.size)}) will be removed from this device. Your original file in Google Drive is not affected.`)) return;
@@ -228,13 +241,13 @@ async function importFiles(files){
     try{
       toast(`Reading ${f.name}${tag}…`,{progress:0,sticky:true});
       doc=await openPdf(new FileSource(f));
-      const page=await doc.getPage(1); const vp=page.getViewport({scale:1});
-      const cc=await renderToCanvas(page,360,540,1,400000); const coverBlob=await (await toBlob(cc,.82)).arrayBuffer();   // stored as bytes (Blobs in IDB fail in some WebKit modes) freeCanvas(cc); page.cleanup();
-      const pages=doc.numPages; await doc.destroy(); doc=null;
+      await doc.getPage(1); await doc.destroy(); doc=null;          // validate before copying
       const n=Math.ceil(f.size/CHUNK);
       for(let i=0;i<n;i++){ const ab=await f.slice(i*CHUNK,Math.min(f.size,(i+1)*CHUNK)).arrayBuffer(); await dbPutChunk(id,i,ab);
         toast(`Saving ${f.name}${tag}…`,{progress:(i+1)/n,sticky:true}); }
-      const t0=titleFromName(f.name); const rec={id,title:t0,series:seriesGuess(t0),fileName:f.name,size:f.size,pages,aspect:vp.width/vp.height,cover:coverBlob,added:Date.now()+k,lastRead:0,page:0,progress:0,rtl:false};
+      doc=await openPdf(new IDBSource(id,f.size));                    // cover from the stored copy (same path as Drive import/migration)
+      const meta=await coverMeta(doc); const pages=doc.numPages; await doc.destroy(); doc=null;
+      const t0=titleFromName(f.name); const rec={id,title:t0,series:seriesGuess(t0),fileName:f.name,size:f.size,pages,...meta,added:Date.now()+k,lastRead:0,page:0,progress:0,rtl:false};
       await dbPut(rec); comics.push(rec); ok++; renderShelf();
     }catch(err){ console.warn('import failed',err); try{ if(doc) await doc.destroy(); }catch(e){} try{ await dbDelete(id); }catch(e){}
       const quota=err&&(err.name==='QuotaExceededError'||/quota/i.test(err.message||''));
