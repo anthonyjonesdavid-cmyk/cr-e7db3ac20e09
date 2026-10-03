@@ -44,8 +44,12 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
   store.set('coverMig',COVER_V); }
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
 function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
-  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); if(t==='home') CF.size(); else SCF.size(); }
-$('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setTab(b.dataset.tab); });
+  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); scopeUI(); if(t==='home') CF.size(); else SCF.size(); }
+// series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
+function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
+function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
+$('#libBack').addEventListener('click',unscope);
+$('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.tab==='library'&&ui.series!=null){ ui.series=null; renderLibrary(); } setTab(b.dataset.tab); });
 
 const coverBox=c=>`<div class="cvr"><img src="${cover(c)}" alt="" decoding="async" loading="lazy" draggable="false">${isDone(c)?`<span class="done" aria-label="Finished">${IC.check}</span>`:''}</div>${inProg(c)?`<div class="pl"><i style="width:${Math.max(2,pctOf(c))}%"></i></div>`:'<div class="pl none"></div>'}`;
 const emptyHTML=()=>`<div class="empty">${IC.book}<h2>No comics yet</h2><p>Import PDF comics from Google Drive or the Files app. They're stored on this device only and never uploaded.</p><div class="ebtns"><button class="pillbtn" data-act="drive">From Google Drive</button><button class="pillbtn ghost" data-act="import">From Files</button></div></div>`;
@@ -156,9 +160,9 @@ function libList(){ const q=ui.q.trim().toLowerCase(); let L=comics.filter(c=>(u
   else L.sort((a,b)=>(b.lastRead||0)-(a.lastRead||0)||b.added-a.added);
   return L; }
 const letterOf=t=>{ const ch=(t||'').trim().charAt(0).toUpperCase(); return /[A-Z]/.test(ch)?ch:'#'; };
-function renderLibrary(){
+function renderLibrary(){ scopeUI();
   $('#sortLbl').textContent=SORTS[ui.sort];
-  $('#chips').innerHTML=(ui.series!=null?`<button class="chip scope" data-act="unscope" aria-label="Clear series">${IC.x}${esc(ui.series||'No series')}</button>`+(ui.series?`<button class="chip" id="seriesEdit" data-act="srename" data-series="${esc(ui.series)}">${IC.edit}Rename Series</button><button class="chip" id="seriesMerge" data-act="smerge" data-series="${esc(ui.series)}">${IC.merge}Merge…</button>`:''):'')+FILTERS.map(([k,l])=>`<button class="chip${ui.filter===k?' on':''}" data-act="filter" data-f="${k}">${l}</button>`).join('');
+  $('#chips').innerHTML=''+FILTERS.map(([k,l])=>`<button class="chip${ui.filter===k?' on':''}" data-act="filter" data-f="${k}">${l}</button>`).join('');
   const grid=$('#libGrid'), az=$('#azIndex');
   if(!comics.length){ grid.innerHTML=''; grid.style.display='none'; renderSeriesHero(); if(!$('#libScroll .empty')) $('#libScroll').insertAdjacentHTML('beforeend',emptyHTML()); az.classList.add('hidden'); $('#library .libbar').classList.add('hidden'); return; }
   $('#library .libbar').classList.remove('hidden'); $('#libScroll .empty')?.remove(); grid.style.display='';
@@ -203,7 +207,7 @@ shelfEl.addEventListener('contextmenu',e=>{ const t=lpTarget(e); e.preventDefaul
 shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefault(); e.stopPropagation(); return; }
   const a=e.target.closest('[data-act]'); if(!a) return; const k=a.dataset.act;
   if(k==='open') openReader(a.dataset.id); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
-  else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope'){ ui.series=null; renderLibrary(); }
+  else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope') unscope();
   else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
   else if(k==='import') $('#fileIn').click(); else if(k==='drive') Drive.start(); },true);
 $('#fileIn').addEventListener('change',e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) importFiles(fs); });

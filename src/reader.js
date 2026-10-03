@@ -9,6 +9,7 @@ const cache=new Map(); let cachePx=0;
 function cacheGet(k){ const e=cache.get(k); if(e){ cache.delete(k); cache.set(k,e); } return e; }
 function cachePut(k,e){ if(cache.has(k)){ freeCanvas(e.canvas); return cache.get(k); } cache.set(k,e); cachePx+=e.px;
   while(cachePx>CACHE_BUDGET&&cache.size>1){ const [ok,oe]=cache.entries().next().value; if(ok===k) break; cache.delete(ok); cachePx-=oe.px; freeCanvas(oe.canvas); } return e; }
+function cacheAny(i){ const pre=i+'|'; let best=null; for(const [k,e] of cache) if(k.startsWith(pre)&&(!best||e.px>best.px)) best=e; return best; }
 function cacheClear(){ cache.forEach(e=>freeCanvas(e.canvas)); cache.clear(); cachePx=0; }
 
 /* ---- priority job queue: one pdf.js render at a time, nearest pages first ---- */
@@ -26,9 +27,11 @@ function dropJobs(pred){ for(const [k,j] of jobs) if(!j.started&&pred(j)){ jobs.
 
 const keyFor=(i,w,h)=>`${i}|${Math.round(w*DPR)}x${Math.round(h*DPR)}`;
 let aspectT=0;
-function noteAspect(i,a){ const old=R.aspects[i]; R.aspects[i]=a; if(R.half&&old&&(old>WIDE)!==(a>WIDE)&&i>0){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) relayout(true); },30); return; } if(old&&Math.abs(old-a)/a>0.03&&R.viewEl&&pagesOf(R.views[R.vi]).includes(i)){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) renderView(); },30); } }
+function noteAspect(i,a){ const old=R.aspects[i]; R.aspects[i]=a; if(i>0&&!R.comic.pageAspect&&a>0.3&&a<1.15){ R.comic.pageAspect=a; /* persisted with the next position save: no extra DB write mid-gesture */ if(R.spread){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) renderView(); },30); return; } }
+  if(R.spread) return;   // spread geometry doesn't depend on individual page shapes
+  if(R.half&&old&&(old>WIDE)!==(a>WIDE)&&i>0){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) relayout(true); },30); return; } if(old&&Math.abs(old-a)/a>0.03&&R.viewEl&&pagesOf(R.views[R.vi]).includes(i)){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) renderView(); },30); } }
 function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key); if(e) return Promise.resolve(e); const doc=R.doc;
-  return enqueue(key,'page',i,prio,async()=>{ const page=await doc.getPage(i+1); const vp=page.getViewport({scale:1}); noteAspect(i,vp.width/vp.height);
+  return enqueue(key,'page',i,prio,async()=>{ if(window.__crSlow) await new Promise(r=>setTimeout(r,window.__crSlow)); const page=await doc.getPage(i+1); const vp=page.getViewport({scale:1}); noteAspect(i,vp.width/vp.height);
     const c=await renderToCanvas(page,w,h,DPR,BASE_MAX_PX); page.cleanup(); return cachePut(key,{canvas:c,px:c.width*c.height}); }); }
 
 /* ---- views: single pages, or spreads with the cover alone ---- */
@@ -51,9 +54,12 @@ function viewOfPage(p,h){ if(R.spread) return p<=0?0:Math.floor((p-1)/2)+1; if(!
   if(first>=0) return first; let k=0; while(k<R.views.length-1&&R.views[k+1][0]<=p) k++; return k; }
 const visualPages=v=>v.length===1?v:(R.rtl?[v[1],v[0]]:[v[0],v[1]]);   // [left slot, right slot]
 function aspectOf(v,h){ let a=0; pagesOf(v).forEach(p=>{ a=Math.max(a,R.aspects[p]||0); }); a=a||R.comic.aspect||0.66; return h?a/2:a; }
-function geom(v,h){ const W=stage.clientWidth,H=stage.clientHeight, ar=aspectOf(v,h===undefined?halfOf(R.views.indexOf(v)):h);
+function geom(v,h){ const W=stage.clientWidth,H=stage.clientHeight, ar=v.length===2?spreadAR():aspectOf(v,h===undefined?halfOf(R.views.indexOf(v)):h);
   if(v.length===2){ const sw=Math.floor(Math.min(W/2,H*ar)), sh=Math.floor(sw/ar), x0=Math.round((W-2*sw)/2), y0=Math.round((H-sh)/2); return [{x:x0,y:y0,w:sw,h:sh},{x:x0+sw,y:y0,w:sw,h:sh}]; }
   const sw=Math.floor(Math.min(W,H*ar)), sh=Math.floor(sw/ar); return [{x:Math.round((W-sw)/2),y:Math.round((H-sh)/2),w:sw,h:sh}]; }
+// one page box for every 2-up spread (the comic's interior page shape, learned once from the first interior page and remembered):
+// per-spread boxes made neighbouring spreads differ in size, so the page drawn during a turn was a different render from the settled page -> blank flash
+const spreadAR=()=>R.comic.pageAspect||R.comic.aspect||0.66;
 const isLandscape=()=>stage.clientWidth>stage.clientHeight*1.05;
 const wantSpread=()=>isLandscape()&&stage.clientWidth>=560&&!store.get('singleLandscape',false)&&R.n>1&&!R.fold;
 const wantHalf=()=>R.fold&&!isLandscape()&&(R.comic.foldPortrait||'half')==='half';   // fold comics in portrait: one half at a time   // fold-in-middle comics: one wide page at a time
@@ -68,8 +74,9 @@ function copyOf(ent){ const c=document.createElement('canvas'); c.width=ent.canv
 function fillPage(d,i,w,h,align,prio,half){ Object.assign(d.dataset,{p:i,w,h,a:align}); if(half) d.dataset.half=half; else delete d.dataset.half; const fw=half?w*2:w;
   const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas,.phn').forEach(x=>x.remove()); const c=half?halfCopy(ent,half):copyOf(ent); placeCanvas(c,w,h,align); d.prepend(c); };
   const e=cacheGet(keyFor(i,fw,h)); if(e){ show(e); return; }
-  d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i+1; d.prepend(ph);
-  requestPage(i,fw,h,prio).then(ent=>{ if(d.isConnected&&d.dataset.p==String(i)&&!d.dataset.hi) show(ent); }).catch(()=>{}); }
+  const any=cacheAny(i); if(any){ show(any); d.dataset.interim='1'; }
+  else { d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i+1; d.prepend(ph); }
+  requestPage(i,fw,h,prio).then(ent=>{ if(d.isConnected&&d.dataset.p==String(i)&&!d.dataset.hi){ show(ent); delete d.dataset.interim; } }).catch(()=>{}); }
 function pageEl(i,r,align,cls,half){ const d=document.createElement('div'); d.className=cls||'pg'; d.style.width=r.w+'px'; d.style.height=r.h+'px';
   if(i==null) d.classList.add('blank'); else fillPage(d,i,r.w,r.h,align,0,half); return d; }
 
@@ -128,15 +135,19 @@ let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayo
 /* ================= Flip engine: real 3D page turn, finger-tracked, with shading ================= */
 function face(i,r,align,extra,half){ const d=pageEl(i,r,align,'face'+(extra?' '+extra:''),half); const s=document.createElement('div'); s.className='shade'; d.appendChild(s); d._s=s; return d; }
 // fold-in-middle: one half of a wide page (the bitmap is the full page's cached render; only that half is copied)
-function halfFace(i,full,half,extra){ const lw=Math.floor(full.w/2), r={x:half==='R'?full.x+lw:full.x,y:full.y,w:half==='R'?full.w-lw:lw,h:full.h};
+function halfFace(i,full,half,extra){
+  // the halves meet on a whole device pixel at the sheet's spine with each canvas placed exactly in face coords: no sub-pixel offset can leave a background column at the spine
+  const dpr=window.devicePixelRatio||1, snap=v=>Math.round(v*dpr)/dpr, sp=snap(full.x+full.w/2), O=0;   // all faces meet exactly at the snapped spine (an overlap strip would show the other half's spine shading)
+  const r=half==='R'?{x:sp-O,y:full.y,w:full.x+full.w-(sp-O),h:full.h}:{x:full.x,y:full.y,w:sp+O-full.x,h:full.h};
   const d=document.createElement('div'); d.className='face half'+(extra?' '+extra:''); d.style.width=r.w+'px'; d.style.height=r.h+'px'; d._r=r; d.dataset.p=i; d.dataset.half=half;
   const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas').forEach(x=>x.remove());
-    const sw=ent.canvas.width, sh=ent.canvas.height, hw=Math.ceil(sw/2), c=document.createElement('canvas'); c.width=hw; c.height=sh;
-    c.getContext('2d',{alpha:false}).drawImage(ent.canvas,half==='R'?sw-hw:0,0,hw,sh,0,0,hw,sh);
-    const ar=sw/sh; let cw=full.w,ch=full.w/ar; if(ch>full.h){ ch=full.h; cw=full.h*ar; } const css=cw*hw/sw;
-    c.style.width=css+'px'; c.style.height=ch+'px'; c.style.top=((full.h-ch)/2)+'px'; c.style.left=(half==='R'?(full.w/2-lw):(full.w/2-css))+'px'; d.prepend(c); };
+    const sw=ent.canvas.width, sh=ent.canvas.height, ar=sw/sh; let cw=full.w,ch=full.w/ar; if(ch>full.h){ ch=full.h; cw=full.h*ar; }
+    const ix=full.x+(full.w-cw)/2, k=sw/cw;                               // sheet image's left edge (page coords) and source px per CSS px
+    const x0=Math.max(0,Math.floor((r.x-ix)*k)), x1=Math.min(sw,Math.ceil((r.x+r.w-ix)*k)); if(x1<=x0) return;
+    const c=document.createElement('canvas'); c.width=x1-x0; c.height=sh; c.getContext('2d',{alpha:false}).drawImage(ent.canvas,x0,0,x1-x0,sh,0,0,x1-x0,sh);
+    c.style.width=((x1-x0)/k)+'px'; c.style.height=ch+'px'; c.style.top=((full.h-ch)/2)+'px'; c.style.left=(ix+x0/k-r.x)+'px'; d.prepend(c); };
   if(i==null) d.classList.add('blank');
-  else { const e=cacheGet(keyFor(i,full.w,full.h)); if(e) show(e); else { d.classList.add('loading'); requestPage(i,full.w,full.h,0).then(ent=>{ if(d.isConnected) show(ent); }).catch(()=>{}); } }
+  else { const e=cacheGet(keyFor(i,full.w,full.h)); if(e) show(e); else { const any=cacheAny(i); if(any) show(any); else d.classList.add('loading'); requestPage(i,full.w,full.h,0).then(ent=>{ if(d.isConnected) show(ent); }).catch(()=>{}); } }
   const s=document.createElement('div'); s.className='shade'; d.appendChild(s); d._s=s; return d; }
 function place(d,r){ d.style.left=r.x+'px'; d.style.top=r.y+'px'; d.style.width=r.w+'px'; d.style.height=r.h+'px'; }
 const grad=(deg,a,b)=>`linear-gradient(${deg}deg,rgba(0,0,0,${a}),rgba(0,0,0,${b}))`;
@@ -144,7 +155,8 @@ const grad=(deg,a,b)=>`linear-gradient(${deg}deg,rgba(0,0,0,${a}),rgba(0,0,0,${b
 function startFlip(vdir){
   if(flip||animating||!R.viewEl||Z.s>1.01) return false;
   const fwd=R.rtl?vdir>0:vdir<0, t=R.vi+(fwd?1:-1); if(t<0||t>=R.views.length) return false;
-  const cv=R.views[R.vi], tv=R.views[t], W=stage.clientWidth;
+  dropLanding(); const cv=R.views[R.vi], tv=R.views[t], W=stage.clientWidth;
+  { const th=halfOf(t), gt=geom(tv,th); visualPages(tv).forEach((p,j)=>{ if(p!=null) requestPage(p,th?gt[j].w*2:gt[j].w,gt[j].h,0).catch(()=>{}); }); }   // destination at top priority
   const wrap=document.createElement('div'); wrap.className='flip';
   const flipper=document.createElement('div'); flipper.className='flipper';
   let front,back,under=[],covered=null,angle,frontR,spine;
@@ -199,16 +211,22 @@ function startFlip(vdir){
     if(covered) covered._s.style.opacity=p>.5?Math.sin((p-.5)*2*Math.PI)*.5:0; }};
   flip.setP(0); return true;
 }
+let landing=null;   // overlay kept on screen until the settled view below it has painted
+function dropLanding(){ if(!landing) return; cancelAnimationFrame(landing.raf); clearTimeout(landing.to); landing.wrap.remove(); landing=null; }
 function finishFlip(complete){ if(!flip) return; const f=flip; flip=null;
-  if(complete){ R.vi=f.t; renderView(); } else if(R.viewEl) R.viewEl.style.visibility='';
-  f.wrap.remove(); }
+  if(!complete){ if(R.viewEl) R.viewEl.style.visibility=''; f.wrap.remove(); return; }
+  dropLanding(); R.vi=f.t; renderView(); const view=R.viewEl, L=landing={wrap:f.wrap,raf:0,to:0};
+  const painted=()=>!view.querySelector('.pg.loading');
+  const swap=()=>{ if(landing!==L) return; let n=0; const tick=()=>{ if(landing!==L) return; if(++n<2){ L.raf=requestAnimationFrame(tick); return; } dropLanding(); };   // 2 frames: let WebKit composite the new canvases first
+    L.raf=requestAnimationFrame(tick); };
+  if(painted()) swap(); else { const t0=performance.now(); const poll=()=>{ if(landing!==L) return; if(painted()||performance.now()-t0>2500) swap(); else L.raf=requestAnimationFrame(poll); }; L.raf=requestAnimationFrame(poll); } }
 const easeInOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2, easeOut=t=>1-Math.pow(1-t,3);
 function animateP(from,to,dur,ease,done){ animating=true; const t0=performance.now(); let raf=0, over=false;
   const end=()=>{ if(over) return; over=true; cancelAnimationFrame(raf); anim=null; if(flip) flip.setP(to); animating=false; done&&done(); };
   const step=now=>{ if(over) return; if(!flip){ over=true; anim=null; animating=false; return; } const k=Math.min(1,Math.max(0,(now-t0)/dur)); flip.setP(from+(to-from)*ease(k)); if(k<1) raf=requestAnimationFrame(step); else end(); };
   anim={end}; raf=requestAnimationFrame(step); }
 const fastForward=()=>{ if(anim) anim.end(); };
-function cancelFlipNow(){ if(anim) anim.end(); if(flip) finishFlip(false); animating=false; drag=null; }
+function cancelFlipNow(){ if(anim) anim.end(); if(flip) finishFlip(false); dropLanding(); animating=false; drag=null; }
 function go(vdir,dur=620){ if(!R.doc||Z.s>1.01) return; if(animating) fastForward(); if(flip) return;
   if(startFlip(vdir)) animateP(0,1,dur,easeInOut,()=>finishFlip(true)); else bounce(vdir); }
 function bounce(vdir){ if(!R.viewEl||!R.viewEl.animate) return; R.viewEl.animate([{transform:'none'},{transform:`translateX(${vdir*14}px)`},{transform:'none'}],{duration:300,easing:'ease-out'}); }

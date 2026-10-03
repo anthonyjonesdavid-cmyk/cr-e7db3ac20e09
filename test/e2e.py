@@ -260,7 +260,20 @@ with sync_playwright() as p:
     st=pg.evaluate("(()=>{const s=document.querySelector('#libScroll'),t=document.querySelector('#libGrid [data-letter=T]');return [s.scrollTop,Math.min(t.offsetTop-8,s.scrollHeight-s.clientHeight)]})()"); shot(pg,'14-library-az'); ok('A-Z index jumps to letter',st[0]>0 and abs(st[0]-st[1])<=2,str(st))
     pg.click('#sortBtn'); pg.click('.menu button:has-text("Recent")'); pg.wait_for_timeout(100)
     tab(pg,'home'); pg.locator('.row-h',has_text='The Hollow').click(); pg.wait_for_timeout(300)
-    ok('series heading opens series grid',pg.locator('.lc').count()==3 and pg.locator('.chip.scope').count()==1); pg.click('.chip.scope'); pg.wait_for_timeout(100)
+    ok('series heading opens series grid',pg.locator('.lc').count()==3 and pg.evaluate("document.querySelector('#shelf').classList.contains('scoped')"))
+    cl=pg.evaluate('''(()=>{const vis=s=>{const e=document.querySelector(s); return !!e&&e.getClientRects().length>0&&getComputedStyle(e).display!=='none';};
+      const tb=document.querySelector('.topbar').getBoundingClientRect(), h=document.querySelector('#seriesHero .hero'), g=document.querySelector('#libGrid').getBoundingClientRect();
+      return {search:vis('#q'),sort:vis('#sortBtn'),chips:vis('#chips'),scope:!!document.querySelector('.chip.scope'),rename:!!document.querySelector('#seriesEdit'),merge:!!document.querySelector('#seriesMerge'),
+        filters:[...document.querySelectorAll('#chips [data-act=filter]')].some(e=>e.getClientRects().length>0),back:vis('#libBack'),gear:vis('#settingsBtn'),seg:vis('#tabs'),plus:vis('#importBtn'),
+        heroTop:h?Math.round(h.getBoundingClientRect().top):-1,tbBottom:Math.round(tb.bottom),gridBelow:h?g.top>=h.getBoundingClientRect().bottom-1:false,az:vis('#azIndex')}})()''')
+    ok('series page: no search / sort / series chip / Rename / Merge / filter chips',not any(cl[k] for k in ('search','sort','chips','scope','rename','merge','filters','az')),json.dumps(cl))
+    ok('series page: top bar keeps Home/Library + "+", back chevron replaces the gear',cl['seg'] and cl['plus'] and cl['back'] and not cl['gear'],json.dumps(cl))
+    ok('series page: carousel sits right under the top bar, grid below',abs(cl['heroTop']-cl['tbBottom'])<=1 and cl['gridBelow'],json.dumps(cl))
+    shot(pg,'59-series-page-clean')
+    pg.click('#libBack'); pg.wait_for_timeout(200)
+    ok('back chevron returns to the full Library (search/sort/filters back, gear back)',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q') and pg.is_visible('#sortBtn') and pg.locator('#chips [data-act=filter]').count()==4 and pg.is_visible('#settingsBtn') and not pg.is_visible('#libBack') and pg.locator('#scf').count()==0)
+    tab(pg,'home'); pg.locator('.row-h',has_text='The Hollow').click(); pg.wait_for_timeout(300); tab(pg,'library'); pg.wait_for_timeout(200)
+    ok('Library tab from a series page shows the full Library',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q'))
     tab(pg,'home'); pg.locator('.row').first.locator('.seeall').click(); pg.wait_for_timeout(300); ok('See all opens library',pg.is_visible('#libGrid') and pg.locator('.lc').count()==len(FILES))
 
     # ---- landscape ----
@@ -393,6 +406,52 @@ with sync_playwright() as p:
         if t=='Twin Moon 01': pg.click('#eFoldP [data-v=half]')
         pg.click('#eSave'); pg.wait_for_timeout(250)
     open_comic(pg,'Twin Moon 01'); ok('back to Auto -> fold',pg.evaluate('__cr.R.fold')==True); ok('back to Half pages in portrait',pg.evaluate('__cr.R.half')==True); back(pg)
+    # ---- REGRESSION: no flicker after a turn lands (landscape 2-up + fold, after portrait halves + rotation, normal + slow renders) ----
+    STAB="""async ({ms,go})=>{ const R=__cr.R; const out={frames:0,blank:0,changes:0,overlay:0,seq:[]}; let last=null; const t0=performance.now();
+      if(go) __cr.go(go);
+      await new Promise(res=>{ const tick=()=>{ const ov=document.querySelector('.flip'); const v=R.viewEl, vis=v&&v.style.visibility!=='hidden';
+        const pg=v?[...v.querySelectorAll('.pg')].map(e=>e.dataset.p||'-').join(','):'';
+        const unpainted=v?[...v.querySelectorAll('.pg:not(.blank)')].some(e=>!e.querySelector('canvas')):true;
+        if(!ov&&(!vis||unpainted)) out.blank++; if(ov) out.overlay++;
+        if(!ov){ if(last!==null&&pg!==last){ out.changes++; out.seq.push(pg); } last=pg; }
+        out.frames++; if(performance.now()-t0<ms) requestAnimationFrame(tick); else res(); }; requestAnimationFrame(tick); });
+      out.final=last; return out; }"""
+    LANDCHK="""async ()=>{ const R=__cr.R; __cr.go(-1,2400); const tgt=new Set(); const t=R.vi+1;
+      await new Promise(res=>{ const tick=()=>{ const f=__cr.flip; if(f&&f.p>0.97){ res(); return; } requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+      const tv=R.views[__cr.flip.t].filter(x=>x!=null).map(String);
+      const faces=[...document.querySelectorAll('.flip .face')].filter(e=>tv.includes(e.dataset.p)&&!e.classList.contains('front')).map(e=>{ const c=e.querySelector('canvas'); const r=e.getBoundingClientRect(); return {p:e.dataset.p,back:e.classList.contains('back'),half:e.classList.contains('half'),cw:c&&c.width,ch:c&&c.height,x:Math.round(r.left),w:Math.round(r.width),h:Math.round(r.height)}; });
+      await new Promise(res=>{ const tick=()=>{ if(!__cr.flip&&!document.querySelector('.flip')){ res(); return; } requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+      const view=[...R.viewEl.querySelectorAll('.pg')].map(e=>{ const c=e.querySelector('canvas'); const r=e.getBoundingClientRect(); return {p:e.dataset.p,cw:c&&c.width,ch:c&&c.height,x:Math.round(r.left),w:Math.round(r.width),h:Math.round(r.height)}; });
+      return {faces,view}; }"""
+    def stable(tag,expect_overlay=True,slow=0):
+        if slow: pg.evaluate(f'window.__crSlow={slow}')
+        r=pg.evaluate(STAB,{'ms':3000,'go':-1})
+        if slow: pg.evaluate('window.__crSlow=0')
+        ok(f'{tag}: no blank/flash frame after the turn lands, page stays put for 3s',r['blank']==0 and r['changes']==0 and r['frames']>60 and (r['overlay']>=1 or not expect_overlay),json.dumps({k:r[k] for k in ('frames','blank','changes','overlay','final','seq')}))
+        return r
+    def same_render(tag):
+        r=pg.evaluate(LANDCHK); v={x['p']:x for x in r['view']}
+        good=bool(r['faces']) and all(f['p'] in v and (f['cw']==v[f['p']]['cw'] or (f['half'] and abs(2*f['cw']-v[f['p']]['cw'])<=1)) and f['ch']==v[f['p']]['ch'] and (f['back'] or f['half'] or (abs(f['x']-v[f['p']]['x'])<=1 and abs(f['w']-v[f['p']]['w'])<=1 and abs(f['h']-v[f['p']]['h'])<=1)) for f in r['faces'])
+        ok(f'{tag}: last frame of the turn uses the same render + position as the settled page',good,json.dumps(r))
+    pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(400)
+    open_comic(pg,'Nightfall 04'); pg.evaluate('__cr.jumpTo(5)'); wait_render(pg); pg.wait_for_timeout(600)
+    ok('landscape standard comic is 2-up',state(pg)['spread'] and state(pg)['len']==2)
+    for k in range(3): stable(f'2-up landscape turn {k+1}')
+    same_render('2-up landscape')
+    sp=pg.evaluate("(()=>{const g=__cr.R.views.slice(1,6).map(v=>[...document.querySelectorAll('.view .pg')].length); const s=new Set([...document.querySelectorAll('.view .pg')].map(e=>e.style.width+'x'+e.style.height)); return [...s]})()")
+    ok('2-up: both pages of a spread share one box size',len(sp)==1,str(sp))
+    pg.evaluate('__cr.jumpTo(20)'); pg.wait_for_timeout(150); stable('2-up landscape turn with slow renders (500ms) just after a jump',slow=500)
+    pg.wait_for_timeout(2500); back(pg)
+    # fold comic: portrait halves first, rotate, then landscape turns
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300); open_comic(pg,'Twin Moon 01'); pg.evaluate('__cr.jumpTo(3)'); wait_render(pg); pg.wait_for_timeout(500)
+    stable('portrait half-page turn')
+    pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(700); wait_render(pg)
+    for k in range(2): stable(f'fold landscape turn after rotating {k+1}')
+    same_render('fold landscape')
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(700); wait_render(pg); pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(700); wait_render(pg)
+    stable('fold landscape turn after rotating twice')
+    stable('fold landscape turn with slow renders (500ms)',slow=500); pg.wait_for_timeout(2500)
+    back(pg); pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
     if BIG:
         t0=time.time(); open_comic(pg,'Atlas Omnibus'); ok('big PDF opens',True,f'{time.time()-t0:.1f}s, {state(pg)["n"]} pages, {os.path.getsize(T+"/Atlas_Omnibus.pdf")//1048576} MB')
         t0=time.time(); pg.evaluate('__cr.jumpTo(150)'); wait_render(pg,60000); ok('big PDF random-access page 151',state(pg)['first']==150,f'{time.time()-t0:.2f}s')
@@ -508,12 +567,12 @@ with sync_playwright() as p:
     heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
     ok('rename series from Home row …',('Ember Trail' in heads) and ('Ember Road' not in heads) and dict(pg.evaluate('__cr.series.counts()')).get('Ember Trail')==3,str(heads))
     pg.locator('.row-h[data-series="Ember Trail"]').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
-    ok('long-press / context menu on series heading opens series menu',pg.locator('#smRename').count()==1); pg.keyboard.press('Escape'); pg.evaluate("document.querySelector('.menu')?.remove()")
-    pg.click('.row-h[data-series="Ember Trail"]'); pg.wait_for_selector('#seriesEdit'); shot(pg,'52-series-grid-rename')
-    pg.click('#seriesEdit'); pg.wait_for_selector('#srName'); pg.fill('#srName','iron tide'); pg.click('#srSave'); pg.wait_for_timeout(500)
+    ok('long-press / context menu on series heading opens series menu',pg.locator('#smRename').count()==1); pg.click('#smRename'); pg.wait_for_selector('#srName'); shot(pg,'52-series-rename')
+    pg.fill('#srName','iron tide'); pg.click('#srSave'); pg.wait_for_timeout(500)
     cnt=dict(pg.evaluate('__cr.series.counts()'))
     ok('renaming onto an existing name merges (case-insensitive)',cnt.get('Iron Tide')==7 and 'Ember Trail' not in cnt and 'iron tide' not in cnt,str(cnt))
-    ok('series grid follows the merged series',pg.inner_text('.chip.scope').strip()=='Iron Tide' and pg.locator('.lc').count()==7)
+    pg.wait_for_timeout(300); pg.click('.row-h[data-series="Iron Tide"]'); pg.wait_for_timeout(400)
+    ok('merged series page shows all 7',pg.locator('.lc').count()==7 and pg.evaluate("document.querySelector('#shelf').classList.contains('scoped')"))
     tl=pg.evaluate("[...document.querySelectorAll('#libGrid .lc')].map(e=>e.dataset.title)")
     ok('merged series sorted by issue number, then title',tl==['Ember Road 01','Iron Tide 01','Ember Road 02','Iron Tide 02','Ember Road 03','Iron Tide 03','Iron Tide 04'],str(tl))
     # ---- series page carousel (same style as Home), strictly by issue number ----
@@ -527,10 +586,10 @@ with sync_playwright() as p:
     shot(pg,'58-series-carousel')
     cb=pg.locator('#scf .cf-item[data-i="0"]').bounding_box(); pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tapping the centred series cover opens it',pg.text_content('#rTitle')=='Ember Road 01'); back(pg); pg.wait_for_timeout(300)
-    ok('back from reader: still on the series page with its carousel',pg.locator('#scf').count()==1 and pg.inner_text('.chip.scope').strip()=='Iron Tide')
+    ok('back from reader: still on the series page with its carousel',pg.locator('#scf').count()==1 and pg.locator('.lc').count()==7 and pg.is_visible('#libBack'))
     sb=pg.locator('#scf .cf-item[data-i="1"]').bounding_box(); pg.mouse.click(sb['x']+sb['width']*0.8,sb['y']+sb['height']/2); pg.wait_for_timeout(700); ok('series carousel: tap side cover centres it',round(pg.evaluate('__cr.SCF.pos'))==1)
-    pg.click('.chip.scope'); pg.wait_for_timeout(300); ok('no series carousel in the full Library',pg.locator('#scf').count()==0)
-    pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(200); pg.click('.row-h[data-series="Iron Tide"]'); pg.wait_for_selector('#seriesEdit'); pg.wait_for_timeout(300)
+    pg.click('#libBack'); pg.wait_for_timeout(300); ok('no series carousel in the full Library',pg.locator('#scf').count()==0)
+    pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(200); pg.wait_for_timeout(300)
     pg.click('#settingsBtn'); pg.wait_for_selector('#sMerge'); pg.click('#sMerge'); pg.wait_for_selector('#mgGo')
     ok('merge sheet: Merge disabled until 2 series picked',pg.locator('#mgGo').is_disabled())
     for nm in ['The Hollow','Twin Moon']: pg.locator('#mgList .ckr',has_text=nm).click()
@@ -646,6 +705,36 @@ with sync_playwright() as p:
     p2.keyboard.press('Escape'); p2.click('#settingsBtn'); p2.wait_for_selector('#sFolderReset'); p2.click('#sFolderReset'); p2.wait_for_timeout(200)
     ok('Settings: reset to default folder',p2.evaluate('__cr.drive.folder().id')=='0ByhXYqPJBamsS2h2X01uS29uaU0')
     c2.close()
+    # mixed-shape (scanned) pages: neighbouring spreads used to get different box sizes -> blank flash on landing
+    c3=b.new_context(viewport={'width':1180,'height':820},has_touch=True,device_scale_factor=2,service_workers='block'); pg_main=pg; pg=c3.new_page()
+    pg.on('pageerror',lambda e:errors.append('pageerror: '+str(e))); pg.goto(URL); pg.wait_for_selector('html[data-ready]')
+    pg.set_input_files('#fileIn',[f'{T}/mixed/Scanned_Mix_01.pdf']); pg.wait_for_function('document.querySelectorAll(".lc").length==1 && !document.querySelector(".toast .tb")',timeout=60000)
+    open_comic(pg,'Scanned Mix 01'); wait_render(pg); pg.wait_for_timeout(800)
+    for j in (5,9,13,17):
+        pg.evaluate(f'__cr.jumpTo({j})'); wait_render(pg); pg.wait_for_timeout(500); stable(f'mixed-shape pages: landscape 2-up turn from p{j+1}')
+    pg.evaluate('__cr.jumpTo(7)'); wait_render(pg); pg.wait_for_timeout(500); same_render('mixed-shape pages')
+    bx=pg.evaluate("(async()=>{const s=new Set(); for(const j of [3,7,11,15]){ __cr.jumpTo(j); await new Promise(r=>setTimeout(r,250)); document.querySelectorAll('.view .pg').forEach(e=>s.add(e.style.width+'x'+e.style.height)); } return [...s]; })()")
+    ok('mixed-shape pages: every spread uses the same page box',len(bx)==1,str(bx))
+    pg.evaluate('__cr.jumpTo(9)'); pg.wait_for_timeout(60); stable('mixed-shape pages: turn with slow renders (600ms) right after a jump',slow=600)
+    pg.wait_for_timeout(2500); back(pg)
+    # fold sheet: no seam/line at the spine at any point of a landscape turn (odd sheet widths used to leave a 1-device-px black column)
+    pg.set_input_files('#fileIn',[f'{T}/mixed/Plain_Fold_01.pdf']); pg.wait_for_function('document.querySelectorAll(".lc").length==2 && !document.querySelector(".toast .tb")',timeout=60000)
+    import io as _io
+    from PIL import Image as _Im
+    import numpy as _np
+    def spine_dip(png,g):
+        a=_np.asarray(_Im.open(_io.BytesIO(png)).convert('L'),dtype=float)[int(g[1]*2)+40:int(g[2]*2)-40]; cx=int(round(g[0]*2)); col=a[:,cx-12:cx+13].mean(0)
+        return round(max(min(col[i-3],col[i+3])-col[i] for i in range(3,22)),1)
+    for HH in (819,823):
+        pg.set_viewport_size({'width':1180,'height':HH}); pg.wait_for_timeout(300); open_comic(pg,'Plain Fold 01'); pg.evaluate('__cr.jumpTo(4)'); wait_render(pg); pg.wait_for_timeout(600)
+        g=pg.evaluate("(()=>{const r=document.querySelector('.view .pg').getBoundingClientRect(); return [r.left+r.width/2,r.top,r.bottom]})()"); dips=[]
+        for d in (-1,1):
+            pg.evaluate(f'__cr.go({d},6000)'); t=0
+            for at in (300,1500,3000,4500,5800):
+                pg.wait_for_timeout(at-t); t=at; dips.append(spine_dip(pg.screenshot(),g))
+            pg.wait_for_timeout(1500)
+        ok(f'fold turn at 1180x{HH}: no seam line at the spine during the turn',max(dips)<40,str(dips)); back(pg)
+    c3.close(); pg=pg_main
     b.close()
 ok('no console errors / page errors',not errors,'\n'.join(errors[:10]))
 print(f'{sum(res)}/{len(res)} passed')
