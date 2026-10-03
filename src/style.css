@@ -267,7 +267,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .seg4{display:grid;grid-template-columns:repeat(4,1fr);background:var(--el2);border-radius:9px;padding:2px;gap:2px}
 .seg4 button{height:32px;border-radius:7px;font-size:13px;font-weight:600;color:#ebebf5cc}
 .seg4 button.on{background:#636366;color:#fff}
-.seg4.seg3{grid-template-columns:repeat(3,1fr)}
+.seg4.seg3{grid-template-columns:repeat(3,1fr)}.seg4.seg2{grid-template-columns:repeat(2,1fr)}
 .fld .fhint{display:block;margin-top:6px;color:var(--mut);font-size:12px;line-height:1.35}
 
 /* Arrange Categories */

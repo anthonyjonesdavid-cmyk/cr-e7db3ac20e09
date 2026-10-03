@@ -44,7 +44,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
   store.set('coverMig',COVER_V); }
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
 function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
-  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); if(t==='home') CF.size(); }
+  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); if(t==='home') CF.size(); else SCF.size(); }
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setTab(b.dataset.tab); });
 
 const coverBox=c=>`<div class="cvr"><img src="${cover(c)}" alt="" decoding="async" loading="lazy" draggable="false">${isDone(c)?`<span class="done" aria-label="Finished">${IC.check}</span>`:''}</div>${inProg(c)?`<div class="pl"><i style="width:${Math.max(2,pctOf(c))}%"></i></div>`:'<div class="pl none"></div>'}`;
@@ -74,6 +74,15 @@ function heroList(){ const seen=new Set(), out=[], push=L=>{ for(const c of L){ 
   const read=comics.filter(c=>c.lastRead).sort((a,b)=>b.lastRead-a.lastRead);
   push(read.filter(inProg)); push(read); push(comics.filter(c=>!c.lastRead).sort((a,b)=>b.added-a.added)); push(comics.slice().sort((a,b)=>b.added-a.added));
   return out; }
+const cfItemsHTML=L=>L.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="${c.id}" style="display:none"><img alt="${esc(c.title)}" decoding="async" draggable="false"><div class="dim"></div></div>`).join('');
+// series page carousel: strictly by issue number (ascending), then title
+const seriesHeroList=s=>comics.filter(c=>(c.series||'')===s).sort(byIssue);
+function renderSeriesHero(){ const sh=$('#seriesHero'); if(!sh) return;
+  if(!ui.series||!comics.length){ if(sh.dataset.sig){ sh.dataset.sig=''; sh.innerHTML=''; SCF.stop(); SCF.el=null; SCF.items=[]; } return; }
+  const L=seriesHeroList(ui.series), sig=ui.series+'|'+L.map(c=>c.id+'.'+(c.coverV||'')).join(',');
+  if(sh.dataset.sig===sig) return; sh.dataset.sig=sig; SCF.stop();
+  if(!L.length){ sh.innerHTML=''; SCF.el=null; SCF.items=[]; return; }
+  sh.innerHTML=`<div class="hero shero"><div class="cf" id="scf" aria-label="${esc(ui.series)}">${cfItemsHTML(L)}</div></div>`; SCF.mount($('#scf'),L); }
 function renderHome(){
   const el=$('#homeScroll'); if(!comics.length){ el.innerHTML=emptyHTML(); Drive.preload(); CF.items=[]; CF.el=null; return; }
   const cf=heroList();
@@ -82,12 +91,13 @@ function renderHome(){
   rowKeys().filter(k=>!hid.has(k)).forEach(k=>{ if(k==='added') rows+=rowHTML('Recently Added',comics.slice().sort((a,b)=>b.added-a.added),'added');
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cf.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="${c.id}" style="display:none"><img alt="${esc(c.title)}" decoding="async" draggable="false"><div class="dim"></div></div>`).join('')}</div></div><div class="rows">${rows}</div>`;
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${rows}</div>`;
   CF.mount($('#cf'),cf);
 }
 
 /* ---------- 3D coverflow: touch-tracked, momentum, snaps to center ---------- */
-const CF={items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
+// one factory, two carousels: Home (CF) and the series page (SCF)
+const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
   mount(el,items){ this.el=el; this.items=items; this.pos=0; this.shown=-1; this.vis=new Set(); this.size(); this.bind(); },
   size(){ if(!this.el||!this.el.isConnected) return; const vw=innerWidth, vh=innerHeight;
     this.cw=Math.round(vw<600? Math.min(vw*.46,vh*.3) : Math.min(290,vw*.3,vh*.33)); this.sp=this.cw*.8;
@@ -132,8 +142,9 @@ const CF={items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
     el.addEventListener('pointerup',e=>end(e,false)); el.addEventListener('pointercancel',e=>end(e,true));
     let wt=0; el.addEventListener('wheel',e=>{ if(Math.abs(e.deltaX)<=Math.abs(e.deltaY)) return; e.preventDefault(); this.stop(); this.moving(true); const n=this.items.length-1;
       this.pos=clamp(this.pos+e.deltaX/this.sp,-.3,n+.3); this.layout(); clearTimeout(wt); wt=setTimeout(()=>this.to(Math.round(this.pos),300),120); },{passive:false}); }
-};
-addEventListener('resize',()=>{ clearTimeout(CF.rt); CF.rt=setTimeout(()=>CF.size(),80); });
+});
+const CF=makeCF(), SCF=makeCF();
+addEventListener('resize',()=>{ clearTimeout(CF.rt); CF.rt=setTimeout(()=>{ CF.size(); SCF.size(); },80); });
 
 /* ---------- Library ---------- */
 const FILTERS=[['all','All'],['unread','Unread'],['progress','In Progress'],['finished','Finished']];
@@ -149,9 +160,9 @@ function renderLibrary(){
   $('#sortLbl').textContent=SORTS[ui.sort];
   $('#chips').innerHTML=(ui.series!=null?`<button class="chip scope" data-act="unscope" aria-label="Clear series">${IC.x}${esc(ui.series||'No series')}</button>`+(ui.series?`<button class="chip" id="seriesEdit" data-act="srename" data-series="${esc(ui.series)}">${IC.edit}Rename Series</button><button class="chip" id="seriesMerge" data-act="smerge" data-series="${esc(ui.series)}">${IC.merge}Merge…</button>`:''):'')+FILTERS.map(([k,l])=>`<button class="chip${ui.filter===k?' on':''}" data-act="filter" data-f="${k}">${l}</button>`).join('');
   const grid=$('#libGrid'), az=$('#azIndex');
-  if(!comics.length){ grid.innerHTML=''; $('#libScroll').firstElementChild.style.display='none'; if(!$('#libScroll .empty')) $('#libScroll').insertAdjacentHTML('beforeend',emptyHTML()); az.classList.add('hidden'); $('#library .libbar').classList.add('hidden'); return; }
+  if(!comics.length){ grid.innerHTML=''; grid.style.display='none'; renderSeriesHero(); if(!$('#libScroll .empty')) $('#libScroll').insertAdjacentHTML('beforeend',emptyHTML()); az.classList.add('hidden'); $('#library .libbar').classList.add('hidden'); return; }
   $('#library .libbar').classList.remove('hidden'); $('#libScroll .empty')?.remove(); grid.style.display='';
-  const L=libList(); const seen=new Set();
+  renderSeriesHero(); const L=libList(); const seen=new Set();
   grid.innerHTML=L.length? L.map(c=>{ const l=letterOf(c.title); const first=ui.sort==='title'&&!seen.has(l)&&(seen.add(l),true);
     return `<button class="lc" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}"${first?` data-letter="${l}"`:''}>${coverBox(c)}</button>`; }).join('')
     : `<div class="lempty" style="grid-column:1/-1">No comics here${ui.q?` matching “${esc(ui.q)}”`:''}.</div>`;
@@ -229,13 +240,16 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
     <div class="fld"><span>Cover</span><div class="seg4" id="eCover" role="radiogroup">${[['auto','Auto'],['right','Right half'],['left','Left half'],['full','Full page']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.coverMode||'auto')===v}" class="${(c.coverMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div></div>
     <div class="fld"><span>Page turn</span><div class="seg4 seg3" id="eTurn" role="radiogroup">${[['auto','Auto'],['standard','Standard'],['fold','Fold in middle']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.turnMode||'auto')===v}" class="${(c.turnMode||'auto')===v?'on':''}">${l}</button>`).join('')}</div>
       <small class="fhint">Fold in middle: for PDFs with two comic pages side by side on each page. Auto detects them${typeof c.foldAuto==='boolean'?` (detected: ${c.foldAuto?'fold in middle':'standard'})`:''}.</small></div>
+    <div class="fld" id="eFoldPW"${(c.turnMode==='fold'||(c.turnMode!=='standard'&&c.foldAuto))?'':' style="display:none"'}><span>Portrait</span><div class="seg4 seg2" id="eFoldP" role="radiogroup">${[['half','Half pages'],['full','Full sheet']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.foldPortrait||'half')===v}" class="${(c.foldPortrait||'half')===v?'on':''}">${l}</button>`).join('')}</div>
+      <small class="fhint">For fold-in-middle comics held upright: Half pages shows one comic page at a time, fitted to the screen. Landscape always shows the full sheet.</small></div>
     <label class="tgl"><input type="checkbox" id="eRtl" ${c.rtl?'checked':''}><span>Right-to-left (manga)<small>Reverses page order and swipe direction</small></span></label>
     <div class="mstat">${esc(c.fileName)} · ${fmtBytes(c.size)} · ${c.pages} pages</div>
   </div><div class="mf"><button class="btn ghost" data-r="delete" id="eDelete" style="color:#ff453a">Delete</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="eSave">Save</button></div>`,
-  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v});
-       ['#eCover','#eTurn'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); }); }));
+  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v,fp:w.querySelector('#eFoldP .on').dataset.v});
+       ['#eCover','#eTurn','#eFoldP'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); });
+         if(sel==='#eTurn') w.querySelector('#eFoldPW').style.display=(b.dataset.v==='fold'||(b.dataset.v==='auto'&&c.foldAuto))?'':'none'; }));
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; await dbPut(c); renderShelf();
+  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; await dbPut(c); renderShelf();
     if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 /* ---------- series: rename (renaming onto an existing name merges) and multi-merge ---------- */
