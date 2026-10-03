@@ -106,14 +106,14 @@ const CF={items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
       const s=Math.sign(o), a=Math.min(ao,1), x=s*(a*cw*.8+Math.max(0,ao-1)*gap);
       const z=-a*cw*.55-Math.max(0,ao-1)*cw*.2, rot=-clamp(o,-1,1)*52, sc=1-a*.1;
       it.style.transform=`translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
-      it.style.zIndex=1000-Math.round(ao*100); it.lastChild.style.opacity=Math.min(.68,a*.4+Math.max(0,ao-1)*.04).toFixed(3);   // far covers fade only slightly
-      it.classList.toggle('far',ao>.55&&ao<=2.5); it.classList.toggle('lite',ao>2.5); }   // far stacks: no blur/reflection/big shadow (keeps compositing cheap)
+      it.style.zIndex=1000-Math.round(ao*100); it.lastChild.style.opacity=Math.min(.55,a*.3+Math.max(0,ao-1)*.04).toFixed(3);   // light dimming so the centre stands out; far covers fade only slightly
+      it.classList.toggle('lite',ao>2.5); }   // covers stay sharp (no blur); far stacks drop reflection/shadow (keeps compositing cheap)
     this.info(); },
   info(){ const i=clamp(Math.round(this.pos),0,this.items.length-1); if(i===this.shown) return; this.shown=i; const c=this.items[i]; if(!c||!this.el) return;
     // no caption under the carousel: the centre cover itself is the control (tap opens); keep it labelled for VoiceOver
     [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1} of ${c.pages}`:''}`:this.items[k].title); }); },
   stop(){ cancelAnimationFrame(this.raf); this.raf=0; },
-  moving(v){ if(this.el) this.el.classList.toggle('moving',v); },   // side-cover blur is dropped while moving (blur re-filters every frame)
+  moving(v){ if(this.el) this.el.classList.toggle('moving',v); },   // shadows are dropped while moving (cheaper compositing)
   to(target,dur){ this.stop(); this.moving(true); const from=this.pos, t0=performance.now(); target=clamp(target,0,this.items.length-1);
     const step=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3); this.pos=from+(target-from)*e; this.layout(); if(k<1) this.raf=requestAnimationFrame(step); else { this.raf=0; this.pos=target; this.layout(); this.moving(false); } };
     this.raf=requestAnimationFrame(step); },

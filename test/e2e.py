@@ -71,6 +71,13 @@ EDGE="""(()=>{const C=__cr.CF; C.stop(); C.pos=Math.min(10,C.items.length-1); C.
   const L=Math.min(...r.map(b=>b.left)), R=Math.max(...r.map(b=>b.right)); C.pos=0; C.layout(); return {L:Math.round(L),R:Math.round(R),vw,n:r.length}})()"""
 def edge_ok(pg,lab):
     e=pg.evaluate(EDGE); ok(f'{lab}: carousel side stacks reach/bleed past both screen edges',e['L']<=0 and e['R']>=e['vw'] and e['n']<=21,str(e))
+def bar_black(pg,lab,sel,clip_fn):
+    """computed style + pixel check: bar region (incl. emulated 44px status-bar inset) is pure #000 while content is scrolled under it"""
+    st=pg.evaluate(f"""(()=>{{const e=document.querySelector('{sel}'); const c=getComputedStyle(e); return {{bg:c.backgroundColor,bf:c.backdropFilter||c.webkitBackdropFilter||'none',op:c.opacity}}}})()""")
+    from PIL import Image; import io
+    x,y,w,h=clip_fn(); im=Image.open(io.BytesIO(pg.screenshot(clip={'x':x,'y':y,'width':w,'height':h}))).convert('RGB')
+    mx=max(max(px) for px in im.getdata())
+    ok(f'{lab}: top bar solid #000 (no blur/translucency), nothing shows through',st['bg']=='rgb(0, 0, 0)' and st['bf'] in ('none','') and st['op']=='1' and mx<=2,f'{st} maxpx={mx}')
 def tab(pg,t): pg.click(f'#tabs [data-tab={t}]'); pg.wait_for_timeout(150)
 def lib_card(pg,title): return pg.locator(f'.lc[data-title="{title}"]')
 def open_comic(pg,title):
@@ -176,6 +183,23 @@ with sync_playwright() as p:
     ok('rows sit just below carousel (room for reflection, no big gap)',25<gap<75,str(round(gap)))
     ok('no now-reading pill on Home',pg.locator('#nowPill').count()==0)
     shot(pg,'10-home-portrait')
+    ok('status-bar-style black + theme-color #000',pg.evaluate("document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').content")=='black' and pg.evaluate("document.querySelector('meta[name=theme-color]').content").lower() in ('#000','#000000'))
+    pg.evaluate("document.documentElement.style.setProperty('--sat','44px'); __cr.CF.size()"); pg.wait_for_timeout(200)
+    pg.evaluate("document.querySelector('#homeScroll').scrollTop=700"); pg.wait_for_timeout(300); shot(pg,'13-home-scrolled-under-bar')
+    bar_black(pg,'Home (scrolled, 44px inset)','.topbar',lambda:(70,0,170,44+8))
+    tab(pg,'library'); pg.evaluate("document.querySelector('#libScroll').scrollTop=600"); pg.wait_for_timeout(300); shot(pg,'14-library-scrolled-under-bar')
+    bar_black(pg,'Library (scrolled, 44px inset)','.topbar',lambda:(70,0,170,44+8))
+    bar_black(pg,'Library search bar area','.libbar',lambda:(pg.locator('.libbar').bounding_box()['x']+2,pg.locator('.libbar').bounding_box()['y']+1,6,8))
+    open_comic(pg,'Nightfall 01'); pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(400); shot(pg,'15-reader-bar-solid')
+    bar_black(pg,'Reader toolbar (44px inset)','.rbar.top',lambda:(0,0,40,44))
+    pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(400)
+    from PIL import Image; import io
+    im=Image.open(io.BytesIO(pg.screenshot(clip={'x':0,'y':0,'width':820,'height':44}))).convert('RGB'); mx=max(max(px) for px in im.getdata())
+    ok('Reader: status-bar inset stays solid black when toolbar is hidden',mx<=2,f'maxpx={mx}')
+    pg.evaluate('__cr.toggleUI(true)'); back(pg)
+    pg.evaluate("document.documentElement.style.removeProperty('--sat'); __cr.CF.size()"); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(400)
+    sharp=pg.evaluate("(()=>{const C=__cr.CF; const chk=()=>[...document.querySelectorAll('#cf .cf-item')].filter(e=>e.style.display!=='none').every(e=>{const f=getComputedStyle(e.firstChild).filter, g=getComputedStyle(e).filter; return (f==='none'||!f)&&(g==='none'||!g)}); const rest=chk(); C.moving(true); C.pos=1.4; C.layout(); const mv=chk(); C.moving(false); C.pos=0; C.layout(); const dim=+document.querySelector('#cf .cf-item[data-i=\"1\"] .dim').style.opacity; return {rest,mv,dim}})()")
+    ok('carousel covers sharp (no blur) at rest and while moving, light dim on sides',sharp['rest'] and sharp['mv'] and 0.15<=sharp['dim']<=0.45,str(sharp))
     edge_ok(pg,'portrait')
     hr=pg.evaluate("(()=>{const h=[...document.querySelectorAll('#homeScroll .row-h')]; return {t:h.map(e=>e.querySelector('h2').textContent),k:h.map(e=>e.dataset.kind)}})()")
     ok('Home rows = Recently Added then one per series (no Unread/Finished)',hr['t'][0]=='Recently Added' and all(k=='series' for k in hr['k'][1:]) and len(hr['k'])>2 and 'Unread' not in hr['t'] and 'Finished' not in hr['t'],str(hr['t']))
