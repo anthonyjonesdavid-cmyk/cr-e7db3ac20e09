@@ -62,7 +62,7 @@ CFSWIPE='''async ({dx,steps,dt,noup})=>{ const el=document.querySelector('#cf');
   const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const tgt=document.elementFromPoint(x,y)||el;
   const ev=(t,cx)=>tgt.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:41,pointerType:'touch',isPrimary:true,clientX:cx,clientY:y,buttons:t==='pointerup'?0:1}));
   ev('pointerdown',x); for(let i=1;i<=steps;i++){ await sleep(dt); ev('pointermove',x+dx*i/steps); }
-  if(noup) return null; ev('pointerup',x+dx); await sleep(1000); return document.querySelector('#cfInfo .cf-title').textContent; }'''
+  if(noup) return null; ev('pointerup',x+dx); await sleep(1000); return __cr.CF.items[Math.round(__cr.CF.pos)].title; }'''
 def state(pg): return pg.evaluate('(()=>{const R=__cr.R;const v=R.views[R.vi]||[];return {vi:R.vi,first:v.filter(x=>x!=null)[0],len:v.length,spread:R.spread,rtl:R.rtl,n:R.n,ui:document.querySelector("#reader").classList.contains("ui"),z:__cr.Z.s,cache:__cr.cache()}})()')
 def shot(pg,name): pg.screenshot(path=f'{SH}/{ENG}-{name}.png')
 def wait_render(pg,t=15000): pg.wait_for_function('document.querySelectorAll(".view .pg.loading").length===0 && document.querySelectorAll(".view .pg canvas").length>0',timeout=t)
@@ -164,7 +164,11 @@ with sync_playwright() as p:
     sheet(pg,'Nightfall 02','aToggle')
     # ---- Home (portrait) ----
     tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(700)
-    ok('carousel centers most recent (Continue Reading)',pg.inner_text('#cfInfo .cf-title')=='Nightfall 01' and f'Page 13 of {N}' in pg.inner_text('#cfInfo'),pg.inner_text('#cfInfo'))
+    ctr=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos), el=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]'); return {t:__cr.CF.items[i].title, aria:el.getAttribute('aria-label')}})()")
+    ok('carousel centers most recent',ctr['t']=='Nightfall 01' and f'page 13 of {N}' in ctr['aria'],str(ctr))
+    ok('no caption block under the carousel',pg.evaluate("!document.querySelector('#cfInfo,.cf-info') && !/CONTINUE READING/i.test(document.querySelector('.hero').innerText)"))
+    gap=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()")
+    ok('rows sit just below carousel (room for reflection, no big gap)',25<gap<75,str(round(gap)))
     ok('now-reading pill shows last comic + %',pg.is_visible('#nowPill') and 'Nightfall 01' in pg.inner_text('#nowPill') and '%' in pg.inner_text('#nowPill'))
     shot(pg,'10-home-portrait')
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=520"); pg.wait_for_timeout(300); shot(pg,'11-home-rows-portrait')
@@ -181,7 +185,7 @@ with sync_playwright() as p:
     cur=round(pg.evaluate('__cr.CF.pos'))
     side=pg.evaluate(f'''(()=>{{const it=document.querySelector('#cf .cf-item[data-i="{cur+1}"]'); const r=it.getBoundingClientRect(); return [r.left+r.width*0.6,r.top+r.height/2]}})()''')
     pg.mouse.click(side[0],side[1]); pg.wait_for_timeout(700); ok('tap side cover brings it to center',round(pg.evaluate('__cr.CF.pos'))==cur+1)
-    cb=pg.locator(f'#cf .cf-item[data-i="{cur+1}"]').bounding_box(); want=pg.inner_text('#cfInfo .cf-title')
+    cb=pg.locator(f'#cf .cf-item[data-i="{cur+1}"]').bounding_box(); want=pg.evaluate('__cr.CF.items[Math.round(__cr.CF.pos)].title')
     pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tap center cover opens it',pg.text_content('#rTitle')==want,want); back(pg)
     pg.click('#nowPill'); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg); ok('pill resumes last comic',pg.text_content('#rTitle')==want); back(pg)
@@ -207,7 +211,7 @@ with sync_playwright() as p:
     # ---- landscape ----
     pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(400)
     cols=pg.evaluate("getComputedStyle(document.querySelector('#libGrid')).gridTemplateColumns.split(' ').length"); ok('library grid: 7 columns landscape',cols==7,str(cols)); shot(pg,'15-library-landscape')
-    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'16-home-landscape')
+    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'16-home-landscape'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()"); ok('landscape: rows close under carousel',20<g<80,str(round(g)))
     open_comic(pg,'Nightfall 01')
     s=state(pg); ok('landscape = two-page spread',s['spread'] and s['len']==2,json.dumps(s))
     pg.evaluate('__cr.jumpTo(0)'); wait_render(pg); pg.wait_for_timeout(200)
@@ -293,7 +297,7 @@ with sync_playwright() as p:
         for i in range(12): pg.evaluate('__cr.go(-1,200)'); pg.wait_for_timeout(260)
         wait_render(pg,60000); c=state(pg)['cache']; ok('LRU bounded after many turns',c['px']<=c['budget'],json.dumps(c)); back(pg)
     # ---- phone ----
-    pg.set_viewport_size({'width':390,'height':844}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'20-phone-home')
+    pg.set_viewport_size({'width':390,'height':844}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'20-phone-home'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()"); ok('phone: rows close under carousel',20<g<80,str(round(g)))
     tab(pg,'library'); pg.wait_for_timeout(200); cols=pg.evaluate("getComputedStyle(document.querySelector('#libGrid')).gridTemplateColumns.split(' ').length"); ok('library grid: 3 columns phone',cols==3,str(cols)); shot(pg,'21-phone-library')
     open_comic(pg,'The Hollow 02'); pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(250); shot(pg,'22-phone-reader')
     pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(250); flicks(pg,'phone')

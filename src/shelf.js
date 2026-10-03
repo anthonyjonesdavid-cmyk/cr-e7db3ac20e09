@@ -52,7 +52,7 @@ function renderHome(){
   let rows=rowHTML('Recently Added',comics.slice().sort((a,b)=>b.added-a.added),'added');
   [...groups.keys()].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).forEach(s=>{ rows+=rowHTML(s,groups.get(s).sort(byTitle),'series',s); });
   rows+=rowHTML('Unread',comics.filter(isUnread).sort(byTitle),'unread')+rowHTML('Finished',comics.filter(isDone).sort((a,b)=>b.lastRead-a.lastRead),'finished');
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cf.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="${c.id}"><img src="${cover(c)}" alt="${esc(c.title)}" draggable="false"><div class="dim"></div></div>`).join('')}</div><div class="cf-info" id="cfInfo"></div></div><div class="rows">${rows}</div>`;
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cf.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="${c.id}"><img src="${cover(c)}" alt="${esc(c.title)}" draggable="false"><div class="dim"></div></div>`).join('')}</div></div><div class="rows">${rows}</div>`;
   CF.mount($('#cf'),cf);
 }
 
@@ -70,8 +70,9 @@ const CF={items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
       it.style.zIndex=1000-Math.round(ao*100); it.lastChild.style.opacity=Math.min(.82,a*.42+Math.max(0,ao-1)*.16).toFixed(3);
       it.classList.toggle('far',ao>.55); }
     this.info(); },
-  info(){ const i=clamp(Math.round(this.pos),0,this.items.length-1); if(i===this.shown) return; this.shown=i; const c=this.items[i], box=$('#cfInfo'); if(!c||!box) return;
-    box.innerHTML=`<div class="cf-kick">${c.lastRead?'Continue Reading':'Recently Added'}</div><div class="cf-title">${esc(c.title)}</div><div class="cf-sub">${c.lastRead?`Page ${(c.page||0)+1} of ${c.pages}${isDone(c)?' · Finished':''}`:`${c.pages} pages`}</div><div class="cf-prog"><i style="width:${pctOf(c)}%"></i></div><button class="pillbtn" data-act="open" data-id="${c.id}">${c.lastRead&&!isDone(c)?'Continue':'Read'}</button>`; },
+  info(){ const i=clamp(Math.round(this.pos),0,this.items.length-1); if(i===this.shown) return; this.shown=i; const c=this.items[i]; if(!c||!this.el) return;
+    // no caption under the carousel: the centre cover itself is the control (tap opens); keep it labelled for VoiceOver
+    [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1} of ${c.pages}`:''}`:this.items[k].title); }); },
   stop(){ cancelAnimationFrame(this.raf); this.raf=0; },
   to(target,dur){ this.stop(); const from=this.pos, t0=performance.now(); target=clamp(target,0,this.items.length-1);
     const step=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3); this.pos=from+(target-from)*e; this.layout(); if(k<1) this.raf=requestAnimationFrame(step); else { this.raf=0; this.pos=target; this.layout(); } };
