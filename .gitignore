@@ -1,0 +1,5 @@
+testpdfs/
+shots/
+*.pdf
+node_modules/
+__pycache__/

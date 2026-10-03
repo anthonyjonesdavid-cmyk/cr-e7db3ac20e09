@@ -1,0 +1,41 @@
+<body>
+<!-- ================= SHELF ================= -->
+<section id="shelf" class="screen">
+  <header class="topbar"><div class="topbar-row">
+    <div class="logo"><img src="icons/apple-touch-icon.png" alt=""><h1>Comic Shelf</h1></div>
+    <span class="sp"></span>
+    <button class="btn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import</button>
+    <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+    <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden>
+  </div></header>
+  <div class="tools" id="tools">
+    <label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search comics or series" autocomplete="off" enterkeyhint="search"></label>
+    <div class="seg" id="sortSeg" role="group" aria-label="Sort">
+      <button data-sort="recent">Recent</button><button data-sort="title">Title</button><button data-sort="added">Added</button>
+    </div>
+    <button class="chipbtn" id="groupBtn" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>Series</button>
+  </div>
+  <main id="shelfScroll"></main>
+</section>
+
+<!-- ================= READER ================= -->
+<section id="reader" class="screen hidden ui" aria-label="Reader">
+  <div id="stage"><div id="zoomer"></div></div>
+  <div class="rbar top" id="rtop"><div class="rrow">
+    <button class="back" id="rBack"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Shelf</button>
+    <div class="rtitle" id="rTitle"></div>
+    <button class="rbtn" id="rRtl" aria-pressed="false" title="Right-to-left (manga)"><svg class="i" viewBox="0 0 24 24"><path d="M20 7H5m0 0 4-4M5 7l4 4M4 17h15m0 0-4-4m4 4-4 4"/></svg>RTL</button>
+    <button class="rbtn" id="rSpread" title="Single page or two-page spread in landscape"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg><span id="rSpreadTxt">2-up</span></button>
+    <button class="rbtn" id="rGrid" title="All pages" aria-label="All pages"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
+  </div></div>
+  <div class="rbar bot" id="rbot"><div class="brow">
+    <div class="scrub"><input type="range" id="scrub" min="1" max="1" value="1" step="1" aria-label="Page"><div id="bubble" class="hidden"><div class="bt"><img alt=""></div><span></span></div></div>
+    <span id="pgText">1 / 1</span>
+  </div></div>
+  <div id="pages" class="hidden"><div class="ph"><button class="icbtn" id="pagesClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button><h3>All Pages</h3></div><div id="pgrid"></div></div>
+</section>
+<script>
+// Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
+if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+</script>
