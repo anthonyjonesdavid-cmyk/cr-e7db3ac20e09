@@ -1,8 +1,8 @@
 // Comic Shelf service worker: app shell + vendored pdf.js cached for offline use.
 // Comics themselves live in IndexedDB and are never fetched over the network.
-const VERSION = 'cr-v1';
+const VERSION = 'cr-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './vendor/pdf.min.mjs', './vendor/pdf.worker.min.mjs',
-  './vendor/bangers.woff2', './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg', './icons/favicon-32.png'];
+  './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg', './icons/favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

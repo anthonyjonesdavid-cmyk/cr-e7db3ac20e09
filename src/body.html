@@ -1,21 +1,23 @@
 <body>
 <!-- ================= SHELF ================= -->
 <section id="shelf" class="screen">
-  <header class="topbar"><div class="topbar-row">
-    <div class="logo"><img src="icons/apple-touch-icon.png" alt=""><h1>Comic Shelf</h1></div>
-    <span class="sp"></span>
-    <button class="btn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Import</button>
-    <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+  <header class="topbar"><div class="tb-row">
+    <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    <div class="segctl" role="tablist" id="tabs"><button role="tab" data-tab="home" class="on">Home</button><button role="tab" data-tab="library">Library</button></div>
+    <button class="icbtn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
     <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden>
   </div></header>
-  <div class="tools" id="tools">
-    <label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search comics or series" autocomplete="off" enterkeyhint="search"></label>
-    <div class="seg" id="sortSeg" role="group" aria-label="Sort">
-      <button data-sort="recent">Recent</button><button data-sort="title">Title</button><button data-sort="added">Added</button>
+  <main id="home" class="tabview"><div class="scrollv" id="homeScroll"></div></main>
+  <main id="library" class="tabview hidden">
+    <div class="libbar">
+      <div class="lrow"><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" enterkeyhint="search"></label>
+        <button class="sortbtn" id="sortBtn" aria-haspopup="menu"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg><span id="sortLbl">Recent</span></button></div>
+      <div class="chips" id="chips"></div>
     </div>
-    <button class="chipbtn" id="groupBtn" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>Series</button>
-  </div>
-  <main id="shelfScroll"></main>
+    <div class="scrollv" id="libScroll"><div class="lgrid" id="libGrid"></div></div>
+    <nav id="azIndex" class="hidden" aria-label="Jump to letter"></nav>
+  </main>
+  <button id="nowPill" class="hidden" aria-label="Resume reading"></button>
 </section>
 
 <!-- ================= READER ================= -->
