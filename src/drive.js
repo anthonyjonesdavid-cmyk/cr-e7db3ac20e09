@@ -87,16 +87,17 @@ const Drive=(()=>{
   async function onPicked(d){ const P=google.picker; if(d[P.Response.ACTION]!==P.Action.PICKED) return;
     const docs=d[P.Response.DOCUMENTS]||[]; let items=[];
     for(const x of docs){ const id=x[P.Document.ID], name=x[P.Document.NAME]||'Untitled.pdf', mt=x[P.Document.MIME_TYPE];
-      if(mt===FOLDER){ try{ toast(`Listing “${name}”…`,{sticky:true}); items=items.concat(await listFolder(id,0,name,[folderKey(),x.resourceKey?`${id}/${x.resourceKey}`:''])); hideToast(); }catch(e){ toast(`Couldn't open folder “${name}”: ${e.message}`); } }
+      if(mt===FOLDER){ try{ toast(`Listing “${name}”…`,{sticky:true}); items=items.concat(await listFolder(id,0,isRangeName(name)?'':name,[folderKey(),x.resourceKey?`${id}/${x.resourceKey}`:''],name)); hideToast(); }catch(e){ toast(`Couldn't open folder “${name}”: ${e.message}`); } }
       else items.push({id,name,size:+(x.sizeBytes||x[P.Document.SIZE_BYTES]||0),resourceKey:x.resourceKey||''}); }
     if(items.length) importRemote(items); else toast('No PDFs found in that selection'); }
-  // recursive listing (PDFs + subfolders); subfolder name becomes the series
-  async function listFolder(fid,depth,series,keys){ keys=keys||[folderKey()]; let out=[], page='';
+  // recursive listing (PDFs + subfolders); subfolder name becomes the series, unless it's just an issue range/era
+  // ('150-199', "300's", '1-50') -> keep the parent folder's name as the series
+  async function listFolder(fid,depth,series,keys,name){ keys=keys||[folderKey()]; let out=[], page='';
     do{ const q=new URLSearchParams({q:`'${fid}' in parents and trashed=false and (mimeType='application/pdf' or mimeType='${FOLDER}')`,fields:'nextPageToken,files(id,name,size,mimeType,resourceKey)',pageSize:'1000',orderBy:'folder,name_natural',supportsAllDrives:'true',includeItemsFromAllDrives:'true'}); if(page) q.set('pageToken',page);
       const r=await fetch('https://www.googleapis.com/drive/v3/files?'+q,{headers:{Authorization:'Bearer '+tok.t,...rkHeader(keys)}});
       if(r.status===401){ tok=null; throw new Error('Google session expired. Try again.'); } if(!r.ok) throw new Error(r.status===404?'Folder not found or no access (HTTP 404)':'HTTP '+r.status); const j=await r.json();
       for(const f of j.files||[]){ const k=f.resourceKey?`${f.id}/${f.resourceKey}`:'';
-        if(f.mimeType===FOLDER){ if(depth<4) out=out.concat(await listFolder(f.id,depth+1,f.name,k?keys.concat(k):keys)); }
+        if(f.mimeType===FOLDER){ if(depth<4) out=out.concat(await listFolder(f.id,depth+1,isRangeName(f.name)?(series||name||''):f.name,k?keys.concat(k):keys,f.name)); }
         else out.push({id:f.id,name:f.name,size:+f.size||0,resourceKey:f.resourceKey||'',series:series||'',keys:k?keys.concat(k):keys}); }
       page=j.nextPageToken||''; }while(page);
     return out; }
@@ -108,7 +109,7 @@ const Drive=(()=>{
     let items, fname=f.name||'Drive folder';
     try{ const mr=await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?fields=name&supportsAllDrives=true`,{headers:{Authorization:'Bearer '+tok.t,...rkHeader([folderKey()])}});
       if(mr.ok) fname=(await mr.json()).name||fname;
-      items=await listFolder(f.id,0,''); hideToast(); }
+      items=await listFolder(f.id,0,'',undefined,fname); hideToast(); }
     catch(e){ toast(`Couldn't list the Drive folder: ${e.message}`); return; }
     if(!items.length){ toast(`No PDFs found in “${fname}”`); return; }
     checklist(items,fname); }
@@ -191,7 +192,7 @@ const Drive=(()=>{
 
   if(resumePicker&&configured()) addEventListener('load',()=>load().then(afterToken).catch(e=>toast("Couldn't load Google Picker: "+e.message)));
   const setFolder=f=>{ if(f) store.set('driveFolder',f); else { try{ localStorage.removeItem('cr.driveFolder'); }catch(e){} } };
-  return {start,preload,importRemote,configured,folder,setFolder,parseFolderLink,checklist,get scope(){return SCOPE},get busy(){return !!ctl},_setToken:t=>{tok=t?{t,exp:Date.now()+3600e3}:null;}};
+  return {isRangeName,start,preload,importRemote,configured,folder,setFolder,parseFolderLink,checklist,get scope(){return SCOPE},get busy(){return !!ctl},_setToken:t=>{tok=t?{t,exp:Date.now()+3600e3}:null;}};
 })();
 
 /* + button: small import menu */

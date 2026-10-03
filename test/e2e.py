@@ -66,6 +66,11 @@ CFSWIPE='''async ({dx,steps,dt,noup})=>{ const el=document.querySelector('#cf');
 def state(pg): return pg.evaluate('(()=>{const R=__cr.R;const v=R.views[R.vi]||[];return {vi:R.vi,first:v.filter(x=>x!=null)[0],len:v.length,spread:R.spread,rtl:R.rtl,n:R.n,ui:document.querySelector("#reader").classList.contains("ui"),z:__cr.Z.s,cache:__cr.cache()}})()')
 def shot(pg,name): pg.screenshot(path=f'{SH}/{ENG}-{name}.png')
 def wait_render(pg,t=15000): pg.wait_for_function('document.querySelectorAll(".view .pg.loading").length===0 && document.querySelectorAll(".view .pg canvas").length>0',timeout=t)
+EDGE="""(()=>{const C=__cr.CF; C.stop(); C.pos=Math.min(10,C.items.length-1); C.layout(); const vw=innerWidth;
+  const r=[...document.querySelectorAll('#cf .cf-item')].filter(e=>e.style.display!=='none').map(e=>e.getBoundingClientRect());
+  const L=Math.min(...r.map(b=>b.left)), R=Math.max(...r.map(b=>b.right)); C.pos=0; C.layout(); return {L:Math.round(L),R:Math.round(R),vw,n:r.length}})()"""
+def edge_ok(pg,lab):
+    e=pg.evaluate(EDGE); ok(f'{lab}: carousel side stacks reach/bleed past both screen edges',e['L']<=0 and e['R']>=e['vw'] and e['n']<=21,str(e))
 def tab(pg,t): pg.click(f'#tabs [data-tab={t}]'); pg.wait_for_timeout(150)
 def lib_card(pg,title): return pg.locator(f'.lc[data-title="{title}"]')
 def open_comic(pg,title):
@@ -171,6 +176,9 @@ with sync_playwright() as p:
     ok('rows sit just below carousel (room for reflection, no big gap)',25<gap<75,str(round(gap)))
     ok('now-reading pill shows last comic + %',pg.is_visible('#nowPill') and 'Nightfall 01' in pg.inner_text('#nowPill') and '%' in pg.inner_text('#nowPill'))
     shot(pg,'10-home-portrait')
+    edge_ok(pg,'portrait')
+    hr=pg.evaluate("(()=>{const h=[...document.querySelectorAll('#homeScroll .row-h')]; return {t:h.map(e=>e.querySelector('h2').textContent),k:h.map(e=>e.dataset.kind)}})()")
+    ok('Home rows = Recently Added then one per series (no Unread/Finished)',hr['t'][0]=='Recently Added' and all(k=='series' for k in hr['k'][1:]) and len(hr['k'])>2 and 'Unread' not in hr['t'] and 'Finished' not in hr['t'],str(hr['t']))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=520"); pg.wait_for_timeout(300); shot(pg,'11-home-rows-portrait')
     sx=pg.evaluate("(()=>{const r=document.querySelectorAll('.row-s')[0]; r.scrollLeft=300; return r.scrollLeft})()"); ok('rows scroll horizontally (free scroll)',sx>0,str(sx))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
@@ -178,6 +186,23 @@ with sync_playwright() as p:
     t1=pg.evaluate(CFSWIPE,{'dx':-150,'steps':6,'dt':16,'noup':False}); pos=pg.evaluate('__cr.CF.pos')
     ok('carousel swipe moves + snaps to a whole cover',t1!='Nightfall 01' and abs(pos-round(pos))<1e-6 and pos>=1,f'{t1} pos={pos}')
     pg.evaluate(CFSWIPE,{'dx':-700,'steps':5,'dt':12,'noup':False}); pos2=pg.evaluate('__cr.CF.pos'); ok('fast fling carries momentum further',pos2>=pos+2,f'{pos}->{pos2}')
+    pg.wait_for_function('!__cr.CF.raf',timeout=5000)
+    cfs=pg.evaluate('''(()=>{const C=__cr.CF, L=C.items, total=+document.querySelector('.row-h .n').textContent;
+      const ip=c=>(c.progress||0)<1&&(c.lastRead||(c.progress||0)>0); let phase=0, okOrder=true, prev=null;
+      L.forEach(c=>{ const ph=ip(c)?0:c.lastRead?1:2; if(ph<phase) okOrder=false;
+        if(ph===phase&&prev){ if(ph<2&&c.lastRead>prev.lastRead) okOrder=false; if(ph===2&&c.added>prev.added) okOrder=false; } phase=ph; prev=c; });
+      return {n:L.length,total,uniq:new Set(L.map(c=>c.id)).size,okOrder,first:L[0].title,ph:L.map(c=>ip(c)?0:c.lastRead?1:2).join('')}})()''')
+    ok('carousel holds up to 50 (all comics when fewer), no duplicates',cfs['n']==min(50,cfs['total']) and cfs['uniq']==cfs['n'],str(cfs))
+    ok('carousel order: in-progress (recent first) > other read > newest unread',cfs['okOrder'] and cfs['first']=='Nightfall 01',cfs['ph'])
+    pg.reload(); pg.wait_for_selector('html[data-ready]'); tab(pg,'home'); pg.wait_for_function('__cr.CF.items.length>0'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(600)   # fresh mount
+    v=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')]; return {shown:k.filter(e=>e.style.display!=='none').map(e=>+e.dataset.i), loaded:k.filter(e=>e.firstChild.getAttribute('src')).map(e=>+e.dataset.i)}})()''')
+    ok('carousel virtualized: only covers within ±10 of centre displayed',max(v['shown'])<=10 and (cfs['n']<=11 or 11 not in v['shown']),str(v['shown']))
+    ok('carousel covers lazy-loaded (only near centre have src)',max(v['loaded'])<=12 and (cfs['n']<=13 or len(v['loaded'])<cfs['n']),str(v['loaded']))
+    pg.evaluate(CFSWIPE,{'dx':-320,'steps':5,'dt':14,'noup':False}); pg.wait_for_function('!__cr.CF.raf',timeout=5000); fl=pg.evaluate('__cr.CF.pos')
+    ok('one flick travels several covers',fl>=min(5,cfs['n']-1),str(fl))
+    v2=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')], p=Math.round(__cr.CF.pos); return k.filter(e=>e.style.display!=='none').every(e=>Math.abs(+e.dataset.i-p)<=10) && !!k[p].firstChild.getAttribute('src')})()''')
+    ok('after flick: window follows centre and its cover is loaded',v2)
+    pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(300)
     pg.wait_for_function('!__cr.CF.raf',timeout=5000); pg.evaluate('(()=>{const C=__cr.CF; C.stop(); C.pos=2; C.layout();})()'); pg.wait_for_timeout(200)
     pg.evaluate(CFSWIPE,{'dx':-110,'steps':6,'dt':30,'noup':True}); pg.wait_for_timeout(150)
     shot(pg,'12-carousel-mid-swipe'); mid=pg.evaluate('__cr.CF.pos'); ok('carousel tracks finger mid-swipe',2.2<mid<3,str(mid))
@@ -211,7 +236,7 @@ with sync_playwright() as p:
     # ---- landscape ----
     pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(400)
     cols=pg.evaluate("getComputedStyle(document.querySelector('#libGrid')).gridTemplateColumns.split(' ').length"); ok('library grid: 7 columns landscape',cols==7,str(cols)); shot(pg,'15-library-landscape')
-    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'16-home-landscape'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()"); ok('landscape: rows close under carousel',20<g<80,str(round(g)))
+    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'16-home-landscape'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()"); ok('landscape: rows close under carousel',20<g<80,str(round(g))); edge_ok(pg,'landscape')
     open_comic(pg,'Nightfall 01')
     s=state(pg); ok('landscape = two-page spread',s['spread'] and s['len']==2,json.dumps(s))
     pg.evaluate('__cr.jumpTo(0)'); wait_render(pg); pg.wait_for_timeout(200)
@@ -297,7 +322,7 @@ with sync_playwright() as p:
         for i in range(12): pg.evaluate('__cr.go(-1,200)'); pg.wait_for_timeout(260)
         wait_render(pg,60000); c=state(pg)['cache']; ok('LRU bounded after many turns',c['px']<=c['budget'],json.dumps(c)); back(pg)
     # ---- phone ----
-    pg.set_viewport_size({'width':390,'height':844}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'20-phone-home'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()"); ok('phone: rows close under carousel',20<g<80,str(round(g)))
+    pg.set_viewport_size({'width':390,'height':844}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'20-phone-home'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.row-h').getBoundingClientRect().top-c.bottom})()"); ok('phone: rows close under carousel',20<g<80,str(round(g))); edge_ok(pg,'phone')
     tab(pg,'library'); pg.wait_for_timeout(200); cols=pg.evaluate("getComputedStyle(document.querySelector('#libGrid')).gridTemplateColumns.split(' ').length"); ok('library grid: 3 columns phone',cols==3,str(cols)); shot(pg,'21-phone-library')
     open_comic(pg,'The Hollow 02'); pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(250); shot(pg,'22-phone-reader')
     pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(250); flicks(pg,'phone')
@@ -395,6 +420,34 @@ with sync_playwright() as p:
     sheet(pg,'Iron Tide 05','aDelete'); pg.wait_for_selector('#confirmOk'); shot(pg,'23-delete-confirm'); pg.click('#confirmOk'); pg.wait_for_timeout(400)
     ok('delete with confirm',pg.locator('.lc').count()==n0-1)
     pg.click('#settingsBtn'); pg.wait_for_selector('.stor'); pg.wait_for_timeout(200); shot(pg,'24-settings'); ok('settings shows storage used',' MB' in pg.inner_text('.stor')); pg.keyboard.press('Escape')
+    # ---- series: issue sort, range names, rename (+merge on existing name), merge sheet ----
+    ok('issue number parsing',pg.evaluate("[__cr.issueNo('X-MEN177'),__cr.issueNo('Uncanny X-Men 001 (1981)'),__cr.issueNo('#12 Annual 2020'),__cr.issueNo('Starlight Ronin v04'),__cr.issueNo('Oneshot')]")==[177,1,12,4,None] or pg.evaluate("[__cr.issueNo('X-MEN177'),__cr.issueNo('Uncanny X-Men 001 (1981)'),__cr.issueNo('#12 Annual 2020'),__cr.issueNo('Starlight Ronin v04'),__cr.issueNo('Oneshot')===Infinity]")==[177,1,12,4,True])
+    rn=pg.evaluate("['150-199',\"300's\",'1-50','300s','1990s','#1-#25','300+','Uncanny X-Men','X-Men 1-50','Amazing Spiderman'].map(__cr.isRangeName)")
+    ok('range/era folder names detected',rn==[True,True,True,True,True,True,True,False,False,False],str(rn))
+    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(200)
+    ok('series rows have a … button',pg.locator('.row-more[data-series="Ember Road"]').count()==1 and pg.locator('.row-more').count()==len(pg.evaluate('__cr.series.counts()')))
+    pg.locator('.row-more[data-series="Ember Road"]').scroll_into_view_if_needed(); pg.click('.row-more[data-series="Ember Road"]'); pg.wait_for_selector('#smRename'); shot(pg,'50-series-menu'); pg.click('#smRename')
+    pg.wait_for_selector('#srName'); shot(pg,'51-rename-series'); pg.fill('#srName','Ember Trail'); pg.click('#srSave'); pg.wait_for_timeout(400)
+    heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
+    ok('rename series from Home row …',('Ember Trail' in heads) and ('Ember Road' not in heads) and dict(pg.evaluate('__cr.series.counts()')).get('Ember Trail')==3,str(heads))
+    pg.locator('.row-h[data-series="Ember Trail"]').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
+    ok('long-press / context menu on series heading opens series menu',pg.locator('#smRename').count()==1); pg.keyboard.press('Escape'); pg.evaluate("document.querySelector('.menu')?.remove()")
+    pg.click('.row-h[data-series="Ember Trail"]'); pg.wait_for_selector('#seriesEdit'); shot(pg,'52-series-grid-rename')
+    pg.click('#seriesEdit'); pg.wait_for_selector('#srName'); pg.fill('#srName','iron tide'); pg.click('#srSave'); pg.wait_for_timeout(500)
+    cnt=dict(pg.evaluate('__cr.series.counts()'))
+    ok('renaming onto an existing name merges (case-insensitive)',cnt.get('Iron Tide')==7 and 'Ember Trail' not in cnt and 'iron tide' not in cnt,str(cnt))
+    ok('series grid follows the merged series',pg.inner_text('.chip.scope').strip()=='Iron Tide' and pg.locator('.lc').count()==7)
+    tl=pg.evaluate("[...document.querySelectorAll('#libGrid .lc')].map(e=>e.dataset.title)")
+    ok('merged series sorted by issue number, then title',tl==['Ember Road 01','Iron Tide 01','Ember Road 02','Iron Tide 02','Ember Road 03','Iron Tide 03','Iron Tide 04'],str(tl))
+    pg.click('#settingsBtn'); pg.wait_for_selector('#sMerge'); pg.click('#sMerge'); pg.wait_for_selector('#mgGo')
+    ok('merge sheet: Merge disabled until 2 series picked',pg.locator('#mgGo').is_disabled())
+    for nm in ['The Hollow','Twin Moon']: pg.locator('#mgList .ckr',has_text=nm).click()
+    ok('merge sheet suggests a name',pg.input_value('#mgName')!='' and not pg.locator('#mgGo').is_disabled(),pg.input_value('#mgName'))
+    pg.fill('#mgName','Hollow Moon'); shot(pg,'53-merge-series'); pg.click('#mgGo'); pg.wait_for_timeout(500)
+    cnt=dict(pg.evaluate('__cr.series.counts()'))
+    ok('merge sheet merges selected series into new name',cnt.get('Hollow Moon')==5 and 'The Hollow' not in cnt and 'Twin Moon' not in cnt,str(cnt))
+    tab(pg,'home'); heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
+    ok('Home rows updated after merge',heads.count('Hollow Moon')==1 and 'Twin Moon' not in heads and 'The Hollow' not in heads,str(heads))
 
     # ---- Import Entire Drive Folder (Drive API mocked via routes; SW blocked so routes apply in every engine) ----
     c2=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2,service_workers='block'); p2=c2.new_page()
@@ -406,8 +459,12 @@ with sync_playwright() as p:
               {'id':'f-gh','name':'Glass_Harbor.pdf','size':str(os.path.getsize(f'{T}/Glass_Harbor.pdf')),'mimeType':'application/pdf'},
               {'id':'sub-asm','name':'Amazing Spiderman','mimeType':'application/vnd.google-apps.folder','resourceKey':'0-subkey'}],
           'sub-asm':[{'id':'f-a1','name':'ASM_001.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_01.pdf')),'mimeType':'application/pdf','resourceKey':'0-filekey'},
-                     {'id':'f-a2','name':'ASM_002.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_02.pdf')),'mimeType':'application/pdf'}]}
-    SRC={'f-nf2':'Nightfall_02.pdf','f-gh':'Glass_Harbor.pdf','f-a1':'Iron_Tide_01.pdf','f-a2':'Iron_Tide_02.pdf'}
+                     {'id':'f-a2','name':'ASM_002.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_02.pdf')),'mimeType':'application/pdf'},
+                     {'id':'sub-rng','name':'150-199','mimeType':'application/vnd.google-apps.folder'}],
+          'sub-rng':[{'id':'f-a3','name':'ASM_150.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_03.pdf')),'mimeType':'application/pdf'}],
+          'sub-300':[{'id':'f-a4','name':'X-MEN300.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_04.pdf')),'mimeType':'application/pdf'}]}
+    FOLD['0ByhXYqPJBamsS2h2X01uS29uaU0'].append({'id':'sub-300','name':"300's",'mimeType':'application/vnd.google-apps.folder'})
+    SRC={'f-nf2':'Nightfall_02.pdf','f-gh':'Glass_Harbor.pdf','f-a1':'Iron_Tide_01.pdf','f-a2':'Iron_Tide_02.pdf','f-a3':'Iron_Tide_03.pdf','f-a4':'Iron_Tide_04.pdf'}
     def drive_api(route):
         from urllib.parse import urlparse, parse_qs
         rq=route.request; u=urlparse(rq.url); q=parse_qs(u.query); h=rq.headers; seen.append((u.path,h.get('authorization'),h.get('x-goog-drive-resource-keys')))
@@ -426,16 +483,18 @@ with sync_playwright() as p:
     ok('folder listing sends resource-key header',any(x[0]=='/drive/v3/files' and x[2] and '0ByhXYqPJBamsS2h2X01uS29uaU0/0-jrOuagpWxzlX6dXlyqbz5Q' in x[2] and x[1]=='Bearer test-token' for x in seen),json.dumps(seen[:3]))
     ok('subfolder listed with its own resource key too',any(x[0]=='/drive/v3/files' and x[2] and 'sub-asm/0-subkey' in x[2] for x in seen))
     ok('checklist groups subfolder as series',p2.inner_text('.ckg').strip().lower()=='amazing spiderman')
-    ok('checklist: 4 PDFs, duplicate marked + unchecked, others checked',p2.locator('.ckr').count()==4 and p2.locator('.ckr.dup input:checked').count()==0 and 'In library' in p2.inner_text('.ckr.dup') and p2.locator('.ckr input:checked').count()==3 and p2.inner_text('#ckGo')=='Import 3')
+    ok('checklist: 6 PDFs, duplicate marked + unchecked, others checked',p2.locator('.ckr').count()==6 and p2.locator('.ckr.dup input:checked').count()==0 and 'In library' in p2.inner_text('.ckr.dup') and p2.locator('.ckr input:checked').count()==5 and p2.inner_text('#ckGo')=='Import 5')
     shot(p2,'30-drive-folder-checklist')
     p2.click('#ckNone'); ok('Select None disables Import',p2.locator('#ckGo').is_disabled())
-    p2.click('#ckAll'); ok('Select All re-selects all new files',p2.inner_text('#ckGo')=='Import 3')
-    p2.locator('.ckr').nth(1).click(); ok('toggle one file off',p2.inner_text('#ckGo')=='Import 2')
+    p2.click('#ckAll'); ok('Select All re-selects all new files',p2.inner_text('#ckGo')=='Import 5')
+    p2.locator('.ckr').nth(1).click(); ok('toggle one file off',p2.inner_text('#ckGo')=='Import 4')
     p2.locator('.ckr').nth(1).click(); p2.click('#ckGo')
-    p2.wait_for_function('document.querySelectorAll(".lc").length==4',timeout=60000)
+    p2.wait_for_function('document.querySelectorAll(".lc").length==6',timeout=90000)
     sers=p2.evaluate("(async()=>{const r=indexedDB.open('comic-reader');await new Promise(x=>r.onsuccess=x);const all=await new Promise(x=>{const q=r.result.transaction('comics').objectStore('comics').getAll();q.onsuccess=()=>x(q.result)});return all.map(c=>[c.title,c.series,c.driveId||''])})()")
     asm=[x for x in sers if x[1]=='Amazing Spiderman']
-    ok('folder import: subfolder files get series = subfolder name',len(asm)==2,json.dumps(sers))
+    ok('folder import: subfolder files get series = subfolder name',len(asm)==3,json.dumps(sers))
+    ok('range-named subfolder (150-199) inside a series folder keeps parent series',['ASM 150','Amazing Spiderman','f-a3'] in sers,json.dumps(sers))
+    ok("range-named subfolder (300's) at top level uses parent (Drive folder) name",['X-MEN300','Comics','f-a4'] in sers,json.dumps(sers))
     dl=[x for x in seen if x[0]=='/drive/v3/files/f-a1']
     ok('download sends token + file/folder resource keys',dl and dl[-1][1]=='Bearer test-token' and 'f-a1/0-filekey' in (dl[-1][2] or '') and 'sub-asm/0-subkey' in (dl[-1][2] or ''),json.dumps(dl))
     p2.wait_for_timeout(1800)

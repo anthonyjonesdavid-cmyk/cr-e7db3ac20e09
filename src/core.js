@@ -131,3 +131,7 @@ async function turnIsFold(doc,c){ const m=c.turnMode||'auto'; if(m==='fold') ret
   const idx=[]; for(let i=1;i<=5&&i<doc.numPages;i++) idx.push(i); let wide=0;
   for(const i of idx){ const pg=await doc.getPage(i+1); try{ if(await pageIsWide(pg)) wide++; } finally{ pg.cleanup(); } }
   c.foldAuto=idx.length>0&&wide>idx.length/2; dbPut(c).catch(()=>{}); return c.foldAuto; }
+
+// Drive subfolder names that are just an issue range / era ('150-199', "300's", '1-50', '1990s', '#1-#25', '300+') aren't series names
+function isRangeName(n){ const s=String(n||'').trim().replace(/[’‘]/g,"'");
+  return /^(?:(?:issues?|nos?\.?|#)\s*)?#?\d{1,4}\s*(?:-|–|—|to|thru|through)\s*#?\d{1,4}$/i.test(s) || /^\d{1,4}\s*'?\s*s$/i.test(s) || /^#?\d{1,4}\s*\+?$/.test(s); }
