@@ -1127,6 +1127,7 @@ function noteAspect(i,a){ const old=R.aspects[i]; R.aspects[i]=a; if(i>0&&!R.com
   if(R.spread) return;   // spread geometry doesn't depend on individual page shapes
   if(R.half&&old&&(old>WIDE)!==(a>WIDE)&&i>0){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) relayout(true); },30); return; } if(old&&Math.abs(old-a)/a>0.03&&R.viewEl&&pagesOf(R.views[R.vi]).includes(i)){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) renderView(); },30); } }
 function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key); if(e) return Promise.resolve(e); const doc=R.doc;
+  if(i===R.n) return enqueue(key,'page',i,prio,async()=>{ const c=await drawEndCard(w,h); return cachePut(key,{canvas:c,px:c.width*c.height}); });
   return enqueue(key,'page',i,prio,async()=>{ if(window.__crSlow) await new Promise(r=>setTimeout(r,window.__crSlow)); const page=await doc.getPage(i+1); const vp=page.getViewport({scale:1}); noteAspect(i,vp.width/vp.height);
     const c=await renderToCanvas(page,w,h,DPR,BASE_MAX_PX); page.cleanup(); return cachePut(key,{canvas:c,px:c.width*c.height}); }); }
 
@@ -1142,6 +1143,11 @@ function buildViews(){ const v=[], vh=[];
       else if(wide) ord.forEach(h=>{ v.push([i]); vh.push(h); });
       else { v.push([i]); vh.push(null); } } }
   else for(let i=0;i<R.n;i++) v.push([i]);
+  // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
+  const E=R.n, real=R.aspects.slice(0,E); R.next=nextIssue(R.comic); R.endBtn=null;
+  R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
+  if(R.spread){ const last=v[v.length-1], slot=R.rtl?0:1; if(last.length===2&&last[1]==null&&last[0]!=null) last[1]=E; else v.push([null,E]); }
+  else { v.push([E]); if(R.half) vh.push(null); }
   R.views=v; R.vh=R.half?vh:[]; }
 const halfOf=k=>R.half?(R.vh[k]||null):null;
 const pagesOf=v=>v?v.filter(x=>x!=null):[];
@@ -1188,7 +1194,7 @@ function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
   [1,-1,2,-2].forEach((d,k)=>{ const v=R.views[R.vi+d]; if(!v) return; const hv=halfOf(R.vi+d), g=geom(v,hv), vis=visualPages(v);
     vis.forEach((p,j)=>{ if(p==null) return; want.add(p); requestPage(p,hv?g[j].w*2:g[j].w,g[j].h,1+k).catch(()=>{}); }); });   // adjacent halves share their sheet's render
   dropJobs(j=>(j.kind==='page'&&!want.has(j.page))||j.kind==='hi'); }
-function updateChrome(){ const ps=pagesOf(R.views[R.vi]); let a=ps[0]+1, b=ps[ps.length-1]+1, N=R.n;
+function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ps[0]+1, b=ps[ps.length-1]+1, N=R.n;
   if(R.half){ a=b=R.vi+1; N=R.views.length; }   // portrait half pages: counter + scrubber count halves
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+N;
   const s=$('#scrub'); s.max=N; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(N>1?(b-1)/(N-1)*100:100)+'%');
@@ -1198,7 +1204,7 @@ function updateChrome(){ const ps=pagesOf(R.views[R.vi]); let a=ps[0]+1, b=ps[ps
 /* ---- progress ---- */
 let saveT=0;
 function saveSoon(){ clearTimeout(saveT); saveT=setTimeout(saveNow,250); }
-function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; const ps=pagesOf(R.views[R.vi]); c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ps[ps.length-1]+1)/R.n; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
+function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ps[ps.length-1]+1)/R.n; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
 addEventListener('pagehide',saveNow); document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveNow(); });
 
 /* ---- open / close ---- */
@@ -1250,7 +1256,7 @@ const grad=(deg,a,b)=>`linear-gradient(${deg}deg,rgba(0,0,0,${a}),rgba(0,0,0,${b
 // vdir: -1 = the page sweeps leftwards (swipe left / tap right), +1 = sweeps rightwards
 function startFlip(vdir){
   if(flip||animating||!R.viewEl||Z.s>1.01) return false;
-  const fwd=R.rtl?vdir>0:vdir<0, t=R.vi+(fwd?1:-1); if(t<0||t>=R.views.length) return false;
+  const fwd=R.rtl?vdir>0:vdir<0, t=R.vi+(fwd?1:-1); if(fwd&&t>=R.views.length&&R.next){ openNext(); return false; } if(t<0||t>=R.views.length) return false;
   dropLanding(); const cv=R.views[R.vi], tv=R.views[t], W=stage.clientWidth;
   { const th=halfOf(t), gt=geom(tv,th); visualPages(tv).forEach((p,j)=>{ if(p!=null) requestPage(p,th?gt[j].w*2:gt[j].w,gt[j].h,0).catch(()=>{}); }); }   // destination at top priority
   const wrap=document.createElement('div'); wrap.className='flip';
@@ -1389,7 +1395,7 @@ stage.addEventListener('contextmenu',e=>e.preventDefault());
 stage.addEventListener('wheel',e=>{ if(!R.doc) return; e.preventDefault(); if(e.ctrlKey){ zoomAt(stagePt(e),Z.s*Math.exp(-e.deltaY*.01),false); if(Z.s<1.02) resetZoom(false); else scheduleHi(); } else if(Z.s>1.01){ Z.tx-=e.deltaX; Z.ty-=e.deltaY; clampZoom(); applyZoom(false); scheduleHi(); } },{passive:false});
 
 let lastTap=null;
-function onTap(pt){ const now=performance.now();
+function onTap(pt){ if(endTap(pt)) return; const now=performance.now();
   if(lastTap&&now-lastTap.t<G.DTAP_MS+40&&Math.hypot(pt.x-lastTap.x,pt.y-lastTap.y)<40){ clearTimeout(lastTap.timer); lastTap=null; doubleTap(pt); return; }
   const tp={t:now,x:pt.x,y:pt.y}; tp.timer=setTimeout(()=>{ if(lastTap===tp) lastTap=null; singleTap(pt); },G.DTAP_MS); lastTap=tp; }
 function singleTap(pt){ const W=stage.clientWidth, edge=Math.min(W*.28,240);
@@ -1414,7 +1420,7 @@ function endPinch(){ pinch=null; if(Z.s<1.06) resetZoom(true); else { clampZoom(
 let hiT=0, hiCanvases=[];
 function scheduleHi(){ clearTimeout(hiT); hiT=setTimeout(doHi,220); }
 function doHi(){ if(!R.viewEl||Z.s<=1.01) return; const mul=Math.min(4,Math.ceil(Z.s*2)/2), doc=R.doc, viewEl=R.viewEl;
-  viewEl.querySelectorAll('.pg[data-p]').forEach(d=>{ if(+(d.dataset.hi||0)>=mul) return; const i=+d.dataset.p, w=+d.dataset.w, h=+d.dataset.h, half=d.dataset.half||'', fw=half?w*2:w;
+  viewEl.querySelectorAll('.pg[data-p]').forEach(d=>{ if(+(d.dataset.hi||0)>=mul||+d.dataset.p>=R.n) return; const i=+d.dataset.p, w=+d.dataset.w, h=+d.dataset.h, half=d.dataset.half||'', fw=half?w*2:w;
     enqueue(`hi|${i}|${fw}x${h}|${mul}|${half}`,'hi',i,-1,async()=>{ const page=await doc.getPage(i+1); let c=await renderToCanvas(page,fw,h,DPR*mul,HI_MAX_PX*(half?2:1)); page.cleanup();
       if(half){ const hc=halfCopy({canvas:c},half); freeCanvas(c); c=hc; } return {canvas:c,px:c.width*c.height}; })
     .then(ent=>{ if(R.viewEl!==viewEl||Z.s<=1.01||!d.isConnected){ freeCanvas(ent.canvas); return; }
@@ -1454,6 +1460,41 @@ function openPages(){ const grid=$('#pgrid'), cur=new Set(pagesOf(R.views[R.vi])
   const c=grid.querySelector('.cur'); if(c) c.scrollIntoView({block:'center'}); }
 $('#pgrid').addEventListener('click',e=>{ const b=e.target.closest('button[data-p]'); if(!b) return; $('#pages').classList.add('hidden'); jumpTo(+b.dataset.p); });
 
+
+/* ---- end of comic: next issue card / End page (drawn like a page, so turns, cache and layout just work) ---- */
+function nextIssue(c){ const s=(c&&c.series||'').trim(); if(!s) return null; const L=comics.filter(x=>(x.series||'').trim()===s).sort(byIssue); const k=L.findIndex(x=>x.id===c.id); return k>=0&&k<L.length-1?L[k+1]:null; }
+const nextImgs=new Map();
+async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.has(key)) return nextImgs.get(key);
+  const doc=await openPdf(new IDBSource(n.id,n.size)); try{ const page=await doc.getPage(1), vp=page.getViewport({scale:1}), cr=n.coverCrop||{x:0,y:0,w:1,h:1};
+    const s=Math.min(mw/(vp.width*cr.w),mh/(vp.height*cr.h)); const big=await renderToCanvas(page,vp.width*s,vp.height*s,1,60e6); page.cleanup();
+    const px=cr.x*big.width, py=cr.y*big.height, pw=cr.w*big.width, ph=cr.h*big.height, out=document.createElement('canvas'); out.width=Math.round(pw); out.height=Math.round(ph);
+    out.getContext('2d',{alpha:false}).drawImage(big,px,py,pw,ph,0,0,out.width,out.height); freeCanvas(big); nextImgs.set(key,out); return out; } finally { doc.destroy().catch(()=>{}); } }
+const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
+async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
+  if(n){ const capH=Math.round(Math.max(64,Math.min(96,h*.1))*k), pad=Math.round(Math.max(14,h*.03)*k), mw=Math.round(W*.86), mh=H-capH-pad;
+    let img=null; try{ img=await nextCover(n,mw,mh); }catch(e){ console.warn(e); }
+    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; cy=pad+(mh-ch); } }
+    const cx=(W-cw)/2; if(img) x.drawImage(img,Math.round(cx),Math.round(cy),Math.round(cw),Math.round(ch)); else { x.fillStyle='#1a1a1a'; x.fillRect(cx,cy,cw,ch); }
+    x.strokeStyle='rgba(255,255,255,.07)'; x.lineWidth=k; x.strokeRect(Math.round(cx)+.5*k,Math.round(cy)+.5*k,Math.round(cw)-k,Math.round(ch)-k);
+    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, ty=cy+ch+capH*.46;
+    x.font=`500 ${Math.round(12*k)}px ${F}`; x.fillStyle='#8c8c8c'; x.letterSpacing=`${1.6*k}px`; x.fillText('NEXT',W/2,ty-Math.round(22*k)); x.letterSpacing='0px';
+    x.font=`600 ${Math.round(17*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,label,W*.9),W/2,ty);
+    x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(22*k));
+  } else { const t=R.comic.title, cy=H*.44;
+    x.font=`400 ${Math.round(12*k)}px ${F}`; x.fillStyle='#7a7a7a'; x.letterSpacing=`${1.6*k}px`; x.fillText('THE END',W/2,cy-Math.round(34*k)); x.letterSpacing='0px';
+    x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,`End of ${t}`,W*.86),W/2,cy);
+    x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; x.fillText(R.comic.series?`No later issue of ${R.comic.series} in your library`:`${R.n} pages`,W/2,cy+Math.round(26*k));
+    const bw=Math.round(168*k), bh=Math.round(40*k), bx=(W-bw)/2, by=cy+Math.round(56*k); x.strokeStyle='rgba(255,255,255,.28)'; x.lineWidth=k; x.beginPath(); x.roundRect(bx+.5*k,by+.5*k,bw-k,bh-k,bh/2); x.stroke();
+    x.font=`500 ${Math.round(15*k)}px ${F}`; x.fillStyle='#e6e6e6'; x.textBaseline='middle'; x.fillText('Back to Library',W/2,by+bh/2);
+    R.endBtn={x:bx/W,y:by/H,w:bw/W,h:bh/H}; }
+  return c; }
+function fitText(x,t,max){ if(x.measureText(t).width<=max) return t; while(t.length>1&&x.measureText(t+'\u2026').width>max) t=t.slice(0,-1); return t+'\u2026'; }
+function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`); if(!d) return false; const cv=d.querySelector('canvas'); if(!cv) return false;
+  const r=cv.getBoundingClientRect(), sr=stage.getBoundingClientRect(), b=R.endBtn, px=pt.x+sr.left-r.left, py=pt.y+sr.top-r.top;
+  if(px>=b.x*r.width-8&&px<=(b.x+b.w)*r.width+8&&py>=b.y*r.height-8&&py<=(b.y+b.h)*r.height+8){ $('#rBack').click(); return true; } return false; }
+function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
+  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false}); }
 /* ================= boot ================= */
 window.__cr={drive:Drive,issueNo,isRangeName,series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),CF,SCF,go,jumpTo,toggleUI};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
