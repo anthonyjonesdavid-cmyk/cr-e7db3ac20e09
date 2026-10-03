@@ -269,3 +269,16 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .seg4 button.on{background:#636366;color:#fff}
 .seg4.seg3{grid-template-columns:repeat(3,1fr)}
 .fld .fhint{display:block;margin-top:6px;color:var(--mut);font-size:12px;line-height:1.35}
+
+/* Arrange Categories */
+.arrl{list-style:none;margin:0;padding:0 16px;max-height:min(60vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.arr{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid #2c2c2e;background:#1c1c1e;position:relative}
+.arr .ah{flex:none;width:40px;height:44px;display:grid;place-items:center;color:var(--mut);touch-action:none;cursor:grab}
+.arr .ah svg{width:22px;height:22px}
+.arr .at{flex:1;min-width:0}.arr .at b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.arr .at small{color:var(--mut);font-size:12px}
+.arr .ab{flex:none;width:36px;height:36px;border-radius:18px;display:grid;place-items:center;color:#d1d1d6;background:var(--el)}
+.arr .ab svg{width:18px;height:18px;stroke-width:2.6}.arr .ab:disabled{opacity:.3}
+.arr .tgl.sm{padding:0;margin-left:4px}
+.arr.off .at{opacity:.45}
+.arr.drag{z-index:2;box-shadow:0 10px 30px rgba(0,0,0,.6);border-radius:10px;background:#2c2c2e;cursor:grabbing}
+.arrm .mf{flex-wrap:wrap}

@@ -13,6 +13,10 @@ const IC={
   undo:'<svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
   trash:'<svg class="i" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
   more:'<svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>',
+  grip:'<svg class="i" viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"/></svg>',
+  up:'<svg class="i" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg>',
+  down:'<svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  arrange:'<svg class="i" viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h11M19 4v16M16.5 6.5 19 4l2.5 2.5M16.5 17.5 19 20l2.5-2.5"/></svg>',
   merge:'<svg class="i" viewBox="0 0 24 24"><path d="M6 3v6a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 3v6a6 6 0 0 1-6 6"/></svg>',
   grid:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 10h18M12 10v11"/></svg>',
 };
@@ -48,9 +52,22 @@ const emptyHTML=()=>`<div class="empty">${IC.book}<h2>No comics yet</h2><p>Impor
 
 /* ---------- Home ---------- */
 function rowHTML(title,list,kind,series){ if(!list.length) return ''; const see=`data-act="see" data-kind="${kind}"${series!=null?` data-series="${esc(series)}"`:''}`;
-  const more=kind==='series'?`<button class="row-more" data-act="smenu" data-series="${esc(series)}" aria-label="Series options for ${esc(title)}">${IC.more}</button>`:'';
+  const more=`<button class="row-more" data-act="smenu" data-kind="${kind}"${series!=null?` data-series="${esc(series)}"`:''} aria-label="Options for ${esc(title)}">${IC.more}</button>`;
   return `<section class="row"><div class="row-top"><button class="row-h" ${see}><h2>${esc(title)}</h2><span class="n">${list.length}</span>${IC.chev}</button>${more}</div>
   <div class="row-s">${list.slice(0,20).map(c=>`<button class="rc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}">${coverBox(c)}<div class="t">${esc(c.title)}</div></button>`).join('')}<button class="seeall" ${see}>${IC.grid}See all</button></div></section>`; }
+/* ---------- Home row arrangement: saved order + hidden set (settings store); keys 'added' | 's:<series>' ---------- */
+const alpha=(a,b)=>a.localeCompare(b,undefined,{numeric:true});
+const rowPrefs=()=>{ const p=store.get('rowOrder',null)||{}; return {order:Array.isArray(p.order)?p.order:[],hidden:Array.isArray(p.hidden)?p.hidden:[],saved:!!p.order}; };
+const setRowPrefs=(order,hidden)=>store.set('rowOrder',{order,hidden});
+const defaultKeys=()=>['added',...seriesCounts().map(([s])=>'s:'+s).sort((a,b)=>alpha(a,b))];
+// saved order (only rows that still exist), then any rows not in it: new series appended alphabetically
+function rowKeys(){ const cur=defaultKeys(), have=new Set(cur), p=rowPrefs(); if(!p.saved) return cur;
+  const out=p.order.filter(k=>have.has(k)), inn=new Set(out); return out.concat(cur.filter(k=>!inn.has(k))); }
+// rename/merge: the result takes the topmost position of the rows involved; hidden only if all of them were hidden
+function carryRow(from,to){ const p=rowPrefs(); if(!p.saved&&!p.hidden.length) return; const order=rowKeys(), tk='s:'+to, keys=new Set(from.map(f=>'s:'+f).concat(tk));
+  const idx=order.findIndex(k=>keys.has(k)); const allHidden=[...keys].filter(k=>order.includes(k)).every(k=>p.hidden.includes(k));
+  const no=order.filter(k=>!keys.has(k)); if(idx>=0) no.splice(Math.min(idx,no.length),0,tk); else no.push(tk);
+  const nh=p.hidden.filter(k=>!keys.has(k)); if(allHidden) nh.push(tk); setRowPrefs(no,nh); }
 // carousel: in-progress (most recently read first), then other read comics, then newest unread; de-duplicated, max CF_MAX
 const CF_MAX=50, CF_WIN=10;
 function heroList(){ const seen=new Set(), out=[], push=L=>{ for(const c of L){ if(out.length>=CF_MAX) return; if(!seen.has(c.id)){ seen.add(c.id); out.push(c); } } };
@@ -61,8 +78,9 @@ function renderHome(){
   const el=$('#homeScroll'); if(!comics.length){ el.innerHTML=emptyHTML(); Drive.preload(); CF.items=[]; CF.el=null; return; }
   const cf=heroList();
   const groups=new Map(); comics.forEach(c=>{ const s=(c.series||'').trim(); if(s){ if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(c); } });
-  let rows=rowHTML('Recently Added',comics.slice().sort((a,b)=>b.added-a.added),'added');
-  [...groups.keys()].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).forEach(s=>{ rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); });
+  let rows=''; const hid=new Set(rowPrefs().hidden);
+  rowKeys().filter(k=>!hid.has(k)).forEach(k=>{ if(k==='added') rows+=rowHTML('Recently Added',comics.slice().sort((a,b)=>b.added-a.added),'added');
+    else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
   el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cf.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="${c.id}" style="display:none"><img alt="${esc(c.title)}" decoding="async" draggable="false"><div class="dim"></div></div>`).join('')}</div></div><div class="rows">${rows}</div>`;
   CF.mount($('#cf'),cf);
@@ -163,8 +181,8 @@ function seeAll(kind,series){ ui.series=null; ui.filter='all'; ui.q=''; $('#q').
 let lp=null, lpFired=false;
 function cancelLP(){ if(lp){ clearTimeout(lp.t); lp=null; } }
 const shelfEl=$('#shelf');
-const lpTarget=e=>e.target.closest('[data-id]')||e.target.closest('.row-h[data-kind=series]');
-const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id) : seriesMenu(t,t.dataset.series);
+const lpTarget=e=>e.target.closest('[data-id]')||e.target.closest('#homeScroll .row-h');
+const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id) : seriesMenu(t,t.dataset.kind==='series'?t.dataset.series:'');
 shelfEl.addEventListener('pointerdown',e=>{ lpFired=false; const t=lpTarget(e); if(!t||e.button>0) return; cancelLP();
   lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ lp=null; lpFired=true; try{navigator.vibrate&&navigator.vibrate(8)}catch(_){} lpRun(t); },520)}; });
 shelfEl.addEventListener('pointermove',e=>{ if(lp&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>9) cancelLP(); });
@@ -175,7 +193,7 @@ shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefau
   const a=e.target.closest('[data-act]'); if(!a) return; const k=a.dataset.act;
   if(k==='open') openReader(a.dataset.id); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
   else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope'){ ui.series=null; renderLibrary(); }
-  else if(k==='smenu') seriesMenu(a,a.dataset.series); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
+  else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
   else if(k==='import') $('#fileIn').click(); else if(k==='drive') Drive.start(); },true);
 $('#fileIn').addEventListener('change',e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) importFiles(fs); });
 $('#settingsBtn').onclick=()=>openSettings();
@@ -223,10 +241,42 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
 /* ---------- series: rename (renaming onto an existing name merges) and multi-merge ---------- */
 const seriesCounts=()=>{ const m=new Map(); comics.forEach(c=>{ const s=(c.series||'').trim(); if(s) m.set(s,(m.get(s)||0)+1); }); return [...m].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})); };
 const canonSeries=n=>{ n=n.trim().replace(/\s+/g,' '); const hit=seriesCounts().find(([s])=>s.toLowerCase()===n.toLowerCase()); return hit?hit[0]:n; };
-async function applySeries(from,to){ const F=new Set(from); let n=0;
+async function applySeries(from,to){ const F=new Set(from); let n=0; carryRow(from.filter(f=>f!==to),to);
   for(const c of comics){ const s=(c.series||'').trim(); if(F.has(s)&&s!==to){ c.series=to; await dbPut(c); n++; } }
   if(ui.series!=null&&F.has(ui.series)) ui.series=to; renderShelf(); return n; }
-function seriesMenu(anchor,s){ if(!s) return; openMenu(anchor,[{label:'Rename Series…',icon:IC.edit,id:'smRename',run:()=>renameSeries(s)},{label:'Merge Series…',icon:IC.merge,id:'smMerge',run:()=>mergeSeries([s])}]); }
+function seriesMenu(anchor,s){ const arr={label:'Arrange Categories…',icon:IC.arrange,id:'smArrange',run:()=>arrangeRows()};
+  openMenu(anchor,s?[{label:'Rename Series…',icon:IC.edit,id:'smRename',run:()=>renameSeries(s)},{label:'Merge Series…',icon:IC.merge,id:'smMerge',run:()=>mergeSeries([s])},arr]:[arr]); }
+/* Arrange Categories sheet: drag handle (touch/pen/mouse via pointer events), ↑/↓ buttons, show/hide toggle, reset */
+async function arrangeRows(){ document.querySelector('.mwrap')?.remove(); const cnt=new Map(seriesCounts());
+  const p=rowPrefs(); let keys=rowKeys(); const hidden=new Set(p.hidden);
+  const label=k=>k==='added'?'Recently Added':k.slice(2), sub=k=>k==='added'?`${comics.length} comic${comics.length===1?'':'s'}`:`${cnt.get(k.slice(2))||0} comic${cnt.get(k.slice(2))===1?'':'s'}`;
+  const li=k=>`<li class="arr${hidden.has(k)?' off':''}" data-k="${esc(k)}"><span class="ah" aria-hidden="true">${IC.grip}</span><span class="at"><b>${esc(label(k))}</b><small>${sub(k)}</small></span>
+    <button class="ab" data-mv="-1" aria-label="Move ${esc(label(k))} up">${IC.up}</button><button class="ab" data-mv="1" aria-label="Move ${esc(label(k))} down">${IC.down}</button>
+    <label class="tgl sm" aria-label="Show ${esc(label(k))} on Home"><input type="checkbox" class="avis" ${hidden.has(k)?'':'checked'}></label></li>`;
+  const {r,vals}=await modal(`<div class="mh"><h3>Arrange Categories</h3><p class="dlsub">Drag ≡ to reorder Home rows, or use the arrows. Switch off to hide a row.</p></div>
+    <ul class="dllist arrl" id="arrList">${keys.map(li).join('')}</ul>
+    <div class="mf"><button class="btn ghost" id="arrReset">Reset to alphabetical</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="arrDone">Done</button></div>`,
+  w=>{ const L=w.querySelector('#arrList');
+    const sync=()=>{ const it=[...L.children]; it.forEach((x,i)=>{ x.querySelector('[data-mv="-1"]').disabled=i===0; x.querySelector('[data-mv="1"]').disabled=i===it.length-1; }); };
+    L.addEventListener('click',e=>{ const b=e.target.closest('[data-mv]'); if(!b) return; const x=b.closest('li'), d=+b.dataset.mv;
+      if(d<0&&x.previousElementSibling) L.insertBefore(x,x.previousElementSibling); else if(d>0&&x.nextElementSibling) L.insertBefore(x.nextElementSibling,x); sync(); b.focus(); });
+    L.addEventListener('change',e=>{ const c=e.target.closest('.avis'); if(c) c.closest('li').classList.toggle('off',!c.checked); });
+    w.querySelector('#arrReset').onclick=()=>{ const by=new Map([...L.children].map(x=>[x.dataset.k,x])); defaultKeys().forEach(k=>{ const x=by.get(k); if(x) L.appendChild(x); }); sync(); toast('Sorted alphabetically'); };
+    // drag: pointer capture on the handle; the row follows the finger and swaps with neighbours past their midpoint
+    let d=null;
+    L.addEventListener('pointerdown',e=>{ const h=e.target.closest('.ah'); if(!h||e.button>0) return; e.preventDefault(); const x=h.closest('li');
+      d={x,id:e.pointerId,y0:e.clientY,raf:0,lastY:e.clientY}; x.classList.add('drag'); try{h.setPointerCapture(e.pointerId)}catch(_){} });
+    const move=y=>{ if(!d) return; d.lastY=y; const x=d.x; let dy=y-d.y0; let p=x.previousElementSibling, n=x.nextElementSibling;
+      while(p&&dy<-p.offsetHeight/2){ L.insertBefore(x,p); d.y0-=p.offsetHeight; dy=y-d.y0; p=x.previousElementSibling; }
+      while(n&&dy>n.offsetHeight/2){ L.insertBefore(n,x); d.y0+=n.offsetHeight; dy=y-d.y0; n=x.nextElementSibling; }
+      x.style.transform=`translateY(${dy}px)`;
+      const lr=L.getBoundingClientRect(); const edge=y<lr.top+36?-1:y>lr.bottom-36?1:0;   // auto-scroll near the list edges
+      if(edge&&!d.raf){ const tick=()=>{ if(!d){return;} const before=L.scrollTop; L.scrollTop+=edge*8; d.y0-=L.scrollTop-before; move(d.lastY); d.raf=(L.scrollTop!==before&&(d.lastY<L.getBoundingClientRect().top+36||d.lastY>L.getBoundingClientRect().bottom-36))?requestAnimationFrame(tick):0; }; d.raf=requestAnimationFrame(tick); } };
+    L.addEventListener('pointermove',e=>{ if(d&&e.pointerId===d.id){ e.preventDefault(); move(e.clientY); } });
+    const end=e=>{ if(!d||e.pointerId!==d.id) return; cancelAnimationFrame(d.raf); d.x.classList.remove('drag'); d.x.style.transform=''; d=null; sync(); };
+    L.addEventListener('pointerup',end); L.addEventListener('pointercancel',end);
+    w._vals=()=>({order:[...L.children].map(x=>x.dataset.k),hidden:[...L.children].filter(x=>!x.querySelector('.avis').checked).map(x=>x.dataset.k)}); sync(); },'drv ckm arrm');
+  if(r!=='save') return; setRowPrefs(vals.order,vals.hidden); renderHome(); toast(vals.hidden.length?`Home rows arranged · ${vals.hidden.length} hidden`:'Home rows arranged'); }
 const nameField=(id,val,ph)=>`<input type="text" id="${id}" value="${esc(val)}" list="${id}L" placeholder="${esc(ph)}" maxlength="80" autocomplete="off" autocapitalize="words"><datalist id="${id}L">${seriesCounts().map(([s])=>`<option value="${esc(s)}">`).join('')}</datalist>`;
 async function renameSeries(old){ if(!old) return; document.querySelector('.mwrap')?.remove(); const n=comics.filter(c=>(c.series||'').trim()===old).length;
   const {r,vals}=await modal(`<div class="mh"><h3>Rename Series</h3></div><div class="mb">
@@ -271,7 +321,7 @@ async function openSettings(){
       <div class="frow"><input id="sFolder" type="url" placeholder="Paste a Drive folder link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn ghost" id="sFolderSave">Save</button></div>
       <small>Google Drive opens in this folder, and Import Entire Drive Folder lists it.${store.get('driveFolder',null)?' <button class="lnk" id="sFolderReset">Reset to default</button>':''}</small></div>
     <div class="sgrp"><b>Series</b><span>${seriesCounts().length} series. Combine series that came from separate folders (e.g. issue ranges) into one.</span>
-      <div class="frow"><button class="btn ghost" data-r="merge" id="sMerge">Merge Series…</button></div></div>
+      <div class="frow"><button class="btn ghost" data-r="merge" id="sMerge">Merge Series…</button><button class="btn ghost" data-r="arrange" id="sArrange">Arrange Categories…</button></div></div>
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
@@ -280,7 +330,7 @@ async function openSettings(){
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
     const rs=w.querySelector('#sFolderReset'); if(rs) rs.onclick=()=>{ Drive.setFolder(null); rs.remove(); cur(); toast('Using the default Drive folder'); }; });
-  if(r==='merge'){ mergeSeries(); return; }
+  if(r==='merge'){ mergeSeries(); return; } if(r==='arrange'){ arrangeRows(); return; }
   if(r==='persist'){ try{ const ok=await navigator.storage.persist(); toast(ok?'Storage marked persistent':'The browser declined for now. It often allows it in the Home Screen app.'); }catch(e){ toast('Not supported here'); } } }
 
 /* ---------- toast ---------- */

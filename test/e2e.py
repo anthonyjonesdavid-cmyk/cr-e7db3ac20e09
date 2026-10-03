@@ -431,7 +431,7 @@ with sync_playwright() as p:
     rn=pg.evaluate("['150-199',\"300's\",'1-50','300s','1990s','#1-#25','300+','Uncanny X-Men','X-Men 1-50','Amazing Spiderman'].map(__cr.isRangeName)")
     ok('range/era folder names detected',rn==[True,True,True,True,True,True,True,False,False,False],str(rn))
     tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(200)
-    ok('series rows have a … button',pg.locator('.row-more[data-series="Ember Road"]').count()==1 and pg.locator('.row-more').count()==len(pg.evaluate('__cr.series.counts()')))
+    ok('series rows have a … button',pg.locator('.row-more[data-series="Ember Road"]').count()==1 and pg.locator('.row-more').count()==len(pg.evaluate('__cr.series.counts()'))+1 and pg.locator('.row-more[data-kind=added]').count()==1)
     pg.locator('.row-more[data-series="Ember Road"]').scroll_into_view_if_needed(); pg.click('.row-more[data-series="Ember Road"]'); pg.wait_for_selector('#smRename'); shot(pg,'50-series-menu'); pg.click('#smRename')
     pg.wait_for_selector('#srName'); shot(pg,'51-rename-series'); pg.fill('#srName','Ember Trail'); pg.click('#srSave'); pg.wait_for_timeout(400)
     heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
@@ -454,6 +454,54 @@ with sync_playwright() as p:
     ok('merge sheet merges selected series into new name',cnt.get('Hollow Moon')==5 and 'The Hollow' not in cnt and 'Twin Moon' not in cnt,str(cnt))
     tab(pg,'home'); heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
     ok('Home rows updated after merge',heads.count('Hollow Moon')==1 and 'Twin Moon' not in heads and 'The Hollow' not in heads,str(heads))
+    # ---- Arrange Categories: order, touch drag, arrows, hide, persist, rename/merge carry, new series append, reset ----
+    HEADS="[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)"
+    AKEYS="[...document.querySelectorAll('#arrList li')].map(e=>e.dataset.k)"
+    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(200)
+    pg.click('.row-more[data-kind=added]'); pg.wait_for_selector('#smArrange'); pg.click('#smArrange'); pg.wait_for_selector('#arrList li'); pg.wait_for_timeout(250)
+    ok('Arrange sheet lists Recently Added + every series (from Recently Added …)',pg.evaluate(AKEYS)==['added','s:Hollow Moon','s:Iron Tide','s:Nightfall','s:Starlight Ronin'],str(pg.evaluate(AKEYS)))
+    shot(pg,'54-arrange-categories')
+    hb=pg.locator('#arrList li[data-k="s:Starlight Ronin"] .ah').bounding_box(); tb=pg.locator('#arrList li[data-k="added"]').bounding_box()
+    x0,y0=hb['x']+hb['width']/2,hb['y']+hb['height']/2; y1=tb['y']+4
+    if ENG=='chromium':   # real touch input (CDP) -> genuine touch pointer events
+        cdp=ctx.new_cdp_session(pg)
+        def tch(tp,px,py): cdp.send('Input.dispatchTouchEvent',{'type':tp,'touchPoints':[] if tp=='touchEnd' else [{'x':px,'y':py,'id':1}]})
+        tch('touchStart',x0,y0)
+        for k in range(1,13): pg.wait_for_timeout(16); tch('touchMove',x0,y0+(y1-y0)*k/12)
+        pg.wait_for_timeout(60); shot(pg,'55-arrange-dragging'); tch('touchEnd',0,0); cdp.detach()
+    else:                    # WebKit: touch-type pointer events on the handle
+        pg.evaluate("""async ({x0,y0,y1})=>{ const h=document.querySelector('#arrList li[data-k="s:Starlight Ronin"] .ah'); const sl=ms=>new Promise(r=>setTimeout(r,ms));
+          const ev=(t,y)=>h.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:77,pointerType:'touch',isPrimary:true,clientX:x0,clientY:y,buttons:t==='pointerup'?0:1}));
+          ev('pointerdown',y0); for(let k=1;k<=12;k++){ await sl(16); ev('pointermove',y0+(y1-y0)*k/12); } await sl(40); ev('pointerup',y1); }""",{'x0':x0,'y0':y0,'y1':y1})
+    pg.wait_for_timeout(200)
+    ok('touch drag reorders (Starlight Ronin dragged to top)',pg.evaluate(AKEYS)==['s:Starlight Ronin','added','s:Hollow Moon','s:Iron Tide','s:Nightfall'],str(pg.evaluate(AKEYS)))
+    ok('drag leaves no transform / drag state',pg.evaluate("![...document.querySelectorAll('#arrList li')].some(e=>e.style.transform||e.classList.contains('drag'))"))
+    ok('first row up-arrow disabled, last row down-arrow disabled',pg.locator('#arrList li').first.locator('[data-mv="-1"]').is_disabled() and pg.locator('#arrList li').last.locator('[data-mv="1"]').is_disabled())
+    pg.click('#arrList li[data-k="s:Nightfall"] [data-mv="-1"]'); pg.wait_for_timeout(100)
+    ok('up arrow moves a row up',pg.evaluate(AKEYS)==['s:Starlight Ronin','added','s:Hollow Moon','s:Nightfall','s:Iron Tide'],str(pg.evaluate(AKEYS)))
+    pg.click('#arrList li[data-k="added"] [data-mv="1"]'); pg.click('#arrList li[data-k="added"] [data-mv="-1"]'); pg.wait_for_timeout(100)
+    ok('down then up returns to place',pg.evaluate(AKEYS)[1]=='added')
+    pg.click('#arrList li[data-k="s:Iron Tide"] .tgl'); pg.wait_for_timeout(100)
+    ok('show/hide toggle (Iron Tide off)',pg.locator('#arrList li[data-k="s:Iron Tide"].off').count()==1)
+    shot(pg,'56-arrange-edited'); pg.click('#arrDone'); pg.wait_for_timeout(400)
+    ok('Home follows arranged order, hidden row gone',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Hollow Moon','Nightfall'],str(pg.evaluate(HEADS)))
+    shot(pg,'57-home-arranged')
+    pg.reload(); pg.wait_for_selector('html[data-ready]'); tab(pg,'home'); pg.wait_for_timeout(500)
+    ok('arrangement persists after relaunch',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Hollow Moon','Nightfall'],str(pg.evaluate(HEADS)))
+    pg.click('.row-more[data-series="Hollow Moon"]'); pg.wait_for_selector('#smRename'); pg.click('#smRename'); pg.wait_for_selector('#srName'); pg.fill('#srName','Aardvark'); pg.click('#srSave'); pg.wait_for_timeout(400)
+    ok('renamed series keeps its position',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
+    sheet(pg,'Nightfall 05','aEdit'); pg.wait_for_selector('#eSeries'); pg.fill('#eSeries','Abyss'); pg.click('#eSave'); pg.wait_for_timeout(400); tab(pg,'home'); pg.wait_for_timeout(200)
+    ok('new series appends at the end (not alphabetically first)',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall','Abyss'],str(pg.evaluate(HEADS)))
+    pg.click('.row-more[data-series="Abyss"]'); pg.wait_for_selector('#smRename'); pg.click('#smRename'); pg.wait_for_selector('#srName'); pg.fill('#srName','Starlight Ronin'); pg.click('#srSave'); pg.wait_for_timeout(400)
+    ok('merged series takes the topmost position of those merged',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
+    pg.locator('#homeScroll .row-h[data-kind=added]').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
+    ok('long-press on Recently Added heading offers Arrange',pg.locator('#smArrange').count()==1 and pg.locator('#smRename').count()==0); pg.evaluate("document.querySelector('.menu')?.remove()")
+    pg.click('#settingsBtn'); pg.wait_for_selector('#sArrange'); pg.click('#sArrange'); pg.wait_for_selector('#arrList li'); pg.wait_for_timeout(200)
+    ok('Settings > Arrange Categories opens sheet with current order',pg.evaluate(AKEYS)==['s:Starlight Ronin','added','s:Aardvark','s:Nightfall','s:Iron Tide'],str(pg.evaluate(AKEYS)))
+    pg.click('#arrReset'); pg.wait_for_timeout(150)
+    ok('Reset to alphabetical (Recently Added first, series A–Z)',pg.evaluate(AKEYS)==['added','s:Aardvark','s:Iron Tide','s:Nightfall','s:Starlight Ronin'],str(pg.evaluate(AKEYS)))
+    pg.click('#arrList li[data-k="s:Iron Tide"] .tgl'); pg.click('#arrDone'); pg.wait_for_timeout(400)
+    ok('Home after reset + re-show',pg.evaluate(HEADS)==['Recently Added','Aardvark','Iron Tide','Nightfall','Starlight Ronin'],str(pg.evaluate(HEADS)))
 
     # ---- Import Entire Drive Folder (Drive API mocked via routes; SW blocked so routes apply in every engine) ----
     c2=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2,service_workers='block'); p2=c2.new_page()
