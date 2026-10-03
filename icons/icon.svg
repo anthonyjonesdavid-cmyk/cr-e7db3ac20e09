@@ -1,9 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<rect width="512" height="512" fill="#000"/>
-<g fill="none" stroke="#fff" stroke-width="20" stroke-linejoin="round">
-<rect x="126" y="112" width="260" height="288" rx="10"/>
-</g>
-<rect x="146" y="132" width="220" height="112" fill="#fff"/>
-<rect x="146" y="262" width="100" height="118" fill="#e5383b"/>
-<rect x="264" y="262" width="102" height="118" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1b1d"/><stop offset="1" stop-color="#050505"/></linearGradient>
+<linearGradient id="pgL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="0.85" stop-color="#f1f1f1"/><stop offset="1" stop-color="#c9c9c9"/></linearGradient>
+<linearGradient id="pgR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="0.85" stop-color="#f1f1f1"/><stop offset="1" stop-color="#c9c9c9"/></linearGradient>
+<clipPath id="cL"><path d="M490 352 C426 312 300 290 182 308 L182 736 C300 718 426 738 490 778 Z"/></clipPath>
+<clipPath id="cR"><path d="M534 352 C598 312 724 290 842 308 L842 736 C724 718 598 738 534 778 Z"/></clipPath></defs>
+<rect width="1024" height="1024" fill="url(#bg2)"/><ellipse cx="512" cy="820" rx="390" ry="34" fill="#000" opacity="0.6"/><path d="M512 330 C440 286 300 262 150 284 L150 770 C300 748 440 768 512 812 Z" fill="url(#pgL)"/><path d="M512 330 C584 286 724 262 874 284 L874 770 C724 748 584 768 512 812 Z" fill="url(#pgR)"/><g clip-path="url(#cL)"><rect x="150" y="240" width="160" height="230" fill="#141414"/><rect x="334" y="240" width="178" height="230" fill="#E3262B"/><rect x="150" y="494" width="362" height="86" fill="#141414"/><rect x="150" y="604" width="362" height="216" fill="#141414"/></g><g clip-path="url(#cR)"><rect x="512" y="240" width="362" height="180" fill="#141414"/><rect x="512" y="446" width="178" height="374" fill="#141414"/><rect x="716" y="446" width="158" height="374" fill="#E3262B"/></g><path d="M512 330 L512 812" stroke="#9a9a9a" stroke-width="4"/>
 </svg>
