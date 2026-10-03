@@ -62,7 +62,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .pillbtn.ghost{background:var(--el2);color:#fff}
 
 /* ---------- Home: rows ---------- */
-.rows{padding:0 0 calc(90px + var(--sab))}
+.rows{padding:0 0 calc(24px + var(--sab))}
 .row{margin:18px 0 6px}.rows>.row:first-child{margin-top:12px}
 .row-top{display:flex;align-items:center}.row-top .row-h{flex:1;min-width:0;padding-right:2px}
 .row-more{flex:none;width:40px;height:34px;margin-right:calc(var(--padr) - 10px);display:grid;place-items:center;color:var(--mut);border-radius:17px}
@@ -105,7 +105,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .chip.scope svg{width:14px;height:14px;stroke-width:2.6}
 .chip .c{font-weight:500;opacity:.6}
 #libScroll{flex:1;min-height:0}
-.lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;padding:6px calc(var(--padr) + var(--azw,0px)) calc(90px + var(--sab)) var(--padx)}
+.lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;padding:6px calc(var(--padr) + var(--azw,0px)) calc(24px + var(--sab)) var(--padx)}
 @media (min-width:600px){.lgrid{grid-template-columns:repeat(5,1fr);gap:12px 8px}}
 @media (min-width:1000px){.lgrid{grid-template-columns:repeat(7,1fr)}}
 .lc{display:block;text-align:left;min-width:0}
@@ -119,14 +119,6 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .azpop{position:absolute;right:46px;width:56px;height:56px;border-radius:12px;background:var(--el2);color:#fff;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:6;pointer-events:none}
 
 /* ---------- now reading pill ---------- */
-#nowPill{position:absolute;left:50%;bottom:calc(12px + var(--sab));transform:translateX(-50%);z-index:8;width:min(520px,calc(100% - 28px));height:54px;border-radius:14px;background:#1c1c1e;border:.5px solid #333;box-shadow:0 10px 30px rgba(0,0,0,.6);display:flex;align-items:center;gap:11px;padding:0 14px 0 7px;text-align:left;overflow:hidden}
-#nowPill img{width:28px;height:42px;object-fit:cover;flex:none;background:var(--el2)}
-#nowPill .np{flex:1;min-width:0}
-#nowPill .np b{display:block;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#nowPill .np span{display:block;font-size:12px;color:var(--mut);margin-top:1px}
-#nowPill .pct{font-size:13px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
-#nowPill svg{width:22px;height:22px;fill:#fff;stroke:none}
-#nowPill .npl{position:absolute;left:0;bottom:0;height:2px;background:#fff}
 
 /* ---------- empty ---------- */
 .empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 28px 80px;gap:10px}
@@ -244,7 +236,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .rows{--rw:112px}
 @media (min-width:600px){.rows{--rw:136px}}
 @media (min-width:1000px){.rows{--rw:142px}}
-.rc,.lc,.cf-item,.seeall,#nowPill{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.rc,.lc,.cf-item,.seeall{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .pl.none{background:transparent}
 /* import menu + Google Drive progress sheet */
 .menu.imp{min-width:230px}
@@ -319,7 +311,6 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="scrollv" id="libScroll"><div class="lgrid" id="libGrid"></div></div>
     <nav id="azIndex" class="hidden" aria-label="Jump to letter"></nav>
   </main>
-  <button id="nowPill" class="hidden" aria-label="Resume reading"></button>
 </section>
 
 <!-- ================= READER ================= -->
@@ -533,7 +524,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
   for(const c of todo){ if(!comics.includes(c)) continue; while(R&&R.comic) await new Promise(r=>setTimeout(r,1500));   // don't compete with the reader
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
-function renderShelf(){ renderHome(); renderLibrary(); renderPill(); setTab(ui.tab); }
+function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
 function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); if(t==='home') CF.size(); }
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setTab(b.dataset.tab); });
@@ -654,17 +645,11 @@ function seeAll(kind,series){ ui.series=null; ui.filter='all'; ui.q=''; $('#q').
   az.addEventListener('pointerdown',e=>{ on=true; try{az.setPointerCapture(e.pointerId)}catch(_){} pick(e.clientY); e.preventDefault(); });
   az.addEventListener('pointermove',e=>{ if(on) pick(e.clientY); }); az.addEventListener('pointerup',done); az.addEventListener('pointercancel',done); })();
 
-/* ---------- now-reading pill ---------- */
-function renderPill(){ const p=$('#nowPill'); const c=comics.filter(x=>x.lastRead&&!isDone(x)).sort((a,b)=>b.lastRead-a.lastRead)[0];
-  if(!c){ p.classList.add('hidden'); return; } p.classList.remove('hidden'); p.dataset.id=c.id; const pc=pctOf(c);
-  p.innerHTML=`<img src="${cover(c)}" alt=""><div class="np"><b>${esc(c.title)}</b><span>Page ${(c.page||0)+1} of ${c.pages}</span></div><span class="pct">${pc}%</span>${IC.play}<i class="npl" style="width:${pc}%"></i>`; }
-$('#nowPill').addEventListener('click',()=>{ const id=$('#nowPill').dataset.id; if(id) openReader(id); });
-
 /* ---------- clicks, long-press & context menu ---------- */
 let lp=null, lpFired=false;
 function cancelLP(){ if(lp){ clearTimeout(lp.t); lp=null; } }
 const shelfEl=$('#shelf');
-const lpTarget=e=>e.target.closest('[data-id]:not(#nowPill)')||e.target.closest('.row-h[data-kind=series]');
+const lpTarget=e=>e.target.closest('[data-id]')||e.target.closest('.row-h[data-kind=series]');
 const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id) : seriesMenu(t,t.dataset.series);
 shelfEl.addEventListener('pointerdown',e=>{ lpFired=false; const t=lpTarget(e); if(!t||e.button>0) return; cancelLP();
   lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ lp=null; lpFired=true; try{navigator.vibrate&&navigator.vibrate(8)}catch(_){} lpRun(t); },520)}; });

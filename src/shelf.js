@@ -38,7 +38,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
   for(const c of todo){ if(!comics.includes(c)) continue; while(R&&R.comic) await new Promise(r=>setTimeout(r,1500));   // don't compete with the reader
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
-function renderShelf(){ renderHome(); renderLibrary(); renderPill(); setTab(ui.tab); }
+function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
 function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); if(t==='home') CF.size(); }
 $('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setTab(b.dataset.tab); });
@@ -159,17 +159,11 @@ function seeAll(kind,series){ ui.series=null; ui.filter='all'; ui.q=''; $('#q').
   az.addEventListener('pointerdown',e=>{ on=true; try{az.setPointerCapture(e.pointerId)}catch(_){} pick(e.clientY); e.preventDefault(); });
   az.addEventListener('pointermove',e=>{ if(on) pick(e.clientY); }); az.addEventListener('pointerup',done); az.addEventListener('pointercancel',done); })();
 
-/* ---------- now-reading pill ---------- */
-function renderPill(){ const p=$('#nowPill'); const c=comics.filter(x=>x.lastRead&&!isDone(x)).sort((a,b)=>b.lastRead-a.lastRead)[0];
-  if(!c){ p.classList.add('hidden'); return; } p.classList.remove('hidden'); p.dataset.id=c.id; const pc=pctOf(c);
-  p.innerHTML=`<img src="${cover(c)}" alt=""><div class="np"><b>${esc(c.title)}</b><span>Page ${(c.page||0)+1} of ${c.pages}</span></div><span class="pct">${pc}%</span>${IC.play}<i class="npl" style="width:${pc}%"></i>`; }
-$('#nowPill').addEventListener('click',()=>{ const id=$('#nowPill').dataset.id; if(id) openReader(id); });
-
 /* ---------- clicks, long-press & context menu ---------- */
 let lp=null, lpFired=false;
 function cancelLP(){ if(lp){ clearTimeout(lp.t); lp=null; } }
 const shelfEl=$('#shelf');
-const lpTarget=e=>e.target.closest('[data-id]:not(#nowPill)')||e.target.closest('.row-h[data-kind=series]');
+const lpTarget=e=>e.target.closest('[data-id]')||e.target.closest('.row-h[data-kind=series]');
 const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id) : seriesMenu(t,t.dataset.series);
 shelfEl.addEventListener('pointerdown',e=>{ lpFired=false; const t=lpTarget(e); if(!t||e.button>0) return; cancelLP();
   lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ lp=null; lpFired=true; try{navigator.vibrate&&navigator.vibrate(8)}catch(_){} lpRun(t); },520)}; });
