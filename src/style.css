@@ -227,3 +227,48 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 @media (min-width:1000px){.rows{--rw:142px}}
 .rc,.lc,.cf-item,.seeall,#nowPill{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .pl.none{background:transparent}
+/* import menu + Google Drive progress sheet */
+.menu.imp{min-width:230px}
+.menu.imp button svg{width:20px;height:20px;stroke-width:1.8;color:#ebebf5cc}
+.ebtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.modal.drv .confirm-msg b{color:#fff}
+.dlwrap{align-items:flex-end}
+@media (min-width:600px){.dlwrap{align-items:center}}
+.modal.dl{width:min(480px,100%);display:flex;flex-direction:column;max-height:min(80vh,640px);overflow:hidden}
+.modal.dl .mh{padding:18px 18px 12px;border-bottom:.5px solid #3a3a3c}
+.dlsub{margin:4px 0 10px;color:var(--mut);font-size:13px;font-variant-numeric:tabular-nums}
+.dlbar{height:4px;border-radius:2px;background:#ffffff1f;overflow:hidden}
+.dlbar i{display:block;height:100%;width:0;background:#fff;border-radius:2px;transition:width .15s linear}
+.dlbar.all{height:5px}
+.dllist{overflow:auto;-webkit-overflow-scrolling:touch;padding:4px 18px;flex:1;min-height:0}
+.dlr{padding:11px 0;border-bottom:.5px solid #2c2c2e}
+.dlr:last-child{border-bottom:0}
+.dlt{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:7px}
+.dlt b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dlp{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums;flex:none}
+.dls{font-size:12px;color:var(--mut);margin-top:6px;font-variant-numeric:tabular-nums}
+.dlr.wait .dlbar i{background:#ffffff40}
+.dlr.done .dlbar i{background:#30d158}.dlr.done .dlp{color:#30d158}
+.dlr.skip{opacity:.55}
+.dlr.fail .dls{color:#ff6961}.dlr.fail .dlbar i{background:#ff453a}
+.dlr.cancel{opacity:.5}
+.modal.dl .mf{padding:12px 18px 18px;border-top:.5px solid #3a3a3c}
+/* settings: Drive folder; folder checklist */
+.sgrp{margin:14px 0 4px;display:flex;flex-direction:column;gap:6px}
+.sgrp>b{font-size:15px}.sgrp>span,.sgrp small{color:var(--mut);font-size:13px}.sgrp>span{word-break:break-all}
+.sgrp code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#ebebf5cc}
+.frow{display:flex;gap:8px}
+.frow input{flex:1;min-width:0;height:38px;border-radius:10px;background:var(--el2);color:#fff;border:0;padding:0 12px;font-size:15px}
+.lnk{color:#0a84ff;font-size:14px;font-weight:600;padding:4px 0}
+.ckbar{display:flex;gap:18px;margin-top:-4px}
+.modal.ckm{width:min(520px,100%);display:flex;flex-direction:column;max-height:min(84vh,720px);overflow:hidden}
+.modal.ckm .mh{border-bottom:.5px solid #3a3a3c;padding-bottom:8px}
+.modal.ckm .mf{border-top:.5px solid #3a3a3c;padding-top:12px}
+.modal.ckm .btn:disabled{opacity:.4}
+.ckg{position:sticky;top:0;background:var(--el);padding:12px 0 6px;font-size:13px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;z-index:1}
+.ckr{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:.5px solid #2c2c2e;cursor:pointer}
+.ckr input{width:22px;height:22px;accent-color:#0a84ff;flex:none}
+.ckt{display:flex;flex-direction:column;min-width:0}
+.ckt b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ckt small{font-size:12px;color:var(--mut)}
+.ckr.dup .ckt b{color:var(--mut)}

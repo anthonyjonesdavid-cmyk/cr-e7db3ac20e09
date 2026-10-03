@@ -1,5 +1,5 @@
 """End-to-end test (Kindle-style shelf + reader): python3 test/e2e.py [chromium|webkit] [--big]  (server on 127.0.0.1:8823)"""
-import sys, os, json, time
+import sys, os, json, time, re
 from playwright.sync_api import sync_playwright
 URL='http://127.0.0.1:8823/'
 ENG=sys.argv[1] if len(sys.argv)>1 else 'chromium'
@@ -8,6 +8,29 @@ T=os.path.abspath(os.path.join(os.path.dirname(__file__),'..','testpdfs'))
 SH=os.path.abspath(os.path.join(os.path.dirname(__file__),'..','shots'))
 os.makedirs(SH,exist_ok=True)
 res=[]; errors=[]
+# ---- mock "Google Drive" download server: streams files slowly (chunked reads), with CORS, like alt=media ----
+import threading, http.server, socketserver, subprocess
+DRV=os.path.join(T,'drive')
+if not os.path.exists(os.path.join(DRV,'Drive_Annual.pdf')): subprocess.run([sys.executable,os.path.join(os.path.dirname(__file__),'gen_pdfs.py'),'--drive'],check=True)
+class SlowH(http.server.BaseHTTPRequestHandler):
+    def log_message(self,*a): pass
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        u=urlparse(self.path); q=parse_qs(u.query); fp=os.path.join(DRV,os.path.basename(u.path))
+        if not u.path.startswith('/f/') or not os.path.exists(fp): self.send_response(404); self.send_header('Access-Control-Allow-Origin','*'); self.end_headers(); return
+        delay=float(q.get('d',['0.03'])[0]); sz=os.path.getsize(fp)
+        self.send_response(200); self.send_header('Content-Type','application/pdf'); self.send_header('Content-Length',str(sz)); self.send_header('Access-Control-Allow-Origin','*'); self.end_headers()
+        try:
+            with open(fp,'rb') as f:
+                while True:
+                    b=f.read(262144)
+                    if not b: break
+                    self.wfile.write(b); self.wfile.flush(); time.sleep(delay)
+        except (BrokenPipeError,ConnectionResetError): pass
+class TS(socketserver.ThreadingMixIn,http.server.HTTPServer): daemon_threads=True; allow_reuse_address=True
+DPORT=8824 if ENG=='chromium' else 8825
+threading.Thread(target=TS(('127.0.0.1',DPORT),SlowH).serve_forever,daemon=True).start()
+DS=f'http://127.0.0.1:{DPORT}'
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS' if cond else 'FAIL'),f'[{ENG}]',name,extra,flush=True)
 GEST='''async ({x,y,pts,hold,noup})=>{
@@ -74,11 +97,15 @@ with sync_playwright() as p:
     ctx=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2)
     pg=ctx.new_page()
     pg.on('pageerror',lambda e:errors.append('pageerror: '+str(e)))
-    pg.on('console',lambda m: errors.append(f'console.{m.type}: {m.text}') if m.type=='error' else None)
+    # hermetic: Google (GIS / Picker) is blocked here; the live check exercises the real sign-in popup
+    import re as _re; GRE=_re.compile(r'https://([a-z0-9-]+\.)*(google|googleapis|gstatic)\.com/')
+    ctx.route(GRE,lambda r:r.abort())
+    pg.on('console',lambda m: errors.append(f'console.{m.type}: {m.text}') if m.type=='error' and not GRE.match((m.location or {}).get('url','') or '') and not GRE.search(m.text) else None)
     pg.goto(URL); pg.wait_for_selector('html[data-ready]')
     ok('robots meta present',pg.evaluate("document.querySelector('meta[name=robots]').content")=='noindex, nofollow')
     ok('no comic display font / halftone left',pg.evaluate("!document.documentElement.outerHTML.includes('Bangers')"))
     shot(pg,'01-empty-home')
+    ok('empty state offers From Google Drive + From Files',pg.locator('#homeScroll [data-act=drive]').count()==1 and pg.locator('#homeScroll [data-act=import]').count()==1)
     t0=time.time(); pg.set_input_files('#fileIn',[f'{T}/{f}' for f in FILES])
     pg.wait_for_function(f'document.querySelectorAll(".lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=(400000 if BIG else 90000))
     ok(f'import {len(FILES)} PDFs',True,f'{time.time()-t0:.1f}s'); pg.wait_for_timeout(600)
@@ -226,11 +253,114 @@ with sync_playwright() as p:
             touch('touchEnd',x+sign*20,y); pg.wait_for_timeout(900)
             ok(f'REAL CDP touch flick 20px {name}',state(pg)['first']==before-sign,f"{before}->{state(pg)['first']}")
     back(pg)
+    # ---- import menu + Google Drive (Drive itself mocked: unconfigured message, then streamed import from a throttled local URL) ----
+    pg.set_viewport_size({'width':820,'height':1180}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
+    pg.click('#importBtn'); pg.wait_for_selector('.menu.imp'); pg.wait_for_timeout(200)
+    ok('+ opens import menu: From Google Drive / Entire Folder / From Files',pg.inner_text('#miDrive').strip()=='From Google Drive' and 'Entire Drive Folder' in pg.inner_text('#miFolder') and pg.inner_text('#miFiles').strip()=='From Files')
+    shot(pg,'25-import-menu')
+    pops=[]; ctx.on('page',lambda q:pops.append(q))
+    pg.click('#miDrive')
+    for _ in range(150):
+        if pops or pg.evaluate('(()=>{const m=document.querySelector("#dConnMsg"); return !!(m&&m.textContent.includes("reach Google"))})()'): break
+        pg.wait_for_timeout(100)
+    if pops:   # (Playwright WebKit doesn't always honour the route block: the real GIS popup opened instead)
+        ok('Drive configured: sign-in popup opens from the tap',True,'popup'); [q.close() for q in pops]; pg.wait_for_timeout(1200)
+        pg.evaluate("document.querySelectorAll('.mwrap').forEach(m=>m.remove())")   # sign-in help sheet shown after the popup closes
+    else:
+        ok('Drive configured: Google unreachable is handled with a clear message',pg.locator('#dConnGo').is_disabled()); shot(pg,'26-drive-unreachable'); pg.click('.modal.drv [data-r=no]')
+    ok('requested scope is drive.readonly (as configured)',pg.evaluate('__cr.drive.scope').endswith('/drive.readonly'))
+    with pg.expect_file_chooser(timeout=3000) as fc:
+        pg.click('#importBtn'); pg.click('#miFiles')
+    ok('From Files opens the system file picker',fc.value is not None)
+    AS=os.path.getsize(f'{DRV}/Drive_Annual.pdf'); NS=os.path.getsize(f'{T}/Nightfall_02.pdf')
+    items=[{'id':'drv-annual','name':'Drive_Annual.pdf','size':AS,'url':f'{DS}/f/Drive_Annual.pdf?d=0.04'},
+           {'id':'drv-dup','name':'Nightfall_02.pdf','size':NS,'url':f'{DS}/f/Nightfall_02.pdf'},
+           {'id':'drv-bad','name':'Broken.pdf','size':90000,'url':f'{DS}/f/Broken.pdf'},
+           {'id':'drv-404','name':'Missing_Issue.pdf','size':5000,'url':f'{DS}/f/nope.pdf'}]
+    n0=pg.evaluate('document.querySelectorAll("#libGrid .lc").length')
+    pg.evaluate('(it)=>{ window.__dr=__cr.drive.importRemote(it,{auth:false}); }',items)
+    pg.wait_for_selector('.modal.dl'); pg.wait_for_function('parseFloat(document.querySelector(".dlr[data-k=\'0\'] .dlbar i").style.width)>=40',timeout=60000)
+    shot(pg,'27-drive-progress')
+    mid=pg.evaluate('({p:document.querySelector(".dlr[data-k=\'0\'] .dlp").textContent,s:document.querySelector(".dlr[data-k=\'0\'] .dls").textContent,sub:document.querySelector("#dlSub").textContent,all:document.querySelector("#dlAll").style.width})')
+    ok('progress sheet: per-file % + bytes + overall',mid['p'].endswith('%') and ' of ' in mid['s'] and '1 of 4' in mid['sub'] and float(mid['all'][:-1])>0,json.dumps(mid))
+    r=pg.evaluate('window.__dr'); errors[:]=[e for e in errors if 'status of 404' not in e]  # the deliberate mock-Drive 404 above
+    ok('drive import result: 1 imported, 1 duplicate skipped, 2 failed',r=={'ok':1,'skip':1,'fail':2},json.dumps(r))
+    sts=pg.eval_on_selector_all('.dlr','els=>els.map(e=>e.className.replace("dlr ","")+": "+e.querySelector(".dls").textContent)')
+    ok('per-file statuses (done / skip / invalid PDF / HTTP 404)',sts[0].startswith('done') and sts[1]=='skip: Already in your library' and sts[2]=='fail: Not a valid PDF' and sts[3].startswith('fail') and '404' in sts[3],json.dumps(sts))
+    shot(pg,'28-drive-done')
+    chunks=pg.evaluate('''()=>new Promise(res=>{const r=indexedDB.open('comic-reader');r.onsuccess=()=>{const d=r.result;const out={};const c=d.transaction('chunks').objectStore('chunks').openKeyCursor();c.onsuccess=()=>{const cur=c.result;if(!cur){res(out);return;}out[cur.key[0]]=(out[cur.key[0]]||0)+1;cur.continue();};};})''')
+    rec=pg.evaluate("(async()=>{const r=indexedDB.open('comic-reader');await new Promise(x=>r.onsuccess=x);const all=await new Promise(x=>{const q=r.result.transaction('comics').objectStore('comics').getAll();q.onsuccess=()=>x(q.result)});const a=all.find(c=>c.driveId==='drv-annual');return a&&{id:a.id,size:a.size,pages:a.pages,title:a.title,series:a.series,n:all.length}})()")
+    ok('streamed into 4 MB IndexedDB chunks (no orphan chunks from failures)',rec and chunks.get(rec['id'])==-(-AS//(4*1024*1024)) and len(chunks)==rec['n'] and rec['size']==AS,f"{rec} chunks={chunks.get(rec['id']) if rec else None} ids={len(chunks)}")
+    ok('title from Drive filename',rec and rec['title']=='Drive Annual' and rec['pages']==30,json.dumps(rec))
+    pg.click('#dlDone'); pg.wait_for_timeout(200); ok('library grew by one',pg.evaluate('document.querySelectorAll("#libGrid .lc").length')==n0+1)
+    open_comic(pg,'Drive Annual'); pg.evaluate('__cr.jumpTo(20)'); wait_render(pg); ok('Drive-imported comic opens + renders deep page',state(pg)['first']==20); back(pg)
+    r=pg.evaluate('(it)=>__cr.drive.importRemote(it,{auth:false})',[{'id':'drv-annual','name':'Renamed In Drive.pdf','size':AS,'url':f'{DS}/f/Drive_Annual.pdf'}])
+    ok('re-import of same Drive file id is skipped',r=={'ok':0,'skip':1,'fail':0},json.dumps(r)); pg.click('#dlDone')
+    pg.evaluate('(it)=>{ window.__dr=__cr.drive.importRemote(it,{auth:false}); }',[{'id':'drv-c1','name':'Cancel_Me.pdf','size':AS,'url':f'{DS}/f/Drive_Annual.pdf?d=0.06'},{'id':'drv-c2','name':'Never_Started.pdf','size':AS,'url':f'{DS}/f/Drive_Annual.pdf'}])
+    pg.wait_for_function('parseFloat(document.querySelector(".dlr[data-k=\'0\'] .dlbar i").style.width)>=25',timeout=60000); pg.click('#dlCancel')
+    r=pg.evaluate('window.__dr'); sts=pg.eval_on_selector_all('.dlr','els=>els.map(e=>e.className.replace("dlr ",""))')
+    chunks2=pg.evaluate('''()=>new Promise(res=>{const r=indexedDB.open('comic-reader');r.onsuccess=()=>{const out=new Set();const c=r.result.transaction('chunks').objectStore('chunks').openKeyCursor();c.onsuccess=()=>{const cur=c.result;if(!cur){res(out.size);return;}out.add(cur.key[0]);cur.continue();};};})''')
+    ok('cancel stops download, cleans partial chunks, skips the rest',r['ok']==0 and sts==['cancel','cancel'] and chunks2==rec['n'] and 'cancelled' in pg.inner_text('#dlHead').lower(),f'{r} {sts} ids={chunks2}')
+    shot(pg,'29-drive-cancelled'); pg.click('#dlDone')
+    sheet(pg,'Drive Annual','aDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(300)
+
     # ---- delete + settings ----
     pg.set_viewport_size({'width':820,'height':1180}); tab(pg,'library'); n0=pg.locator('.lc').count()
     sheet(pg,'Iron Tide 05','aDelete'); pg.wait_for_selector('#confirmOk'); shot(pg,'23-delete-confirm'); pg.click('#confirmOk'); pg.wait_for_timeout(400)
     ok('delete with confirm',pg.locator('.lc').count()==n0-1)
     pg.click('#settingsBtn'); pg.wait_for_selector('.stor'); pg.wait_for_timeout(200); shot(pg,'24-settings'); ok('settings shows storage used',' MB' in pg.inner_text('.stor')); pg.keyboard.press('Escape')
+
+    # ---- Import Entire Drive Folder (Drive API mocked via routes; SW blocked so routes apply in every engine) ----
+    c2=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2,service_workers='block'); p2=c2.new_page()
+    p2.on('pageerror',lambda e:errors.append('pageerror(folder): '+str(e)))
+    p2.on('console',lambda m: errors.append(f'console(folder): {m.text}') if m.type=='error' and not GRE.search(m.text) and not GRE.match((m.location or {}).get('url','') or '') else None)
+    c2.route(GRE,lambda r:r.abort())
+    seen=[]
+    FOLD={'0ByhXYqPJBamsS2h2X01uS29uaU0':[{'id':'f-nf2','name':'Nightfall_02.pdf','size':str(os.path.getsize(f'{T}/Nightfall_02.pdf')),'mimeType':'application/pdf'},
+              {'id':'f-gh','name':'Glass_Harbor.pdf','size':str(os.path.getsize(f'{T}/Glass_Harbor.pdf')),'mimeType':'application/pdf'},
+              {'id':'sub-asm','name':'Amazing Spiderman','mimeType':'application/vnd.google-apps.folder','resourceKey':'0-subkey'}],
+          'sub-asm':[{'id':'f-a1','name':'ASM_001.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_01.pdf')),'mimeType':'application/pdf','resourceKey':'0-filekey'},
+                     {'id':'f-a2','name':'ASM_002.pdf','size':str(os.path.getsize(f'{T}/Iron_Tide_02.pdf')),'mimeType':'application/pdf'}]}
+    SRC={'f-nf2':'Nightfall_02.pdf','f-gh':'Glass_Harbor.pdf','f-a1':'Iron_Tide_01.pdf','f-a2':'Iron_Tide_02.pdf'}
+    def drive_api(route):
+        from urllib.parse import urlparse, parse_qs
+        rq=route.request; u=urlparse(rq.url); q=parse_qs(u.query); h=rq.headers; seen.append((u.path,h.get('authorization'),h.get('x-goog-drive-resource-keys')))
+        cors={'Access-Control-Allow-Origin':'*'}
+        if u.path=='/drive/v3/files':
+            fid=q['q'][0].split("'")[1]; return route.fulfill(status=200,headers=cors,content_type='application/json',body=json.dumps({'files':FOLD.get(fid,[])}))
+        fid=u.path.rsplit('/',1)[1]
+        if q.get('alt')==['media']: return route.fulfill(status=200,headers=cors,content_type='application/pdf',path=f'{T}/{SRC[fid]}')
+        return route.fulfill(status=200,headers=cors,content_type='application/json',body=json.dumps({'name':'Comics'}))
+    c2.route(re.compile(r'https://www\.googleapis\.com/drive/v3/files.*'),drive_api)
+    p2.goto(URL); p2.wait_for_selector('html[data-ready]')
+    p2.set_input_files('#fileIn',[f'{T}/Nightfall_02.pdf']); p2.wait_for_function('document.querySelectorAll(".lc").length==1 && !document.querySelector(".toast .tb")',timeout=60000)
+    ok('default Drive folder from config',p2.evaluate('__cr.drive.folder().id')=='0ByhXYqPJBamsS2h2X01uS29uaU0')
+    p2.evaluate("__cr.drive._setToken('test-token')"); p2.click('#importBtn'); p2.click('#miFolder')
+    p2.wait_for_selector('.modal.ckm #ckGo'); p2.wait_for_timeout(300)
+    ok('folder listing sends resource-key header',any(x[0]=='/drive/v3/files' and x[2] and '0ByhXYqPJBamsS2h2X01uS29uaU0/0-jrOuagpWxzlX6dXlyqbz5Q' in x[2] and x[1]=='Bearer test-token' for x in seen),json.dumps(seen[:3]))
+    ok('subfolder listed with its own resource key too',any(x[0]=='/drive/v3/files' and x[2] and 'sub-asm/0-subkey' in x[2] for x in seen))
+    ok('checklist groups subfolder as series',p2.inner_text('.ckg').strip().lower()=='amazing spiderman')
+    ok('checklist: 4 PDFs, duplicate marked + unchecked, others checked',p2.locator('.ckr').count()==4 and p2.locator('.ckr.dup input:checked').count()==0 and 'In library' in p2.inner_text('.ckr.dup') and p2.locator('.ckr input:checked').count()==3 and p2.inner_text('#ckGo')=='Import 3')
+    shot(p2,'30-drive-folder-checklist')
+    p2.click('#ckNone'); ok('Select None disables Import',p2.locator('#ckGo').is_disabled())
+    p2.click('#ckAll'); ok('Select All re-selects all new files',p2.inner_text('#ckGo')=='Import 3')
+    p2.locator('.ckr').nth(1).click(); ok('toggle one file off',p2.inner_text('#ckGo')=='Import 2')
+    p2.locator('.ckr').nth(1).click(); p2.click('#ckGo')
+    p2.wait_for_function('document.querySelectorAll(".lc").length==4',timeout=60000)
+    sers=p2.evaluate("(async()=>{const r=indexedDB.open('comic-reader');await new Promise(x=>r.onsuccess=x);const all=await new Promise(x=>{const q=r.result.transaction('comics').objectStore('comics').getAll();q.onsuccess=()=>x(q.result)});return all.map(c=>[c.title,c.series,c.driveId||''])})()")
+    asm=[x for x in sers if x[1]=='Amazing Spiderman']
+    ok('folder import: subfolder files get series = subfolder name',len(asm)==2,json.dumps(sers))
+    dl=[x for x in seen if x[0]=='/drive/v3/files/f-a1']
+    ok('download sends token + file/folder resource keys',dl and dl[-1][1]=='Bearer test-token' and 'f-a1/0-filekey' in (dl[-1][2] or '') and 'sub-asm/0-subkey' in (dl[-1][2] or ''),json.dumps(dl))
+    p2.wait_for_timeout(1800)
+    # Settings: change folder by pasting a link
+    p2.evaluate("document.querySelectorAll('.mwrap').forEach(m=>m.remove())")
+    p2.click('#settingsBtn'); p2.wait_for_selector('#sFolder'); p2.fill('#sFolder','https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrSt?resourcekey=0-XyZ123&usp=sharing'); p2.click('#sFolderSave'); p2.wait_for_timeout(200)
+    f=p2.evaluate('__cr.drive.folder()'); ok('Settings: paste folder link -> id + resourcekey parsed',f['id']=='1AbCdEfGhIjKlMnOpQrSt' and f['resourceKey']=='0-XyZ123',json.dumps(f))
+    shot(p2,'31-settings-drive-folder')
+    p2.keyboard.press('Escape'); p2.click('#settingsBtn'); p2.wait_for_selector('#sFolderReset'); p2.click('#sFolderReset'); p2.wait_for_timeout(200)
+    ok('Settings: reset to default folder',p2.evaluate('__cr.drive.folder().id')=='0ByhXYqPJBamsS2h2X01uS29uaU0')
+    c2.close()
     b.close()
 ok('no console errors / page errors',not errors,'\n'.join(errors[:10]))
 print(f'{sum(res)}/{len(res)} passed')

@@ -1,5 +1,5 @@
 """Generate ORIGINAL test comics (painted-style covers, no real characters/logos/publisher marks).
-Output: ../testpdfs/ (git-ignored).  Usage: python3 test/gen_pdfs.py [--big]"""
+Output: ../testpdfs/ (git-ignored).  Usage: python3 test/gen_pdfs.py [--big] | --drive"""
 import os, io, sys, math, random
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageChops
 from reportlab.pdfgen import canvas
@@ -159,6 +159,16 @@ def make(fname, series, label, n, seed, big=False):
         interior(c, i, n, series, rnd, img)
     c.save(); print(fname, os.path.getsize(os.path.join(OUT, fname))//1024, 'KB', flush=True)
 
+def drive_fixtures():
+    # served by the throttled mock-Drive server in e2e.py: a multi-chunk (~22 MB) PDF + a broken "PDF"
+    global OUT
+    d = os.path.join(OUT, 'drive'); os.makedirs(d, exist_ok=True); old, OUT = OUT, d
+    try:
+        if not os.path.exists(os.path.join(d, 'Drive_Annual.pdf')): make('Drive_Annual.pdf', 'Atlas Omnibus', 'ANNUAL', 30, 21, big=True)
+        open(os.path.join(d, 'Broken.pdf'), 'wb').write(b'this is not a pdf\n' * 5000)
+    finally: OUT = old
+
+if __name__ == '__main__' and '--drive' in sys.argv: drive_fixtures(); sys.exit(0)
 if __name__ == '__main__':
     for f in os.listdir(OUT):
         if f.endswith('.pdf') and (f != 'Atlas_Omnibus.pdf' or '--big' in sys.argv): os.remove(os.path.join(OUT, f))
