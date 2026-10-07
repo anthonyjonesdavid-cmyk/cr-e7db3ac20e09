@@ -39,14 +39,15 @@ function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key)
 // half mode (fold comics in portrait): each wide sheet becomes two views, its halves in reading order (RTL: right half first);
 // the wide cover sheet shows only its cover half (from the cover-crop detection); narrow sheets stay whole. R.vh[k] = 'L' | 'R' | null
 const WIDE=1.15;
-function buildViews(){ const v=[], vh=[];
-  if(R.spread){ v.push([null,0]); for(let i=1;i<R.n;i+=2) v.push([i,i+1<R.n?i+1:null]); }
+function realPages(){ const skip=R.skip||new Set(); const pages=[]; for(let i=0;i<R.n;i++) if(!skip.has(i)) pages.push(i); return pages; }
+function buildViews(){ const v=[], vh=[], pages=realPages();
+  if(R.spread){ if(pages.length) v.push([null,pages[0]]); for(let i=1;i<pages.length;i+=2) v.push([pages[i],i+1<pages.length?pages[i+1]:null]); }
   else if(R.half){ const ord=R.rtl?['R','L']:['L','R'], side=(R.comic.coverCrop&&R.comic.coverCrop.side)||'';
-    for(let i=0;i<R.n;i++){ const wide=(R.aspects[i]||0)>WIDE;
-      if(i===0&&wide&&(side==='right'||side==='left')){ v.push([0]); vh.push(side==='right'?'R':'L'); }
+    for(const i of pages){ const wide=(R.aspects[i]||0)>WIDE;
+      if(i===pages[0]&&wide&&(side==='right'||side==='left')){ v.push([i]); vh.push(side==='right'?'R':'L'); }
       else if(wide) ord.forEach(h=>{ v.push([i]); vh.push(h); });
       else { v.push([i]); vh.push(null); } } }
-  else for(let i=0;i<R.n;i++) v.push([i]);
+  else pages.forEach(i=>v.push([i]));
   // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
   const E=R.n, real=R.aspects.slice(0,E); R.next=nextIssue(R.comic); R.endBtn=null;
   R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
@@ -121,27 +122,33 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
-  try{ const skip=await trailingBlanks(doc,c); if(R.comic!==c) return; if(skip){ R.n-=skip; R.aspects.length=R.n; } }catch(e){ console.warn('blank-page scan failed',e); }
+  R.skip=new Set(); try{ R.skip=await blankPages(doc,c); if(R.comic!==c) return; }catch(e){ console.warn('blank-page scan failed',e); }
   R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1); renderView();
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
 // trailing scan pages that are black (or white) except a copyright line. Only the last two, never the cover.
 // Dropping them does not shift earlier landscape pairs: the next-issue card takes the empty right-hand slot.
-async function trailingBlanks(doc,c){
-  if(Number.isInteger(c.blankTail)) return c.blankTail;
-  const n=doc.numPages; let skip=0;
-  for(let i=n; i>1 && skip<2; i--){
+function nearlyEmpty(canvas){
+  const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height).data;
+  let dark=0, n=canvas.width*canvas.height;
+  for(let i=0;i<im.length;i+=4){ const l=.299*im[i]+.587*im[i+1]+.114*im[i+2]; if(l<28) dark++; }
+  return dark/n>0.97;   // copyright line on a black page stays under 3%
+}
+// blanks near the end, including one sitting in front of a last ad. Cover is never skipped.
+// Landscape re-pairs the pages that remain, so a blank does not take a slot beside a real page.
+async function blankPages(doc,c){
+  if(Array.isArray(c.blankPages)) return new Set(c.blankPages);
+  const n=doc.numPages, found=[];
+  for(let i=n; i>1 && n-i<8; i--){
     const page=await doc.getPage(i);
     const canvas=await renderToCanvas(page,96,140,1,40000);
     page.cleanup();
-    const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height);
-    const blank=isBlank(regionStats(im.data,canvas.width,0,0,canvas.width,canvas.height));
+    const blank=nearlyEmpty(canvas);
     freeCanvas(canvas);
-    if(!blank) break;
-    skip++;
+    if(blank) found.push(i-1);
   }
-  c.blankTail=skip; return skip;
+  c.blankPages=found; return new Set(found);
 }
 function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
