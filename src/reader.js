@@ -51,8 +51,7 @@ function buildViews(){ const v=[], vh=[], pages=realPages();
   // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
   const E=R.n, real=R.aspects.slice(0,E); R.next=nextIssue(R.comic); R.endBtn=null;
   R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
-  if(R.spread){ const last=v[v.length-1], slot=R.rtl?0:1; if(last.length===2&&last[1]==null&&last[0]!=null) last[1]=E; else v.push([null,E]); }
-  else { v.push([E]); if(R.half) vh.push(null); }
+  v.push([E]); if(R.half) vh.push(null);   // end card is its own page: no blank slot beside or after it
   R.views=v; R.vh=R.half?vh:[]; }
 const halfOf=k=>R.half?(R.vh[k]||null):null;
 const pagesOf=v=>v?v.filter(x=>x!=null):[];
@@ -130,25 +129,24 @@ async function openReader(id,opts={}){ const {push=true}=opts;
 // trailing scan pages that are black (or white) except a copyright line. Only the last two, never the cover.
 // Dropping them does not shift earlier landscape pairs: the next-issue card takes the empty right-hand slot.
 function nearlyEmpty(canvas){
-  const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height).data;
-  const n=canvas.width*canvas.height; let dark=0, light=0, mid=0;
-  for(let i=0;i<im.length;i+=4){ const l=.299*im[i]+.587*im[i+1]+.114*im[i+2]; if(l<55) dark++; else if(l>205) light++; else mid++; }
-  return mid/n<0.04 && (dark/n>0.9 || light/n>0.9);   // black or white page, copyright line allowed
+  const w=canvas.width, h=canvas.height, x0=Math.floor(w*.1), y0=Math.floor(h*.08), x1=Math.ceil(w*.9), y1=Math.ceil(h*.92);
+  const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,Math.max(1,x1-x0),Math.max(1,y1-y0)).data;
+  const n=im.length/4; let dark=0, light=0, mid=0;
+  for(let i=0;i<im.length;i+=4){ const l=.299*im[i]+.587*im[i+1]+.114*im[i+2]; if(l<72) dark++; else if(l>198) light++; else mid++; }
+  return mid/n<0.07 && (dark/n>0.84 || light/n>0.84);   // black or white page, copyright line and scan margin allowed
 }
-// blanks in the last stretch of the issue, including one sitting in front of the house ads. Cover is never skipped.
-// Landscape re-pairs the pages that remain, so a blank does not take a slot beside a real page.
+// Every page except the cover. Result stays off the comic record so a bad scan is not saved.
 async function blankPages(doc,c){
-  if(Array.isArray(c.blankPagesV2)) return new Set(c.blankPagesV2);
+  delete c.blankPages; delete c.blankPagesV2; delete c.blankTail;
   const n=doc.numPages, found=[];
-  for(let i=n; i>1 && n-i<24; i--){
+  for(let i=2;i<=n;i++){
     const page=await doc.getPage(i);
-    const canvas=await renderToCanvas(page,96,140,1,40000);
+    const canvas=await renderToCanvas(page,72,108,1,20000);
     page.cleanup();
-    const blank=nearlyEmpty(canvas);
+    if(nearlyEmpty(canvas)) found.push(i-1);
     freeCanvas(canvas);
-    if(blank) found.push(i-1);
   }
-  c.blankPagesV2=found; return new Set(found);
+  return new Set(found);
 }
 function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
