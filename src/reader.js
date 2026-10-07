@@ -403,16 +403,18 @@ async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.
 const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
 async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
   const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
-  if(n){ const capH=Math.round(Math.max(128,Math.min(188,h*.24))*k), pad=Math.round(Math.max(18,h*.035)*k);
+  if(n){ const pad=Math.round(Math.max(16,h*.03)*k), gap=Math.round(18*k);
     const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`;
-    const ty=pad+Math.round(62*k);
-    x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#bdbdbd'; x.letterSpacing=`${2.4*k}px`; x.fillText('NEXT',W/2,ty-Math.round(38*k)); x.letterSpacing='0px';
-    x.font=`650 ${Math.round(32*k)}px ${F}`; x.fillStyle='#f4f4f4'; x.fillText(fitText(x,label,W*.92),W/2,ty);
-    x.font=`500 ${Math.round(20*k)}px ${F}`; x.fillStyle='#a3a3a3'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(38*k));
-    const top=pad+capH, mw=Math.round(W*.62), mh=H-top-pad;
+    const capH=Math.round(108*k), mw=Math.round(W*.62), mh=Math.min(Math.round(H*.62), H-capH-gap-pad*2);
     let img=null; try{ img=await nextCover(n,mw,mh); }catch(e){ console.warn(e); }
-    let cw=mw, ch=mh, cy=top; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; } cy=top+Math.max(0,Math.round((mh-ch)/2)); }
-    const cx=(W-cw)/2; if(img) x.drawImage(img,Math.round(cx),Math.round(cy),Math.round(cw),Math.round(ch)); else { x.fillStyle='#1a1a1a'; x.fillRect(cx,cy,cw,ch); }
+    let cw=mw, ch=mh; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; } }
+    const block=capH+gap+ch, y0=Math.max(pad,Math.round((H-block)/2));
+    const ty=y0+Math.round(62*k);
+    x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#bdbdbd'; x.letterSpacing=`${2.4*k}px`; x.fillText('NEXT',W/2,ty-Math.round(36*k)); x.letterSpacing='0px';
+    x.font=`650 ${Math.round(32*k)}px ${F}`; x.fillStyle='#f4f4f4'; x.fillText(fitText(x,label,W*.92),W/2,ty);
+    x.font=`500 ${Math.round(20*k)}px ${F}`; x.fillStyle='#a3a3a3'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(34*k));
+    const cy=y0+capH+gap, cx=(W-cw)/2;
+    if(img) x.drawImage(img,Math.round(cx),Math.round(cy),Math.round(cw),Math.round(ch)); else { x.fillStyle='#1a1a1a'; x.fillRect(cx,cy,cw,ch); }
     x.strokeStyle='rgba(255,255,255,.07)'; x.lineWidth=k; x.strokeRect(Math.round(cx)+.5*k,Math.round(cy)+.5*k,Math.round(cw)-k,Math.round(ch)-k);
   } else { const t=R.comic.title, cy=H*.44;
     x.font=`400 ${Math.round(12*k)}px ${F}`; x.fillStyle='#7a7a7a'; x.letterSpacing=`${1.6*k}px`; x.fillText('THE END',W/2,cy-Math.round(34*k)); x.letterSpacing='0px';
