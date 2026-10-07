@@ -195,8 +195,6 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .flipper{position:absolute;will-change:transform;z-index:5}
 .flipper>.face{left:0;top:0;width:100%;height:100%}
 .flipper>.face.back{transform:rotateY(180deg)}
-.face.paper{background:#efece6}
-.face.paper>canvas{opacity:.13}
 .rbar{position:absolute;left:0;right:0;z-index:20;background:#000;transition:transform .2s ease,visibility .2s}
 .rbar.top{top:0;padding:var(--sat) max(6px,var(--sar)) 0 max(6px,var(--sal));border-bottom:.5px solid var(--sep)}
 .rbar.bot{bottom:0;padding:0 max(14px,var(--sar)) var(--sab) max(14px,var(--sal));border-top:.5px solid var(--sep)}
@@ -1292,7 +1290,7 @@ function startFlip(vdir){
     const gc=geom(cv,ch)[0], gt=geom(tv,th)[0], sgn=R.rtl?1:-1;
     const turning=fwd?cv[0]:tv[0], stay=fwd?tv[0]:cv[0], rT=fwd?gc:gt, rS=fwd?gt:gc, hT=fwd?ch:th, hS=fwd?th:ch;
     const u=face(stay,rS,'c','',hS); place(u,rS); under=[u]; wrap.append(u);
-    front=face(turning,rT,'c','front',hT); back=face(turning,rT,'c','back paper',hT); frontR=rT;
+    front=face(turning,rT,'c','front',hT); back=face(turning,rT,'c','back',hT); back.style.visibility='hidden'; frontR=rT;
     flipper.style.transformOrigin=R.rtl?'100% 50%':'0 50%'; spine=R.rtl?rT.x+rT.w:rT.x;
     angle=fwd?(p=>sgn*180*p):(p=>sgn*180*(1-p));
     u._s.style.background=grad(R.rtl?270:90,.7,.06); front._s.style.background=grad(R.rtl?270:90,.04,.5); back._s.style.background=grad(R.rtl?90:270,.04,.35);
@@ -1307,7 +1305,8 @@ function startFlip(vdir){
   const track=travel=>{ const e=clamp(travel*k/fw,0,2); return (single&&!fwd)? 1-Math.acos(clamp(e,-1,1))/Math.PI : Math.acos(clamp(1-e,-1,1))/Math.PI; };
   flip={vdir,fwd,t,wrap,p:-1,track,mode:fold?'fold':single?(R.half?'half':'single'):'spread',setP(p){ p=clamp(p,0,1); this.p=p; const a=angle(p), aa=Math.abs(a);
     flipper.style.transform=`rotateY(${a.toFixed(2)}deg)`; const showFront=aa<90;
-    front.style.visibility=showFront?'visible':'hidden'; back.style.visibility=showFront?'hidden':'visible';
+    front.style.visibility=showFront?'visible':'hidden'; back.style.visibility=(single||showFront)?'hidden':'visible';
+    if(single) flipper.style.visibility=showFront?'visible':'hidden';   // no paper verso: past the spine, only the page underneath
     front._s.style.opacity=showFront?(aa/90)*.85:0; gl.style.opacity=showFront?Math.sin(aa/90*Math.PI)*.55:0;
     back._s.style.opacity=showFront?0:((180-aa)/90)*.8;
     under.forEach(u=>u._s.style.opacity=single?(1-aa/180)*.9:(1-p)*.9);

@@ -195,7 +195,7 @@ function startFlip(vdir){
     const gc=geom(cv,ch)[0], gt=geom(tv,th)[0], sgn=R.rtl?1:-1;
     const turning=fwd?cv[0]:tv[0], stay=fwd?tv[0]:cv[0], rT=fwd?gc:gt, rS=fwd?gt:gc, hT=fwd?ch:th, hS=fwd?th:ch;
     const u=face(stay,rS,'c','',hS); place(u,rS); under=[u]; wrap.append(u);
-    front=face(turning,rT,'c','front',hT); back=face(turning,rT,'c','back paper',hT); frontR=rT;
+    front=face(turning,rT,'c','front',hT); back=face(turning,rT,'c','back',hT); back.style.visibility='hidden'; frontR=rT;
     flipper.style.transformOrigin=R.rtl?'100% 50%':'0 50%'; spine=R.rtl?rT.x+rT.w:rT.x;
     angle=fwd?(p=>sgn*180*p):(p=>sgn*180*(1-p));
     u._s.style.background=grad(R.rtl?270:90,.7,.06); front._s.style.background=grad(R.rtl?270:90,.04,.5); back._s.style.background=grad(R.rtl?90:270,.04,.35);
@@ -210,7 +210,8 @@ function startFlip(vdir){
   const track=travel=>{ const e=clamp(travel*k/fw,0,2); return (single&&!fwd)? 1-Math.acos(clamp(e,-1,1))/Math.PI : Math.acos(clamp(1-e,-1,1))/Math.PI; };
   flip={vdir,fwd,t,wrap,p:-1,track,mode:fold?'fold':single?(R.half?'half':'single'):'spread',setP(p){ p=clamp(p,0,1); this.p=p; const a=angle(p), aa=Math.abs(a);
     flipper.style.transform=`rotateY(${a.toFixed(2)}deg)`; const showFront=aa<90;
-    front.style.visibility=showFront?'visible':'hidden'; back.style.visibility=showFront?'hidden':'visible';
+    front.style.visibility=showFront?'visible':'hidden'; back.style.visibility=(single||showFront)?'hidden':'visible';
+    if(single) flipper.style.visibility=showFront?'visible':'hidden';   // no paper verso: past the spine, only the page underneath
     front._s.style.opacity=showFront?(aa/90)*.85:0; gl.style.opacity=showFront?Math.sin(aa/90*Math.PI)*.55:0;
     back._s.style.opacity=showFront?0:((180-aa)/90)*.8;
     under.forEach(u=>u._s.style.opacity=single?(1-aa/180)*.9:(1-p)*.9);

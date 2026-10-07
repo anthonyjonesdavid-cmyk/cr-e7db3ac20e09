@@ -174,8 +174,6 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .flipper{position:absolute;will-change:transform;z-index:5}
 .flipper>.face{left:0;top:0;width:100%;height:100%}
 .flipper>.face.back{transform:rotateY(180deg)}
-.face.paper{background:#efece6}
-.face.paper>canvas{opacity:.13}
 .rbar{position:absolute;left:0;right:0;z-index:20;background:#000;transition:transform .2s ease,visibility .2s}
 .rbar.top{top:0;padding:var(--sat) max(6px,var(--sar)) 0 max(6px,var(--sal));border-bottom:.5px solid var(--sep)}
 .rbar.bot{bottom:0;padding:0 max(14px,var(--sar)) var(--sab) max(14px,var(--sal));border-top:.5px solid var(--sep)}
