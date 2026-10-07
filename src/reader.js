@@ -112,7 +112,7 @@ function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length
 addEventListener('pagehide',saveNow); document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveNow(); });
 
 /* ---- open / close ---- */
-async function openReader(id,{push=true}={}){
+async function openReader(id,opts={}){ const {push=true}=opts;
   const c=comics.find(x=>x.id===id); if(!c){ toast('Comic not found'); return; }
   if(push) try{ history.pushState({r:id},'','#/read/'+id); }catch(e){}
   R.gen++; R.comic=c; R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
@@ -121,7 +121,7 @@ async function openReader(id,{push=true}={}){
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
-  R.spread=wantSpread(); R.half=wantHalf(); R.lastHalf=c.half?{s:c.page||0,h:c.half}:null; buildViews(); R.vi=clamp(viewOfPage(c.page||0,c.half),0,R.views.length-1); renderView();
+  R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1); renderView();
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
@@ -399,4 +399,5 @@ function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.vi
   const r=cv.getBoundingClientRect(), sr=stage.getBoundingClientRect(), b=R.endBtn, px=pt.x+sr.left-r.left, py=pt.y+sr.top-r.top;
   if(px>=b.x*r.width-8&&px<=(b.x+b.w)*r.width+8&&py>=b.y*r.height-8&&py<=(b.y+b.h)*r.height+8){ $('#rBack').click(); return true; } return false; }
 function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
-  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false}); }
+  n.page=0; n.half=null;   // the next-issue card always starts that issue on its cover, not the saved page
+  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,atCover:true}); }
