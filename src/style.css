@@ -288,6 +288,3 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 #libBack{display:none}#shelf.scoped #libBack{display:inline-flex}#shelf.scoped #settingsBtn{display:none}
 #shelf.scoped .libbar,#shelf.scoped #azIndex{display:none!important}
 .tb-r{position:relative;display:flex;justify-content:flex-end;align-items:center}
-#kindleBtn{display:none;position:absolute;right:40px;top:50%;margin-top:-20px;color:#ffffffa6}
-#kindleBtn .ki{width:17px;height:17px;stroke-width:1.6}
-#shelf.scoped #kindleBtn{display:inline-flex}
