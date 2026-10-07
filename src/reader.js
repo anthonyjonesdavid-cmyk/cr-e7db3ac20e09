@@ -377,15 +377,15 @@ async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.
 const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
 async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
   const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
-  if(n){ const capH=Math.round(Math.max(84,Math.min(104,h*.1))*k), pad=Math.round(Math.max(14,h*.03)*k), mw=Math.round(W*.86), mh=H-capH-pad;
+  if(n){ const capH=Math.round(Math.max(132,Math.min(210,h*.3))*k), pad=Math.round(Math.max(20,h*.045)*k), mw=Math.round(W*.58), mh=Math.min(Math.round(H*.56), H-capH-pad);
     let img=null; try{ img=await nextCover(n,mw,mh); }catch(e){ console.warn(e); }
-    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; cy=Math.max(pad,Math.round((H-ch-capH)/2)); } }   /* width-limited (phones): cover + caption centred as a group */
+    let cw=mw, ch=mh, cy=pad; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; } cy=Math.max(pad,Math.round((H-ch-capH)/2)); }   /* smaller cover, caption centred with it */
     const cx=(W-cw)/2; if(img) x.drawImage(img,Math.round(cx),Math.round(cy),Math.round(cw),Math.round(ch)); else { x.fillStyle='#1a1a1a'; x.fillRect(cx,cy,cw,ch); }
     x.strokeStyle='rgba(255,255,255,.07)'; x.lineWidth=k; x.strokeRect(Math.round(cx)+.5*k,Math.round(cy)+.5*k,Math.round(cw)-k,Math.round(ch)-k);
-    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, cb=cy+ch, ty=cb+Math.round(48*k);   /* fixed rhythm under the cover: NEXT / title / hint */
-    x.font=`500 ${Math.round(12*k)}px ${F}`; x.fillStyle='#8c8c8c'; x.letterSpacing=`${1.6*k}px`; x.fillText('NEXT',W/2,ty-Math.round(22*k)); x.letterSpacing='0px';
-    x.font=`600 ${Math.round(17*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,label,W*.9),W/2,ty);
-    x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(22*k));
+    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`, cb=cy+ch, ty=cb+Math.round(78*k);   /* NEXT / title / hint, larger than the old caption */
+    x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#bdbdbd'; x.letterSpacing=`${2.4*k}px`; x.fillText('NEXT',W/2,ty-Math.round(40*k)); x.letterSpacing='0px';
+    x.font=`650 ${Math.round(32*k)}px ${F}`; x.fillStyle='#f4f4f4'; x.fillText(fitText(x,label,W*.92),W/2,ty);
+    x.font=`500 ${Math.round(20*k)}px ${F}`; x.fillStyle='#a3a3a3'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(40*k));
   } else { const t=R.comic.title, cy=H*.44;
     x.font=`400 ${Math.round(12*k)}px ${F}`; x.fillStyle='#7a7a7a'; x.letterSpacing=`${1.6*k}px`; x.fillText('THE END',W/2,cy-Math.round(34*k)); x.letterSpacing='0px';
     x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,`End of ${t}`,W*.86),W/2,cy);
