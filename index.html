@@ -1216,8 +1216,27 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
+  try{ const skip=await trailingBlanks(doc,c); if(R.comic!==c) return; if(skip){ R.n-=skip; R.aspects.length=R.n; } }catch(e){ console.warn('blank-page scan failed',e); }
   R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1); renderView();
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
+}
+
+// trailing scan pages that are black (or white) except a copyright line. Only the last two, never the cover.
+// Dropping them does not shift earlier landscape pairs: the next-issue card takes the empty right-hand slot.
+async function trailingBlanks(doc,c){
+  if(Number.isInteger(c.blankTail)) return c.blankTail;
+  const n=doc.numPages; let skip=0;
+  for(let i=n; i>1 && skip<2; i--){
+    const page=await doc.getPage(i);
+    const canvas=await renderToCanvas(page,96,140,1,40000);
+    page.cleanup();
+    const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height);
+    const blank=isBlank(regionStats(im.data,canvas.width,0,0,canvas.width,canvas.height));
+    freeCanvas(canvas);
+    if(!blank) break;
+    skip++;
+  }
+  c.blankTail=skip; return skip;
 }
 function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
