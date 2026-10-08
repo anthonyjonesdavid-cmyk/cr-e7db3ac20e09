@@ -39,25 +39,28 @@ function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key)
 // half mode (fold comics in portrait): each wide sheet becomes two views, its halves in reading order (RTL: right half first);
 // the wide cover sheet shows only its cover half (from the cover-crop detection); narrow sheets stay whole. R.vh[k] = 'L' | 'R' | null
 const WIDE=1.15;
-function realPages(){ const skip=R.skip||new Set(); const pages=[]; for(let i=0;i<R.n;i++) if(!skip.has(i)) pages.push(i); return pages; }
-function buildViews(){ const v=[], vh=[], pages=realPages();
-  if(R.spread){ if(pages.length) v.push([null,pages[0]]); for(let i=1;i<pages.length;i+=2) v.push([pages[i],i+1<pages.length?pages[i+1]:null]); }
+// skipped blank pages (black + nearly white): the reader works on R.seq (visible page indices); R.ord maps page -> position in it
+function setSeq(){ const c=R.comic, on=c.skipBlack??store.get('skipBlack',true), sk=new Set(on?[...(c.blackPages||[]),...(c.whitePages||[])].filter(p=>p>0&&p<R.n):[]);
+  R.skip=sk; R.seq=[]; R.ord=new Map(); for(let i=0;i<R.n;i++) if(!sk.has(i)){ R.ord.set(i,R.seq.length); R.seq.push(i); } }
+const ordOf=p=>R.ord.has(p)?R.ord.get(p):R.seq.length-1;
+function buildViews(){ const v=[], vh=[]; setSeq(); const S=R.seq;
+  if(R.spread){ v.push([null,S[0]]); for(let j=1;j<S.length;j+=2) v.push([S[j],j+1<S.length?S[j+1]:null]); }
   else if(R.half){ const ord=R.rtl?['R','L']:['L','R'], side=(R.comic.coverCrop&&R.comic.coverCrop.side)||'';
-    for(const i of pages){ const wide=(R.aspects[i]||0)>WIDE;
-      if(i===pages[0]&&wide&&(side==='right'||side==='left')){ v.push([i]); vh.push(side==='right'?'R':'L'); }
+    for(const i of S){ const wide=(R.aspects[i]||0)>WIDE;
+      if(i===0&&wide&&(side==='right'||side==='left')){ v.push([0]); vh.push(side==='right'?'R':'L'); }
       else if(wide) ord.forEach(h=>{ v.push([i]); vh.push(h); });
       else { v.push([i]); vh.push(null); } } }
-  else pages.forEach(i=>v.push([i]));
+  else for(const i of S) v.push([i]);
   // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
-  const E=R.n, real=R.aspects.slice(0,E); R.next=nextIssue(R.comic); R.endBtn=null;
+  const E=R.n, real=S.map(i=>R.aspects[i]); R.next=nextIssue(R.comic); R.endBtn=null;
   R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
   v.push([E]); if(R.half) vh.push(null);   // end card is its own page: no blank slot beside or after it
   R.views=v; R.vh=R.half?vh:[]; }
 const halfOf=k=>R.half?(R.vh[k]||null):null;
 const pagesOf=v=>v?v.filter(x=>x!=null):[];
-function viewOfPage(p,h){ if(R.spread) return p<=0?0:Math.floor((p-1)/2)+1; if(!R.half) return p;
-  let first=-1; for(let k=0;k<R.views.length;k++){ if(R.views[k][0]===p){ if(first<0) first=k; if(!h||R.vh[k]===h) return k; } else if(first>=0) break; }
-  if(first>=0) return first; let k=0; while(k<R.views.length-1&&R.views[k+1][0]<=p) k++; return k; }
+function viewOfPage(p,h){ let q=p>=R.n?R.n:(R.seq.find(i=>i>=p)??R.seq[R.seq.length-1]);   // skipped page -> next visible page
+  let first=-1; for(let k=0;k<R.views.length;k++){ if(R.views[k].includes(q)){ if(first<0) first=k; if(!R.half||!h||R.vh[k]===h) return k; } else if(first>=0) break; }
+  return first>=0?first:0; }
 const visualPages=v=>v.length===1?v:(R.rtl?[v[1],v[0]]:[v[0],v[1]]);   // [left slot, right slot]
 function aspectOf(v,h){ let a=0; pagesOf(v).forEach(p=>{ a=Math.max(a,R.aspects[p]||0); }); a=a||R.comic.aspect||0.66; return h?a/2:a; }
 function geom(v,h){ const W=stage.clientWidth,H=stage.clientHeight, ar=v.length===2?spreadAR():aspectOf(v,h===undefined?halfOf(R.views.indexOf(v)):h);
@@ -98,7 +101,7 @@ function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
   [1,-1,2,-2].forEach((d,k)=>{ const v=R.views[R.vi+d]; if(!v) return; const hv=halfOf(R.vi+d), g=geom(v,hv), vis=visualPages(v);
     vis.forEach((p,j)=>{ if(p==null) return; want.add(p); requestPage(p,hv?g[j].w*2:g[j].w,g[j].h,1+k).catch(()=>{}); }); });   // adjacent halves share their sheet's render
   dropJobs(j=>(j.kind==='page'&&!want.has(j.page))||j.kind==='hi'); }
-function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ps[0]+1, b=ps[ps.length-1]+1, N=R.n;
+function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ordOf(ps[0])+1, b=ordOf(ps[ps.length-1])+1, N=R.seq.length;
   if(R.half){ N=R.views.length-1; a=b=Math.min(R.vi+1,N); }   // the end card isn't counted   // portrait half pages: counter + scrubber count halves
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+N;
   const s=$('#scrub'); s.max=N; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(N>1?(b-1)/(N-1)*100:100)+'%');
@@ -108,7 +111,7 @@ function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.
 /* ---- progress ---- */
 let saveT=0;
 function saveSoon(){ clearTimeout(saveT); saveT=setTimeout(saveNow,250); }
-function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ps[ps.length-1]+1)/R.n; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
+function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ordOf(ps[ps.length-1])+1)/R.seq.length; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
 addEventListener('pagehide',saveNow); document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveNow(); });
 
 /* ---- open / close ---- */
@@ -121,36 +124,14 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
-  R.skip=new Set(); try{ R.skip=await blankPages(doc,c); if(R.comic!==c) return; }catch(e){ console.warn('blank-page scan failed',e); }
   R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1); renderView();
+  if(needsBlack(c)) kickBlack(300);   /* not checked yet: checked now in the background, from the current page on; blank pages drop out in place */
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-// trailing scan pages that are black (or white) except a copyright line. Only the last two, never the cover.
-// Dropping them does not shift earlier landscape pairs: the next-issue card takes the empty right-hand slot.
-function nearlyEmpty(canvas){
-  const w=canvas.width, h=canvas.height, x0=Math.floor(w*.1), y0=Math.floor(h*.08), x1=Math.ceil(w*.9), y1=Math.ceil(h*.92);
-  const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,Math.max(1,x1-x0),Math.max(1,y1-y0)).data;
-  const n=im.length/4; let dark=0, light=0, mid=0;
-  for(let i=0;i<im.length;i+=4){ const l=.299*im[i]+.587*im[i+1]+.114*im[i+2]; if(l<72) dark++; else if(l>198) light++; else mid++; }
-  return mid/n<0.07 && (dark/n>0.84 || light/n>0.84);   // black or white page, copyright line and scan margin allowed
-}
-// Every page except the cover. Result stays off the comic record so a bad scan is not saved.
-async function blankPages(doc,c){
-  delete c.blankPages; delete c.blankPagesV2; delete c.blankTail;
-  const n=doc.numPages, found=[];
-  for(let i=2;i<=n;i++){
-    const page=await doc.getPage(i);
-    const canvas=await renderToCanvas(page,72,108,1,20000);
-    page.cleanup();
-    if(nearlyEmpty(canvas)) found.push(i-1);
-    freeCanvas(canvas);
-  }
-  return new Set(found);
-}
 function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
-  readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); }
+  readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
 addEventListener('popstate',()=>{ const m=location.hash.match(/^#\/read\/(.+)$/); if(m){ if(!R.comic||R.comic.id!==m[1]) openReader(m[1],{push:false}); } else if(R.comic) closeReader(); });
 $('#rRtl').onclick=()=>{ R.rtl=!R.rtl; R.comic.rtl=R.rtl; dbPut(R.comic); cancelFlipNow(); if(R.half) relayout(true); else renderView(); toast(R.rtl?'Right-to-left (manga) on':'Left-to-right'); };
@@ -370,18 +351,18 @@ function thumb(i,prio){ const u=R.thumbs.get(i); if(u){ R.thumbs.delete(i); R.th
   return enqueue('t|'+i,'thumb',i,prio,async()=>{ const page=await doc.getPage(i+1); const c=await renderToCanvas(page,110,165,2,80000); page.cleanup(); const b=await toBlob(c,.7); freeCanvas(c);
     const url=URL.createObjectURL(b); R.thumbs.set(i,url); while(R.thumbs.size>400){ const [k,v]=R.thumbs.entries().next().value; URL.revokeObjectURL(v); R.thumbs.delete(k); } return url; }); }
 const scrub=$('#scrub'), bubble=$('#bubble');
-function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.n, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
+function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.seq.length, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
   bubble.classList.remove('hidden'); bubble.style.left=clamp(x,56,w-40)+'px'; bubble.querySelector('span').textContent=`Page ${v}`;
-  const sh=R.half?((R.views[v-1]||[0])[0]):v-1;   // half pages: thumbnail of that half's sheet
+  const sh=R.half?((R.views[v-1]||[0])[0]):(R.seq[v-1]??0);   // half pages: thumbnail of that half's sheet
   scrub.style.setProperty('--pct',frac*100+'%'); const img=bubble.querySelector('img'); img.dataset.p=sh; const u=R.thumbs.get(sh);
   if(u) img.src=u; else { img.removeAttribute('src'); thumb(sh,-2).then(url=>{ if(img.dataset.p==String(sh)) img.src=url; }).catch(()=>{}); } }
 const hideBubble=ms=>setTimeout(()=>{ bubble.classList.add('hidden'); scrubbing=false; },ms);
 scrub.addEventListener('input',()=>{ scrubbing=true; clearTimeout(R.uiT); showBubble(); });
-scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(+scrub.value-1); hideBubble(600); });
+scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(R.seq[+scrub.value-1]??0); hideBubble(600); });
 $('#rGrid').onclick=openPages; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
 let pagesIO=null;
 function openPages(){ const grid=$('#pgrid'), cur=new Set(pagesOf(R.views[R.vi]));
-  grid.innerHTML=Array.from({length:R.n},(_,i)=>`<button data-p="${i}" class="${cur.has(i)?'cur':''}"><div class="th"></div><span>${i+1}</span></button>`).join('');
+  grid.innerHTML=R.seq.map((i,k)=>`<button data-p="${i}" class="${cur.has(i)?'cur':''}"><div class="th"></div><span>${k+1}</span></button>`).join('');
   $('#pages').classList.remove('hidden'); if(pagesIO) pagesIO.disconnect();
   pagesIO=new IntersectionObserver(es=>es.forEach(en=>{ if(!en.isIntersecting) return; const b=en.target; pagesIO.unobserve(b); const i=+b.dataset.p;
     thumb(i,20+i*.001).then(u=>{ b.querySelector('.th').innerHTML=`<img src="${u}" alt="">`; }).catch(()=>{}); }),{root:grid,rootMargin:'300px'});
@@ -429,3 +410,9 @@ function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.vi
 function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
   n.page=0; n.half=null;   // the next-issue card always starts that issue on its cover, not the saved page
   try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,atCover:true}); }
+
+// blank-black detection finished (or the setting changed) for the open comic: rebuild the page sequence in place, keeping the reader on the same page
+function reseq(){ if(!R.comic||!R.doc||!R.views.length) return; if(flip||animating||landing){ clearTimeout(R.reseqT); R.reseqT=setTimeout(reseq,250); return; }
+  const was=R.skip?[...R.skip].join():''; const cur=pagesOf(R.views[R.vi]).filter(p=>p!=null&&p<=R.n), p=cur.length?cur[0]:0, h=halfOf(R.vi);
+  buildViews(); if([...R.skip].join()===was){ return; } R.vi=clamp(viewOfPage(p,h),0,R.views.length-1); renderView(); }
+addEventListener('cr-black',e=>{ if(R.comic&&e.detail===R.comic.id) reseq(); });

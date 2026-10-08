@@ -458,8 +458,8 @@ with sync_playwright() as p:
       const diff=(i)=>Math.abs(im[i]-bg[0])+Math.abs(im[i+1]-bg[1])+Math.abs(im[i+2]-bg[2])>30;
       const rows=[]; for(let y=0;y<H;y++){ let n=0,l=W,r=-1,run=0,best=0; for(let xx=0;xx<W;xx++){ if(diff((y*W+xx)*4)){ n++; run++; if(run>best) best=run; if(xx<l) l=xx; r=xx; } else run=0; } rows.push([n,l,r,best]); }
       let t=-1,b=-1; for(let y=0;y<H;y++) if(rows[y][3]>Math.min(W,H)*0.3){ if(t<0) t=y; b=y; }       // cover = wide rows of content
-      let gap=-1; for(let y=b+1;y<H;y++) if(rows[y][0]>0){ gap=y-b; break; }
-      let cap=0, capL=W, capR=0; for(let y=b+2;y<H;y++) if(rows[y][0]>0){ cap++; capL=Math.min(capL,rows[y][1]); capR=Math.max(capR,rows[y][2]); }
+      let gap=-1; for(let y=b+1;y<H;y++) if(rows[y][0]>0){ gap=y-b; break; } if(gap<0) for(let y=t-1;y>=0;y--) if(rows[y][0]>0){ gap=t-y; break; }   /* caption under (v14) or above (v19) the cover */
+      let cap=0, capL=W, capR=0; for(let y=0;y<H;y++) if((y<t-1||y>b+1)&&rows[y][0]>0){ cap++; capL=Math.min(capL,rows[y][1]); capR=Math.max(capR,rows[y][2]); }
       const r=c.getBoundingClientRect(), st=document.querySelector('#stage').getBoundingClientRect();
       return {gap,W,H,cssW:r.width,cssH:r.height,dpr:devicePixelRatio,bg,coverTop:t/H,coverBottom:b/H,coverH:(b-t)/H,capRows:cap,capL:capL/W,capR:capR/W,
         inView:r.left>=st.left-1&&r.right<=st.right+1&&r.top>=st.top-1&&r.bottom<=st.bottom+1,next:R.next&&R.next.title,view:R.views[R.vi],last:R.vi===R.views.length-1,n:R.n,pg:document.querySelector('#pgText').textContent}; })()"""
@@ -470,8 +470,8 @@ with sync_playwright() as p:
         open_comic(pg,title); pg.evaluate('__cr.jumpTo(__cr.R.n)'); return card()
     pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(300)
     c=to_end('Iron Tide 04')
-    ok('end card (landscape 2-up): last page on the left, next-issue card on the right',c and c['last'] and c['view']==[c['n']-1,c['n']] and c['next']=='Iron Tide 05',json.dumps(c and {k:c[k] for k in ('view','n','next','last')}))
-    ok('end card: cover smaller, caption under it, all on screen',c['coverH']>0.38 and c['coverH']<0.7 and c['capRows']>10 and c['coverBottom']<0.95 and c['inView'] and abs(c['W']-round(c['cssW']*c['dpr']))<=2,json.dumps(c))
+    ok('end card (landscape 2-up): card is its own page after the last spread (v19)',c and c['last'] and c['view']==[c['n']] and c['next']=='Iron Tide 05',json.dumps(c and {k:c[k] for k in ('view','n','next','last')}))
+    ok('end card: cover smaller, caption above it, all on screen',c['coverH']>0.38 and c['coverH']<0.7 and c['capRows']>10 and c['coverBottom']<0.95 and c['inView'] and abs(c['W']-round(c['cssW']*c['dpr']))<=2,json.dumps(c))
     ok('end card: page counter ignores the card',c['pg'].endswith(f"{c['n']} / {c['n']}") and str(c['n']+1) not in c['pg'],c['pg'])
     pg.evaluate('__cr.go(1)'); pg.wait_for_timeout(900); ok('can turn back from the card',state(pg)['vi']==pg.evaluate('__cr.R.views.length')-2)
     pg.evaluate('__cr.go(-1)'); pg.wait_for_timeout(900); pg.evaluate('__cr.go(-1)')
@@ -500,7 +500,7 @@ with sync_playwright() as p:
     ok('fold comic: fold turn onto the card lands on it',pg.evaluate('__cr.R.vi===__cr.R.views.length-1'))
     back(pg); pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
     c=to_end('Twin Moon 01')
-    ok('fold comic (portrait halves): card is its own page after the last half',c['view']==[c['n']] and pg.evaluate('__cr.R.half') and c['coverH']>0.7,json.dumps(c))
+    ok('fold comic (portrait halves): card is its own page after the last half',c['view']==[c['n']] and pg.evaluate('__cr.R.half') and 0.38<c['coverH']<0.7,json.dumps(c))
     pg.evaluate('__cr.go(-1)'); pg.wait_for_function("document.querySelector('#rTitle').textContent==='Twin Moon 02'",timeout=20000); wait_render(pg)
     ok('fold comic: turning past the card opens Twin Moon 02 at the start',state(pg)['first']==0)
     back(pg)
@@ -509,9 +509,9 @@ with sync_playwright() as p:
         pg.set_viewport_size({'width':vw,'height':vh}); pg.wait_for_timeout(300); pg.evaluate("document.documentElement.style.setProperty('--sat','24px')")
         c=to_end('Iron Tide 04'); pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(500); shot(pg,f'60-end-card-{nm}')
         sb=pg.evaluate("(()=>{const r=document.querySelector('#stage').getBoundingClientRect(); return r.top})()")
-        good=(c['inView'] and c['coverH']>(0.6 if nm=='iphone' else 0.7) and c['capRows']>10 and c['gap']>=8 and c['capL']>0.02 and c['capR']<0.98 and abs(c['W']-round(c['cssW']*c['dpr']))<=2
-              and (c['bg']==[11,11,11] if c['view']==[c['n']-1,c['n']] else c['bg']==[0,0,0]))
-        ok(f'design checklist {nm} {vw}x{vh}: sharp canvas, cover dominant, caption under cover unclipped, dark bg, on screen',good,json.dumps(c))
+        good=(c['inView'] and 0.38<c['coverH']<0.7 and c['capRows']>10 and c['gap']>=8 and c['capL']>0.02 and c['capR']<0.98 and abs(c['W']-round(c['cssW']*c['dpr']))<=2
+              and (c['bg']==[11,11,11] if nm=='ipad-landscape' else c['bg']==[0,0,0]))
+        ok(f'design checklist {nm} {vw}x{vh}: sharp canvas, cover + caption above it unclipped, dark bg, on screen',good,json.dumps(c))
         px=pg.evaluate("(async()=>{ const top=getComputedStyle(document.querySelector('#reader'),'::before'); return [top.backgroundColor,top.height]; })()")
         ok(f'design checklist {nm}: solid black status-bar strip over the reader',px[0] in ('rgb(0, 0, 0)','rgba(0, 0, 0, 1)'),json.dumps(px))
         back(pg); pg.evaluate("document.documentElement.style.removeProperty('--sat')")
@@ -798,6 +798,88 @@ with sync_playwright() as p:
                 pg.wait_for_timeout(at-t); t=at; dips.append(spine_dip(pg.screenshot(),g))
             pg.wait_for_timeout(1500)
         ok(f'fold turn at 1180x{HH}: no seam line at the spine during the turn',max(dips)<40,str(dips)); back(pg)
+    # ---- cr-v20: blank pages (black "TM & ©" pages between ads, nearly white pages) are skipped ----
+    import glob as _glob
+    flagged={}
+    for f in sorted(_glob.glob(f'{T}/*.pdf')+_glob.glob(f'{T}/mixed/*.pdf')):
+        u='testpdfs/'+os.path.relpath(f,T).replace(os.sep,'/')
+        r=pg.evaluate("async u=>{const s=await __cr.black.statsOfUrl(u); const L=k=>s.map((x,i)=>x[k]&&i>0?i:-1).filter(i=>i>=0); return {black:L('black'),white:L('white')}}",u)
+        if r['black'] or r['white']: flagged[os.path.basename(f)]=r
+    want={'Midnight_Run_01.pdf':{'black':[12,14],'white':[]},'Midnight_Fold_01.pdf':{'black':[5],'white':[]},'Ad_Break_01.pdf':{'black':[3],'white':[5]},'Plain_Fold_01.pdf':{'black':[],'white':[2,8]}}
+    if os.path.exists(f'{T}/mixed/Video_Frame_01.pdf'): want['Video_Frame_01.pdf']={'black':[1,2],'white':[]}     # local-only: the real frame from David's recording
+    dk=pg.evaluate("(async()=>{const s=await __cr.black.statsOfUrl('testpdfs/mixed/Midnight_Run_01.pdf'); return [5,7,8,9].map(i=>[i,+s[i].share.toFixed(3),+s[i].std.toFixed(1),s[i].black])})()")
+    ok('blank-page detector: across all fixtures only the blank pages are flagged (his black "TM & ©" page incl. the real video frame, nearly white pages; not night scenes, yellow ads, covers)',flagged==want and not any(x[3] for x in dk),json.dumps([flagged,dk]))
+    pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300)
+    with open(f'{T}/mixed/Midnight_Run_01.pdf','rb') as fi, open('/tmp/Midnight_Run_02.pdf','wb') as fo: fo.write(fi.read()+b'\n%copy 02\n')
+    pg.set_input_files('#fileIn',[f'{T}/mixed/Midnight_Run_01.pdf','/tmp/Midnight_Run_02.pdf',f'{T}/mixed/Midnight_Fold_01.pdf',f'{T}/mixed/Ad_Break_01.pdf']); pg.wait_for_function('document.querySelectorAll(".lc").length==6 && !document.querySelector(".toast .tb")',timeout=90000)
+    IDBREC="t=>new Promise(r=>{const q=indexedDB.open('comic-reader'); q.onsuccess=()=>{const g=q.result.transaction('comics').objectStore('comics').getAll(); g.onsuccess=()=>{const c=g.result.find(x=>x.title===t); q.result.close(); r(c?{bp:c.blackPages??null,v:c.blackV||0,page:c.page||0,sk:c.skipBlack??null}:null)}}})"
+    t0=time.time()
+    try: pg.wait_for_function("(()=>['Midnight Run 01','Midnight Run 02','Midnight Fold 01'].every(t=>{const c=__cr.comics.find(x=>x.title===t); return c&&c.blackV}))()",timeout=60000); dt=time.time()-t0
+    except Exception: dt=None
+    r1,r2,rf=[pg.evaluate(IDBREC,t) for t in ('Midnight Run 01','Midnight Run 02','Midnight Fold 01')]
+    ok('background detection after import finds the black pages and caches them in IndexedDB',dt is not None and r1['bp']==[12,14] and r2['bp']==[12,14] and rf['bp']==[5] and r1['v']>0,json.dumps([dt,r1,r2,rf]))
+    try: pg.wait_for_function("(()=>{const c=__cr.comics.find(x=>x.title==='Ad Break 01'); return c&&c.blackV})()",timeout=60000)
+    except Exception: pass
+    ra=pg.evaluate("(()=>{const c=__cr.comics.find(x=>x.title==='Ad Break 01'); return {b:c.blackPages,w:c.whitePages}})()")
+    ok('his page (black, small "TM & © 2000 MARVEL" box at the bottom edge) and a nearly white page are found; ads + dark alley kept',ra=={'b':[3],'w':[5]},json.dumps(ra))
+    VP="(()=>{const R=__cr.R; return {views:R.views.map(v=>v.filter(x=>x!=null&&x<R.n)), vh:R.vh, n:R.n, seq:R.seq.length, half:R.half, spread:R.spread, vi:R.vi, txt:document.querySelector('#pgText').textContent, max:+document.querySelector('#scrub').max, next:R.next&&R.next.title}})()"
+    vp=lambda: pg.evaluate(VP)
+    def flat(v): return sorted(set(x for w in v['views'] for x in w))
+    # portrait, single pages
+    open_comic(pg,'Midnight Run 01'); v=vp()
+    ok('portrait: black pages 13 and 15 left out; counter + scrubber use 14 pages',flat(v)==[p for p in range(16) if p not in (12,14)] and v['txt']=='1 / 14' and v['max']==14,json.dumps(v))
+    pg.evaluate('__cr.jumpTo(11)'); wait_render(pg); a=vp()['txt']; pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(900); wait_render(pg); s1=state(pg); b1=vp()['txt']
+    ok('portrait: turning from page 12 lands on page 14 (13 skipped), counter 12/14 -> 13/14',a=='12 / 14' and s1['first']==13 and b1=='13 / 14',json.dumps([a,s1['first'],b1]))
+    pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(400); shot(pg,'61-skip-black-portrait'); pg.evaluate('__cr.toggleUI(false)')
+    pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(900); s2=state(pg); pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(900); v=vp()
+    ok('portrait: next turn skips page 15 too, then the next-issue card',s2['first']==15 and v['views'][v['vi']]==[] and v['next']=='Midnight Run 02',json.dumps([s2['first'],v['vi'],v['next']]))
+    pg.keyboard.press('ArrowLeft'); pg.wait_for_timeout(900); pg.keyboard.press('ArrowLeft'); pg.wait_for_timeout(900); s3=state(pg); pg.keyboard.press('ArrowLeft'); pg.wait_for_timeout(900); s4=state(pg)
+    ok('portrait: turning back skips the black pages as well',(s3['first'],s4['first'])==(13,11),json.dumps([s3['first'],s4['first']]))
+    pg.evaluate("(()=>{const s=document.querySelector('#scrub'); s.value=13; s.dispatchEvent(new Event('input',{bubbles:true})); s.dispatchEvent(new Event('change',{bubbles:true}));})()"); pg.wait_for_timeout(700); wait_render(pg)
+    ok('scrubber position 13 of 14 = page 14 of the file',state(pg)['first']==13 and vp()['txt']=='13 / 14',json.dumps([state(pg)['first'],vp()['txt']]))
+    pg.evaluate('__cr.toggleUI(true)'); pg.click('#rGrid'); pg.wait_for_timeout(500); ng=pg.evaluate("document.querySelectorAll('#pgrid > *').length"); pg.click('#pagesClose'); pg.wait_for_timeout(300); pg.evaluate('__cr.toggleUI(false)')
+    ok('page grid lists the 14 visible pages',ng==14,str(ng))
+    pg.wait_for_timeout(1500); back(pg); pg.wait_for_timeout(300); open_comic(pg,'Midnight Run 01')
+    ok('resume: reopening returns to the same page',state(pg)['first']==13 and vp()['txt']=='13 / 14',json.dumps([state(pg)['first'],vp()['txt']]))
+    back(pg); pg.evaluate("__cr.comics.find(x=>x.title==='Midnight Run 01').page=12"); open_comic(pg,'Midnight Run 01')
+    ok('resume: a saved position on a skipped page opens at the next visible page',state(pg)['first']==13,json.dumps(state(pg)))
+    back(pg)
+    # landscape 2-up spreads + RTL + card
+    pg.set_viewport_size({'width':1180,'height':823}); pg.wait_for_timeout(300); open_comic(pg,'Midnight Run 01'); v=vp()
+    ok('landscape 2-up: spreads pair around the skipped pages',v['spread'] and v['views'][:-1]==[[0],[1,2],[3,4],[5,6],[7,8],[9,10],[11,13],[15]],json.dumps(v['views']))
+    pg.evaluate('__cr.jumpTo(11)'); wait_render(pg); pg.wait_for_timeout(300); t1=vp()['txt']; pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(1100); wait_render(pg); v=vp()
+    ok('landscape: counter 12–13 / 14, then the last page + next-issue card',t1=='12–13 / 14' and v['views'][v['vi']]==[15] and v['next']=='Midnight Run 02' and v['txt']=='14 / 14',json.dumps([t1,v['vi'],v['txt'],v['next']]))
+    shot(pg,'62-skip-black-landscape-card')
+    pg.evaluate('__cr.toggleUI(true)'); pg.click('#rRtl'); pg.wait_for_timeout(400); pg.evaluate('__cr.toggleUI(false)'); pg.evaluate('__cr.jumpTo(9)'); wait_render(pg); pg.keyboard.press('ArrowLeft'); pg.wait_for_timeout(1100); v=vp()
+    ok('RTL: same pairs without black pages; turning goes 10–11 -> 12+14',v['views'][v['vi']]==[11,13] and flat(v)==[p for p in range(16) if p not in (12,14)],json.dumps([v['vi'],v['views']]))
+    pg.evaluate('__cr.toggleUI(true)'); pg.click('#rRtl'); pg.wait_for_timeout(400); pg.evaluate('__cr.toggleUI(false)'); back(pg)
+    # fold comic: landscape full sheets + portrait half pages
+    open_comic(pg,'Midnight Fold 01'); v=vp()
+    ok('fold comic (landscape): black sheet 6 left out, 7 sheets',not v['half'] and v['views'][:-1]==[[0],[1],[2],[3],[4],[6],[7]] and v['txt']=='1 / 7',json.dumps(v))
+    pg.evaluate('__cr.jumpTo(4)'); wait_render(pg); pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(1100); ok('fold: turn from sheet 5 lands on sheet 7',state(pg)['first']==6,json.dumps(state(pg)))
+    back(pg); pg.set_viewport_size({'width':820,'height':1180}); pg.wait_for_timeout(300); open_comic(pg,'Midnight Fold 01'); v=vp()
+    ok('fold comic (portrait half pages): black sheet left out, 13 halves',v['half'] and [w[0] for w in v['views'][:-1]]==[0,1,1,2,2,3,3,4,4,6,6,7,7] and v['txt'].endswith('/ 13') and v['max']==13,json.dumps(v))
+    back(pg)
+    # Edit sheet: per-comic switch
+    sheet(pg,'Midnight Run 01','aEdit'); pg.wait_for_selector('#eSkip')
+    e=pg.evaluate("(()=>({b:[...document.querySelectorAll('#eSkip button')].map(x=>x.textContent+(x.classList.contains('on')?'*':'')),h:document.querySelector('#eSkipHint').textContent}))()")
+    ok('Edit sheet: "Skip black pages" On/Off, default On, lists the pages found',e['b']==['On*','Off'] and 'pages 13, 15' in e['h'],json.dumps(e))
+    shot(pg,'63-edit-skip-black'); pg.click('#eSkip [data-v=off]'); pg.click('#eSave'); pg.wait_for_timeout(300)
+    open_comic(pg,'Midnight Run 01'); pg.evaluate('__cr.jumpTo(11)'); wait_render(pg); pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(900); v=vp()
+    ok('Skip black pages Off: all 16 pages, black page shown',v['txt']=='13 / 16' and state(pg)['first']==12 and pg.evaluate(IDBREC,'Midnight Run 01')['sk']==False,json.dumps(v['txt']))
+    back(pg); sheet(pg,'Midnight Run 01','aEdit'); pg.wait_for_selector('#eSkip'); pg.click('#eSkip [data-v=on]'); pg.click('#eSave'); pg.wait_for_timeout(300)
+    # Settings: global default (per-comic choice wins)
+    pg.click('#settingsBtn'); pg.wait_for_selector('#sSkipBlack'); gd=pg.is_checked('#sSkipBlack'); pg.click('#sSkipBlack'); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    open_comic(pg,'Midnight Fold 01'); fo=vp(); back(pg); open_comic(pg,'Midnight Run 01'); mo=vp(); back(pg)
+    ok('Settings: global "Skip black pages" defaults On; Off shows black pages, a per-comic On still skips',gd and 5 in flat(fo) and fo['txt'].endswith('/ 15') and 12 not in flat(mo),json.dumps([gd,fo['txt'],mo['txt']]))
+    pg.click('#settingsBtn'); pg.wait_for_selector('#sSkipBlack'); pg.click('#sSkipBlack'); pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    # comic imported before cr-v15: checked lazily on first open, re-flows in place, result cached
+    pg.evaluate("""new Promise(r=>{const q=indexedDB.open('comic-reader'); q.onsuccess=()=>{const s=q.result.transaction('comics','readwrite').objectStore('comics'); const g=s.getAll(); g.onsuccess=()=>{const c=g.result.find(x=>x.title==='Midnight Run 02'); delete c.blackV; delete c.blackPages; c.page=3; s.put(c).onsuccess=()=>{q.result.close(); r(1)}}}})""")
+    pg.reload(); pg.wait_for_selector('html[data-ready]'); open_comic(pg,'Midnight Run 02'); before=vp()['txt']
+    try: pg.wait_for_function("document.querySelector('#pgText').textContent.endsWith('/ 14')",timeout=30000); after=vp()['txt']
+    except Exception: after=vp()['txt']
+    ok('older comic: checked on first open, black pages drop out while reading, same page kept',before=='4 / 16' and after=='4 / 14' and state(pg)['first']==3,json.dumps([before,after,state(pg)['first']]))
+    back(pg); ok('lazy result cached in IndexedDB',pg.evaluate(IDBREC,'Midnight Run 02')['bp']==[12,14])
     c3.close(); pg=pg_main
     b.close()
 ok('no console errors / page errors',not errors,'\n'.join(errors[:10]))

@@ -31,7 +31,30 @@ const byIssue=(a,b)=>{ const x=issueNo(a.title), y=issueNo(b.title); return x!==
 function seriesGuess(t){ const s=t.replace(/[([].*?[)\]]/g,' ').replace(/\s+/g,' ').trim();
   const m=s.match(/^(.*?)[\s,_-]*(?:#|no\.?\s*|issue\s*|vol(?:ume)?\.?\s*|v|ch(?:apter)?\.?\s*|book\s*)?(\d{1,4})(?:\s*of\s*\d+)?$/i);
   return m&&m[1].trim().length>=2&&/[a-z]/i.test(m[1])? m[1].replace(/[\s,_#-]+$/,'').trim() : ''; }
-async function loadLibrary(){ comics=await dbAll(); renderShelf(); setTimeout(migrateCovers,400); }
+async function loadLibrary(){ comics=await dbAll(); renderShelf(); setTimeout(migrateCovers,400); kickBlack(5000); }
+/* ---- background blank-black page detection, cached per comic (c.blackPages, c.blackV) ----
+   newest-read first, one comic at a time, idle-paced; while a comic is open only that comic is scanned */
+const needsBlack=c=>c.blackV!==BLACK_V;
+const skipVal=c=>(c.skipBlack??store.get('skipBlack',true))?'on':'off';
+const blankList=c=>[...(c.blackPages||[]),...(c.whitePages||[])].filter(p=>p>0&&p<c.pages).sort((a,b)=>a-b);
+const skipList=c=>skipVal(c)==='on'?blankList(c):[];
+let blackBusy=false, blackT=0;
+let lastInput=0; ['pointerdown','pointermove','keydown','wheel'].forEach(t=>addEventListener(t,()=>{ lastInput=performance.now(); },{capture:true,passive:true}));
+const readerBusy=()=>!!R.comic&&(flip||animating||landing||running>0||jobs.size>0||performance.now()-lastInput<1500);
+function kickBlack(delay=1500){ clearTimeout(blackT); blackT=setTimeout(blackLoop,delay); }
+async function blackLoop(){ if(blackBusy||window.__crNoScan) return; blackBusy=true;
+  try{ for(;;){ if(importing) { kickBlack(3000); break; }
+      const open=R.comic, c=open?(needsBlack(open)?open:null):comics.filter(needsBlack).sort((a,b)=>(b.lastRead||0)-(a.lastRead||0)||(b.added||0)-(a.added||0))[0];
+      if(!c) break; if(!await scanOne(c)) break; } }
+  finally{ blackBusy=false; } }
+async function scanOne(c){ let doc=null; const id=c.id;
+  const alive=()=>!window.__crNoScan&&comics.some(x=>x.id===id)&&(!R.comic||R.comic.id===id);
+  const pause=async()=>{ for(let k=0;k<600&&readerBusy();k++) await new Promise(r=>setTimeout(r,100));   /* never compete with a page turn or page render */
+    await new Promise(r=>{ const go=()=>setTimeout(r,R.comic?40:6); if(window.requestIdleCallback) requestIdleCallback(go,{timeout:300}); else go(); }); };
+  try{ doc=await openPdf(new IDBSource(c.id,c.size)); const r=await scanBlack(doc,{alive,pause,from:R.comic&&R.comic.id===id?(c.page||0):1}); if(r==null) return false;
+    c.blackPages=r.black; c.whitePages=r.white; c.blackV=BLACK_V; delete c.blankPages; delete c.blankPagesV2; delete c.blankTail; await dbPut(c); dispatchEvent(new CustomEvent('cr-black',{detail:id})); return true; }
+  catch(e){ console.warn('black-page scan failed',e); c.blackPages=[]; c.whitePages=[]; c.blackV=BLACK_V; return true; }
+  finally{ if(doc) doc.destroy().catch(()=>{}); } }
 /* regenerate a comic's cover thumbnail from its stored PDF (cover mode change, or migration) */
 let coverJob=Promise.resolve();
 function recover(c,mode){ return coverJob=coverJob.then(async()=>{ const doc=await openPdf(new IDBSource(c.id,c.size));
@@ -125,7 +148,7 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
     this.info(); },
   info(){ const i=clamp(Math.round(this.pos),0,this.items.length-1); if(i===this.shown) return; this.shown=i; const c=this.items[i]; if(!c||!this.el) return;
     // no caption under the carousel: the centre cover itself is the control (tap opens); keep it labelled for VoiceOver
-    [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1} of ${c.pages}`:''}`:this.items[k].title); }); },
+    [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1-skipList(c).filter(p=>p<(c.page||0)).length} of ${c.pages-skipList(c).length}`:''}`:this.items[k].title); }); },
   stop(){ cancelAnimationFrame(this.raf); this.raf=0; },
   moving(v){ if(this.el) this.el.classList.toggle('moving',v); },   // shadows are dropped while moving (cheaper compositing)
   to(target,dur){ this.stop(); this.moving(true); const from=this.pos, t0=performance.now(); target=clamp(target,0,this.items.length-1);
@@ -246,14 +269,16 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
       <small class="fhint">Fold in middle: for PDFs with two comic pages side by side on each page. Auto detects them${typeof c.foldAuto==='boolean'?` (detected: ${c.foldAuto?'fold in middle':'standard'})`:''}.</small></div>
     <div class="fld" id="eFoldPW"${(c.turnMode==='fold'||(c.turnMode!=='standard'&&c.foldAuto))?'':' style="display:none"'}><span>Portrait</span><div class="seg4 seg2" id="eFoldP" role="radiogroup">${[['half','Half pages'],['full','Full sheet']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.foldPortrait||'half')===v}" class="${(c.foldPortrait||'half')===v?'on':''}">${l}</button>`).join('')}</div>
       <small class="fhint">For fold-in-middle comics held upright: Half pages shows one comic page at a time, fitted to the screen. Landscape always shows the full sheet.</small></div>
+    <div class="fld"><span>Skip blank pages</span><div class="seg4 seg2" id="eSkip" role="radiogroup">${[['on','On'],['off','Off']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${skipVal(c)===v}" class="${skipVal(c)===v?'on':''}">${l}</button>`).join('')}</div>
+      <small class="fhint" id="eSkipHint">Leaves out blank pages: black ones (like a black “TM &amp; ©” page between ads) and nearly white ones. ${needsBlack(c)?'Not checked yet.':blankList(c).length?`Found: page${blankList(c).length>1?'s':''} ${blankList(c).map(p=>p+1).join(', ')}.`:'None found in this comic.'}</small></div>
     <label class="tgl"><input type="checkbox" id="eRtl" ${c.rtl?'checked':''}><span>Right-to-left (manga)<small>Reverses page order and swipe direction</small></span></label>
     <div class="mstat">${esc(c.fileName)} · ${fmtBytes(c.size)} · ${c.pages} pages</div>
   </div><div class="mf"><button class="btn ghost" data-r="delete" id="eDelete" style="color:#ff453a">Delete</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="eSave">Save</button></div>`,
-  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v,fp:w.querySelector('#eFoldP .on').dataset.v});
-       ['#eCover','#eTurn','#eFoldP'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); });
+  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v,fp:w.querySelector('#eFoldP .on').dataset.v,sk:w.querySelector('#eSkip .on').dataset.v});
+       ['#eCover','#eTurn','#eFoldP','#eSkip'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); });
          if(sel==='#eTurn') w.querySelector('#eFoldPW').style.display=(b.dataset.v==='fold'||(b.dataset.v==='auto'&&c.foldAuto))?'':'none'; }));
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; await dbPut(c); renderShelf();
+  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; if(vals.sk!==skipVal(c)) c.skipBlack=vals.sk==='on'; await dbPut(c); renderShelf(); dispatchEvent(new CustomEvent('cr-black',{detail:c.id}));
     if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 /* ---------- series: rename (renaming onto an existing name merges) and multi-merge ---------- */
@@ -334,6 +359,7 @@ async function openSettings(){
   const {r}=await modal(`<div class="mh"><h3>Settings</h3></div><div class="mb">
     <div class="stor"><b>${fmtBytes(est.usage||mine)}</b><span>used${est.quota?` of ~${fmtBytes(est.quota)} available`:''}</span></div>
     <div class="mstat">${comics.length} comic${comics.length===1?'':'s'} · ${fmtBytes(mine)} of PDFs · storage ${persisted?'persistent ✓':'not yet marked persistent'}</div>
+    <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSkipBlack" ${store.get('skipBlack',true)?'checked':''}><span>Skip blank pages<small>Leaves out blank pages: black ones (like a black “TM &amp; ©” page between ads) and nearly white ones. Each comic can override this in Edit.</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSingle" ${store.get('singleLandscape',false)?'checked':''}><span>Single page in landscape<small>Off shows two-page spreads when the iPad is sideways</small></span></label>
     <div class="sgrp"><b>Google Drive folder</b><span id="sFolderCur">${esc(Drive.folder().name||'Folder')} · <code>${esc(Drive.folder().id)}</code>${store.get('driveFolder',null)?'':' (default)'}</span>
       <div class="frow"><input id="sFolder" type="url" placeholder="Paste a Drive folder link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn ghost" id="sFolderSave">Save</button></div>
@@ -343,7 +369,7 @@ async function openSettings(){
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
-  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked));
+  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked)); w.querySelector('#sSkipBlack').addEventListener('change',e=>{ store.set('skipBlack',e.target.checked); if(R.comic) dispatchEvent(new CustomEvent('cr-black',{detail:R.comic.id})); });
     const cur=()=>{ const f=Drive.folder(); w.querySelector('#sFolderCur').innerHTML=`${esc(f.name||'Folder')} · <code>${esc(f.id)}</code>${store.get('driveFolder',null)?'':' (default)'}`; };
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
@@ -382,6 +408,6 @@ async function importFiles(files){
       const quota=err&&(err.name==='QuotaExceededError'||/quota/i.test(err.message||''));
       toast(quota?`Out of storage space importing “${f.name}”.`:`Couldn't import “${f.name}”: ${err&&err.message||'not a valid PDF'}`); await new Promise(r=>setTimeout(r,1800)); }
   }
-  importing=false; if(ok) toast(`Imported ${ok} comic${ok>1?'s':''} ✓`); renderShelf();
+  importing=false; if(ok) toast(`Imported ${ok} comic${ok>1?'s':''} ✓`); renderShelf(); if(ok) kickBlack();
 }
 

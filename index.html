@@ -350,7 +350,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=19',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!window.__crReloading){ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=20',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(!window.__crReloading){ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -503,6 +503,41 @@ async function turnIsFold(doc,c){ const m=c.turnMode||'auto'; if(m==='fold') ret
 function isRangeName(n){ const s=String(n||'').trim().replace(/[’‘]/g,"'");
   return /^(?:(?:issues?|nos?\.?|#)\s*)?#?\d{1,4}\s*(?:-|–|—|to|thru|through)\s*#?\d{1,4}$/i.test(s) || /^\d{1,4}\s*'?\s*s$/i.test(s) || /^#?\d{1,4}\s*\+?$/.test(s); }
 
+/* ---- blank black pages (scanned "TM & ©" pages between ads) ----
+   A page is "blank black" when, on a small render (page 1 never counts):
+   - at least 95% of it is near-black (luma < 32), ignoring a thin 3% border (scanner edges);
+   - everything bright is one small blob (the copyright box: at most 3.5% of the page), with almost nothing bright outside it (<= 0.03%: no stars, windows, rain);
+   - the black outside that blob is flat: dark mean <= 22 and spread (std) <= 4.5. Night-scene art has gradients/texture (std 5.8+ on our dark test pages). */
+const BLACK_V=2;   /* bump to re-check every comic */
+function blackStats(d,W,H){
+  const m=Math.round(Math.min(W,H)*.03), x0=m, y0=m, x1=W-m, y1=H-m, w=x1-x0, h=y1-y0, N=w*h, L=new Float32Array(N), bright=new Uint8Array(N);
+  let dark=0; for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=((y+y0)*W+(x+x0))*4, l=.299*d[i]+.587*d[i+1]+.114*d[i+2], k=y*w+x; L[k]=l; if(l<32) dark++; else bright[k]=1; }
+  const share=dark/N; let best=null;
+  if(share>=0.95){ const seen=new Uint8Array(N), st=[];                        // largest bright blob (4-connected)
+    for(let k=0;k<N;k++){ if(!bright[k]||seen[k]) continue; let n=0,l=w,r=-1,t=h,b=-1; st.push(k); seen[k]=1;
+      while(st.length){ const q=st.pop(), x=q%w, y=(q-x)/w; n++; if(x<l) l=x; if(x>r) r=x; if(y<t) t=y; if(y>b) b=y;
+        for(const nb of [x>0?q-1:-1,x<w-1?q+1:-1,y>0?q-w:-1,y<h-1?q+w:-1]) if(nb>=0&&bright[nb]&&!seen[nb]){ seen[nb]=1; st.push(nb); } }
+      if(!best||n>best.n) best={n,l,r,t,b}; } }
+  const pad=2, bx=best?{l:best.l-pad,r:best.r+pad,t:best.t-pad,b:best.b+pad}:null, inBox=(x,y)=>bx&&x>=bx.l&&x<=bx.r&&y>=bx.t&&y<=bx.b;
+  let out=0, sum=0, sq=0, nd=0; for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(inBox(x,y)) continue; const k=y*w+x; if(bright[k]) out++; else { const l=L[k]; sum+=l; sq+=l*l; nd++; } }
+  const mean=nd?sum/nd:0, std=nd?Math.sqrt(Math.max(0,sq/nd-mean*mean)):0, boxArea=bx?((bx.r-bx.l+1)*(bx.b-bx.t+1))/N:0;
+  const black=share>=0.95&&boxArea<=0.035&&out<=N*0.0003&&mean<=22&&std<=4.5;
+  /* nearly white page (cr-v19 rule): inner 80%x84% is >84% light (luma>198) with <7% mid-tones. Light must also be near-neutral
+     (channel spread <=18) so plain coloured pages (yellow ads, pale-blue sheets) are not taken for blank paper */
+  const wx0=Math.floor(W*.1), wy0=Math.floor(H*.08), wx1=Math.ceil(W*.9), wy1=Math.ceil(H*.92); let wl=0, wm=0, wn=0;
+  for(let y=wy0;y<wy1;y++) for(let x=wx0;x<wx1;x++){ const i=(y*W+x)*4, l=.299*d[i]+.587*d[i+1]+.114*d[i+2]; wn++; if(l>198){ if(Math.max(d[i],d[i+1],d[i+2])-Math.min(d[i],d[i+1],d[i+2])<=18) wl++; } else if(l>=72) wm++; }
+  const white=wn>0&&wm/wn<0.07&&wl/wn>0.84;
+  return {share,boxArea,outside:out/N,mean,std,black,white}; }
+async function pageBlackStats(page){ const vp=page.getViewport({scale:1}), wide=vp.width>vp.height;
+  const c=await renderToCanvas(page,wide?192:96,wide?144:144,1,40000); const x=c.getContext('2d',{willReadFrequently:true});
+  const d=x.getImageData(0,0,c.width,c.height).data, s=blackStats(d,c.width,c.height); freeCanvas(c); return s; }
+// blank pages of a document (never page 0): {black:[...], white:[...]}, or null if cancelled. Yields between pages.
+// Scans from page `from` to the end first (where the reader is heading), then the rest. Black: gives up if a quarter of the pages look black.
+async function scanBlack(doc,{alive=()=>true,pause=()=>new Promise(r=>setTimeout(r,16)),from=1}={}){ const n=doc.numPages, black=[], white=[], f=clamp(from|0,1,Math.max(1,n-1));
+  const order=[]; for(let i=f;i<n;i++) order.push(i); for(let i=1;i<f;i++) order.push(i);
+  for(const i of order){ if(!alive()) return null; await pause(); const page=await doc.getPage(i+1); try{ const s=await pageBlackStats(page); if(s.black) black.push(i); else if(s.white) white.push(i); } finally{ page.cleanup(); } }
+  black.sort((a,b)=>a-b); white.sort((a,b)=>a-b); return {black:black.length>Math.max(3,n*.25)?[]:black, white}; }
+
 /* ================= Shelf: Home (coverflow + rows) and Library (grid) ================= */
 let comics=[]; const coverURL=new Map();
 const ui={tab:store.get('tab','home'), sort:store.get('sort','recent'), filter:'all', series:null, q:''};
@@ -535,7 +570,30 @@ const byIssue=(a,b)=>{ const x=issueNo(a.title), y=issueNo(b.title); return x!==
 function seriesGuess(t){ const s=t.replace(/[([].*?[)\]]/g,' ').replace(/\s+/g,' ').trim();
   const m=s.match(/^(.*?)[\s,_-]*(?:#|no\.?\s*|issue\s*|vol(?:ume)?\.?\s*|v|ch(?:apter)?\.?\s*|book\s*)?(\d{1,4})(?:\s*of\s*\d+)?$/i);
   return m&&m[1].trim().length>=2&&/[a-z]/i.test(m[1])? m[1].replace(/[\s,_#-]+$/,'').trim() : ''; }
-async function loadLibrary(){ comics=await dbAll(); renderShelf(); setTimeout(migrateCovers,400); }
+async function loadLibrary(){ comics=await dbAll(); renderShelf(); setTimeout(migrateCovers,400); kickBlack(5000); }
+/* ---- background blank-black page detection, cached per comic (c.blackPages, c.blackV) ----
+   newest-read first, one comic at a time, idle-paced; while a comic is open only that comic is scanned */
+const needsBlack=c=>c.blackV!==BLACK_V;
+const skipVal=c=>(c.skipBlack??store.get('skipBlack',true))?'on':'off';
+const blankList=c=>[...(c.blackPages||[]),...(c.whitePages||[])].filter(p=>p>0&&p<c.pages).sort((a,b)=>a-b);
+const skipList=c=>skipVal(c)==='on'?blankList(c):[];
+let blackBusy=false, blackT=0;
+let lastInput=0; ['pointerdown','pointermove','keydown','wheel'].forEach(t=>addEventListener(t,()=>{ lastInput=performance.now(); },{capture:true,passive:true}));
+const readerBusy=()=>!!R.comic&&(flip||animating||landing||running>0||jobs.size>0||performance.now()-lastInput<1500);
+function kickBlack(delay=1500){ clearTimeout(blackT); blackT=setTimeout(blackLoop,delay); }
+async function blackLoop(){ if(blackBusy||window.__crNoScan) return; blackBusy=true;
+  try{ for(;;){ if(importing) { kickBlack(3000); break; }
+      const open=R.comic, c=open?(needsBlack(open)?open:null):comics.filter(needsBlack).sort((a,b)=>(b.lastRead||0)-(a.lastRead||0)||(b.added||0)-(a.added||0))[0];
+      if(!c) break; if(!await scanOne(c)) break; } }
+  finally{ blackBusy=false; } }
+async function scanOne(c){ let doc=null; const id=c.id;
+  const alive=()=>!window.__crNoScan&&comics.some(x=>x.id===id)&&(!R.comic||R.comic.id===id);
+  const pause=async()=>{ for(let k=0;k<600&&readerBusy();k++) await new Promise(r=>setTimeout(r,100));   /* never compete with a page turn or page render */
+    await new Promise(r=>{ const go=()=>setTimeout(r,R.comic?40:6); if(window.requestIdleCallback) requestIdleCallback(go,{timeout:300}); else go(); }); };
+  try{ doc=await openPdf(new IDBSource(c.id,c.size)); const r=await scanBlack(doc,{alive,pause,from:R.comic&&R.comic.id===id?(c.page||0):1}); if(r==null) return false;
+    c.blackPages=r.black; c.whitePages=r.white; c.blackV=BLACK_V; delete c.blankPages; delete c.blankPagesV2; delete c.blankTail; await dbPut(c); dispatchEvent(new CustomEvent('cr-black',{detail:id})); return true; }
+  catch(e){ console.warn('black-page scan failed',e); c.blackPages=[]; c.whitePages=[]; c.blackV=BLACK_V; return true; }
+  finally{ if(doc) doc.destroy().catch(()=>{}); } }
 /* regenerate a comic's cover thumbnail from its stored PDF (cover mode change, or migration) */
 let coverJob=Promise.resolve();
 function recover(c,mode){ return coverJob=coverJob.then(async()=>{ const doc=await openPdf(new IDBSource(c.id,c.size));
@@ -629,7 +687,7 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
     this.info(); },
   info(){ const i=clamp(Math.round(this.pos),0,this.items.length-1); if(i===this.shown) return; this.shown=i; const c=this.items[i]; if(!c||!this.el) return;
     // no caption under the carousel: the centre cover itself is the control (tap opens); keep it labelled for VoiceOver
-    [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1} of ${c.pages}`:''}`:this.items[k].title); }); },
+    [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1-skipList(c).filter(p=>p<(c.page||0)).length} of ${c.pages-skipList(c).length}`:''}`:this.items[k].title); }); },
   stop(){ cancelAnimationFrame(this.raf); this.raf=0; },
   moving(v){ if(this.el) this.el.classList.toggle('moving',v); },   // shadows are dropped while moving (cheaper compositing)
   to(target,dur){ this.stop(); this.moving(true); const from=this.pos, t0=performance.now(); target=clamp(target,0,this.items.length-1);
@@ -750,14 +808,16 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
       <small class="fhint">Fold in middle: for PDFs with two comic pages side by side on each page. Auto detects them${typeof c.foldAuto==='boolean'?` (detected: ${c.foldAuto?'fold in middle':'standard'})`:''}.</small></div>
     <div class="fld" id="eFoldPW"${(c.turnMode==='fold'||(c.turnMode!=='standard'&&c.foldAuto))?'':' style="display:none"'}><span>Portrait</span><div class="seg4 seg2" id="eFoldP" role="radiogroup">${[['half','Half pages'],['full','Full sheet']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${(c.foldPortrait||'half')===v}" class="${(c.foldPortrait||'half')===v?'on':''}">${l}</button>`).join('')}</div>
       <small class="fhint">For fold-in-middle comics held upright: Half pages shows one comic page at a time, fitted to the screen. Landscape always shows the full sheet.</small></div>
+    <div class="fld"><span>Skip blank pages</span><div class="seg4 seg2" id="eSkip" role="radiogroup">${[['on','On'],['off','Off']].map(([v,l])=>`<button type="button" role="radio" data-v="${v}" aria-checked="${skipVal(c)===v}" class="${skipVal(c)===v?'on':''}">${l}</button>`).join('')}</div>
+      <small class="fhint" id="eSkipHint">Leaves out blank pages: black ones (like a black “TM &amp; ©” page between ads) and nearly white ones. ${needsBlack(c)?'Not checked yet.':blankList(c).length?`Found: page${blankList(c).length>1?'s':''} ${blankList(c).map(p=>p+1).join(', ')}.`:'None found in this comic.'}</small></div>
     <label class="tgl"><input type="checkbox" id="eRtl" ${c.rtl?'checked':''}><span>Right-to-left (manga)<small>Reverses page order and swipe direction</small></span></label>
     <div class="mstat">${esc(c.fileName)} · ${fmtBytes(c.size)} · ${c.pages} pages</div>
   </div><div class="mf"><button class="btn ghost" data-r="delete" id="eDelete" style="color:#ff453a">Delete</button><span class="sp"></span><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="eSave">Save</button></div>`,
-  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v,fp:w.querySelector('#eFoldP .on').dataset.v});
-       ['#eCover','#eTurn','#eFoldP'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); });
+  w=>{ w._vals=()=>({t:w.querySelector('#eTitle').value,s:w.querySelector('#eSeries').value,r:w.querySelector('#eRtl').checked,cv:w.querySelector('#eCover .on').dataset.v,tm:w.querySelector('#eTurn .on').dataset.v,fp:w.querySelector('#eFoldP .on').dataset.v,sk:w.querySelector('#eSkip .on').dataset.v});
+       ['#eCover','#eTurn','#eFoldP','#eSkip'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); });
          if(sel==='#eTurn') w.querySelector('#eFoldPW').style.display=(b.dataset.v==='fold'||(b.dataset.v==='auto'&&c.foldAuto))?'':'none'; }));
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; await dbPut(c); renderShelf();
+  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; if(vals.sk!==skipVal(c)) c.skipBlack=vals.sk==='on'; await dbPut(c); renderShelf(); dispatchEvent(new CustomEvent('cr-black',{detail:c.id}));
     if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 /* ---------- series: rename (renaming onto an existing name merges) and multi-merge ---------- */
@@ -838,6 +898,7 @@ async function openSettings(){
   const {r}=await modal(`<div class="mh"><h3>Settings</h3></div><div class="mb">
     <div class="stor"><b>${fmtBytes(est.usage||mine)}</b><span>used${est.quota?` of ~${fmtBytes(est.quota)} available`:''}</span></div>
     <div class="mstat">${comics.length} comic${comics.length===1?'':'s'} · ${fmtBytes(mine)} of PDFs · storage ${persisted?'persistent ✓':'not yet marked persistent'}</div>
+    <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSkipBlack" ${store.get('skipBlack',true)?'checked':''}><span>Skip blank pages<small>Leaves out blank pages: black ones (like a black “TM &amp; ©” page between ads) and nearly white ones. Each comic can override this in Edit.</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSingle" ${store.get('singleLandscape',false)?'checked':''}><span>Single page in landscape<small>Off shows two-page spreads when the iPad is sideways</small></span></label>
     <div class="sgrp"><b>Google Drive folder</b><span id="sFolderCur">${esc(Drive.folder().name||'Folder')} · <code>${esc(Drive.folder().id)}</code>${store.get('driveFolder',null)?'':' (default)'}</span>
       <div class="frow"><input id="sFolder" type="url" placeholder="Paste a Drive folder link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn ghost" id="sFolderSave">Save</button></div>
@@ -847,7 +908,7 @@ async function openSettings(){
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
-  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked));
+  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked)); w.querySelector('#sSkipBlack').addEventListener('change',e=>{ store.set('skipBlack',e.target.checked); if(R.comic) dispatchEvent(new CustomEvent('cr-black',{detail:R.comic.id})); });
     const cur=()=>{ const f=Drive.folder(); w.querySelector('#sFolderCur').innerHTML=`${esc(f.name||'Folder')} · <code>${esc(f.id)}</code>${store.get('driveFolder',null)?'':' (default)'}`; };
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
@@ -886,7 +947,7 @@ async function importFiles(files){
       const quota=err&&(err.name==='QuotaExceededError'||/quota/i.test(err.message||''));
       toast(quota?`Out of storage space importing “${f.name}”.`:`Couldn't import “${f.name}”: ${err&&err.message||'not a valid PDF'}`); await new Promise(r=>setTimeout(r,1800)); }
   }
-  importing=false; if(ok) toast(`Imported ${ok} comic${ok>1?'s':''} ✓`); renderShelf();
+  importing=false; if(ok) toast(`Imported ${ok} comic${ok>1?'s':''} ✓`); renderShelf(); if(ok) kickBlack();
 }
 
 /* ================= Google Drive import (GIS token client + Picker; streamed into chunked IndexedDB) =================
@@ -1074,7 +1135,7 @@ const Drive=(()=>{
         else { fail++; r.st='fail'; const quota=err&&(err.name==='QuotaExceededError'||/quota/i.test(err.message||'')); r.msg=quota?'Out of storage space':/Invalid PDF|PDF header|InvalidPDF/i.test(err.message||'')?'Not a valid PDF':(err.message||'Download failed'); console.warn('drive import failed',err); } }
       paint(true);
     }
-    importing=false; ctl=null; renderShelf(); try{ wl&&wl.release(); }catch(e){}
+    importing=false; ctl=null; renderShelf(); if(ok) kickBlack(); try{ wl&&wl.release(); }catch(e){}
     w.querySelector('#dlHead').textContent=signal.aborted?'Import cancelled':fail?'Import finished with problems':'Import complete';
     w.querySelector('#dlSub').textContent=[ok&&`${ok} imported`,skip&&`${skip} already in library`,fail&&`${fail} failed`,signal.aborted&&'cancelled'].filter(Boolean).join(' · ')||'Nothing imported';
     const b=w.querySelector('#dlCancel'); b.textContent='Done'; b.className='btn'; b.id='dlDone'; b.onclick=()=>w.remove();
@@ -1134,25 +1195,28 @@ function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key)
 // half mode (fold comics in portrait): each wide sheet becomes two views, its halves in reading order (RTL: right half first);
 // the wide cover sheet shows only its cover half (from the cover-crop detection); narrow sheets stay whole. R.vh[k] = 'L' | 'R' | null
 const WIDE=1.15;
-function realPages(){ const skip=R.skip||new Set(); const pages=[]; for(let i=0;i<R.n;i++) if(!skip.has(i)) pages.push(i); return pages; }
-function buildViews(){ const v=[], vh=[], pages=realPages();
-  if(R.spread){ if(pages.length) v.push([null,pages[0]]); for(let i=1;i<pages.length;i+=2) v.push([pages[i],i+1<pages.length?pages[i+1]:null]); }
+// skipped blank pages (black + nearly white): the reader works on R.seq (visible page indices); R.ord maps page -> position in it
+function setSeq(){ const c=R.comic, on=c.skipBlack??store.get('skipBlack',true), sk=new Set(on?[...(c.blackPages||[]),...(c.whitePages||[])].filter(p=>p>0&&p<R.n):[]);
+  R.skip=sk; R.seq=[]; R.ord=new Map(); for(let i=0;i<R.n;i++) if(!sk.has(i)){ R.ord.set(i,R.seq.length); R.seq.push(i); } }
+const ordOf=p=>R.ord.has(p)?R.ord.get(p):R.seq.length-1;
+function buildViews(){ const v=[], vh=[]; setSeq(); const S=R.seq;
+  if(R.spread){ v.push([null,S[0]]); for(let j=1;j<S.length;j+=2) v.push([S[j],j+1<S.length?S[j+1]:null]); }
   else if(R.half){ const ord=R.rtl?['R','L']:['L','R'], side=(R.comic.coverCrop&&R.comic.coverCrop.side)||'';
-    for(const i of pages){ const wide=(R.aspects[i]||0)>WIDE;
-      if(i===pages[0]&&wide&&(side==='right'||side==='left')){ v.push([i]); vh.push(side==='right'?'R':'L'); }
+    for(const i of S){ const wide=(R.aspects[i]||0)>WIDE;
+      if(i===0&&wide&&(side==='right'||side==='left')){ v.push([0]); vh.push(side==='right'?'R':'L'); }
       else if(wide) ord.forEach(h=>{ v.push([i]); vh.push(h); });
       else { v.push([i]); vh.push(null); } } }
-  else pages.forEach(i=>v.push([i]));
+  else for(const i of S) v.push([i]);
   // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
-  const E=R.n, real=R.aspects.slice(0,E); R.next=nextIssue(R.comic); R.endBtn=null;
+  const E=R.n, real=S.map(i=>R.aspects[i]); R.next=nextIssue(R.comic); R.endBtn=null;
   R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
   v.push([E]); if(R.half) vh.push(null);   // end card is its own page: no blank slot beside or after it
   R.views=v; R.vh=R.half?vh:[]; }
 const halfOf=k=>R.half?(R.vh[k]||null):null;
 const pagesOf=v=>v?v.filter(x=>x!=null):[];
-function viewOfPage(p,h){ if(R.spread) return p<=0?0:Math.floor((p-1)/2)+1; if(!R.half) return p;
-  let first=-1; for(let k=0;k<R.views.length;k++){ if(R.views[k][0]===p){ if(first<0) first=k; if(!h||R.vh[k]===h) return k; } else if(first>=0) break; }
-  if(first>=0) return first; let k=0; while(k<R.views.length-1&&R.views[k+1][0]<=p) k++; return k; }
+function viewOfPage(p,h){ let q=p>=R.n?R.n:(R.seq.find(i=>i>=p)??R.seq[R.seq.length-1]);   // skipped page -> next visible page
+  let first=-1; for(let k=0;k<R.views.length;k++){ if(R.views[k].includes(q)){ if(first<0) first=k; if(!R.half||!h||R.vh[k]===h) return k; } else if(first>=0) break; }
+  return first>=0?first:0; }
 const visualPages=v=>v.length===1?v:(R.rtl?[v[1],v[0]]:[v[0],v[1]]);   // [left slot, right slot]
 function aspectOf(v,h){ let a=0; pagesOf(v).forEach(p=>{ a=Math.max(a,R.aspects[p]||0); }); a=a||R.comic.aspect||0.66; return h?a/2:a; }
 function geom(v,h){ const W=stage.clientWidth,H=stage.clientHeight, ar=v.length===2?spreadAR():aspectOf(v,h===undefined?halfOf(R.views.indexOf(v)):h);
@@ -1193,7 +1257,7 @@ function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
   [1,-1,2,-2].forEach((d,k)=>{ const v=R.views[R.vi+d]; if(!v) return; const hv=halfOf(R.vi+d), g=geom(v,hv), vis=visualPages(v);
     vis.forEach((p,j)=>{ if(p==null) return; want.add(p); requestPage(p,hv?g[j].w*2:g[j].w,g[j].h,1+k).catch(()=>{}); }); });   // adjacent halves share their sheet's render
   dropJobs(j=>(j.kind==='page'&&!want.has(j.page))||j.kind==='hi'); }
-function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ps[0]+1, b=ps[ps.length-1]+1, N=R.n;
+function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ordOf(ps[0])+1, b=ordOf(ps[ps.length-1])+1, N=R.seq.length;
   if(R.half){ N=R.views.length-1; a=b=Math.min(R.vi+1,N); }   // the end card isn't counted   // portrait half pages: counter + scrubber count halves
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+N;
   const s=$('#scrub'); s.max=N; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(N>1?(b-1)/(N-1)*100:100)+'%');
@@ -1203,7 +1267,7 @@ function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.
 /* ---- progress ---- */
 let saveT=0;
 function saveSoon(){ clearTimeout(saveT); saveT=setTimeout(saveNow,250); }
-function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ps[ps.length-1]+1)/R.n; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
+function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ordOf(ps[ps.length-1])+1)/R.seq.length; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
 addEventListener('pagehide',saveNow); document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveNow(); });
 
 /* ---- open / close ---- */
@@ -1216,36 +1280,14 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
-  R.skip=new Set(); try{ R.skip=await blankPages(doc,c); if(R.comic!==c) return; }catch(e){ console.warn('blank-page scan failed',e); }
   R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1); renderView();
+  if(needsBlack(c)) kickBlack(300);   /* not checked yet: checked now in the background, from the current page on; blank pages drop out in place */
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-// trailing scan pages that are black (or white) except a copyright line. Only the last two, never the cover.
-// Dropping them does not shift earlier landscape pairs: the next-issue card takes the empty right-hand slot.
-function nearlyEmpty(canvas){
-  const w=canvas.width, h=canvas.height, x0=Math.floor(w*.1), y0=Math.floor(h*.08), x1=Math.ceil(w*.9), y1=Math.ceil(h*.92);
-  const im=canvas.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,Math.max(1,x1-x0),Math.max(1,y1-y0)).data;
-  const n=im.length/4; let dark=0, light=0, mid=0;
-  for(let i=0;i<im.length;i+=4){ const l=.299*im[i]+.587*im[i+1]+.114*im[i+2]; if(l<72) dark++; else if(l>198) light++; else mid++; }
-  return mid/n<0.07 && (dark/n>0.84 || light/n>0.84);   // black or white page, copyright line and scan margin allowed
-}
-// Every page except the cover. Result stays off the comic record so a bad scan is not saved.
-async function blankPages(doc,c){
-  delete c.blankPages; delete c.blankPagesV2; delete c.blankTail;
-  const n=doc.numPages, found=[];
-  for(let i=2;i<=n;i++){
-    const page=await doc.getPage(i);
-    const canvas=await renderToCanvas(page,72,108,1,20000);
-    page.cleanup();
-    if(nearlyEmpty(canvas)) found.push(i-1);
-    freeCanvas(canvas);
-  }
-  return new Set(found);
-}
 function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
-  readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); }
+  readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
 addEventListener('popstate',()=>{ const m=location.hash.match(/^#\/read\/(.+)$/); if(m){ if(!R.comic||R.comic.id!==m[1]) openReader(m[1],{push:false}); } else if(R.comic) closeReader(); });
 $('#rRtl').onclick=()=>{ R.rtl=!R.rtl; R.comic.rtl=R.rtl; dbPut(R.comic); cancelFlipNow(); if(R.half) relayout(true); else renderView(); toast(R.rtl?'Right-to-left (manga) on':'Left-to-right'); };
@@ -1465,18 +1507,18 @@ function thumb(i,prio){ const u=R.thumbs.get(i); if(u){ R.thumbs.delete(i); R.th
   return enqueue('t|'+i,'thumb',i,prio,async()=>{ const page=await doc.getPage(i+1); const c=await renderToCanvas(page,110,165,2,80000); page.cleanup(); const b=await toBlob(c,.7); freeCanvas(c);
     const url=URL.createObjectURL(b); R.thumbs.set(i,url); while(R.thumbs.size>400){ const [k,v]=R.thumbs.entries().next().value; URL.revokeObjectURL(v); R.thumbs.delete(k); } return url; }); }
 const scrub=$('#scrub'), bubble=$('#bubble');
-function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.n, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
+function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.seq.length, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
   bubble.classList.remove('hidden'); bubble.style.left=clamp(x,56,w-40)+'px'; bubble.querySelector('span').textContent=`Page ${v}`;
-  const sh=R.half?((R.views[v-1]||[0])[0]):v-1;   // half pages: thumbnail of that half's sheet
+  const sh=R.half?((R.views[v-1]||[0])[0]):(R.seq[v-1]??0);   // half pages: thumbnail of that half's sheet
   scrub.style.setProperty('--pct',frac*100+'%'); const img=bubble.querySelector('img'); img.dataset.p=sh; const u=R.thumbs.get(sh);
   if(u) img.src=u; else { img.removeAttribute('src'); thumb(sh,-2).then(url=>{ if(img.dataset.p==String(sh)) img.src=url; }).catch(()=>{}); } }
 const hideBubble=ms=>setTimeout(()=>{ bubble.classList.add('hidden'); scrubbing=false; },ms);
 scrub.addEventListener('input',()=>{ scrubbing=true; clearTimeout(R.uiT); showBubble(); });
-scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(+scrub.value-1); hideBubble(600); });
+scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(R.seq[+scrub.value-1]??0); hideBubble(600); });
 $('#rGrid').onclick=openPages; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
 let pagesIO=null;
 function openPages(){ const grid=$('#pgrid'), cur=new Set(pagesOf(R.views[R.vi]));
-  grid.innerHTML=Array.from({length:R.n},(_,i)=>`<button data-p="${i}" class="${cur.has(i)?'cur':''}"><div class="th"></div><span>${i+1}</span></button>`).join('');
+  grid.innerHTML=R.seq.map((i,k)=>`<button data-p="${i}" class="${cur.has(i)?'cur':''}"><div class="th"></div><span>${k+1}</span></button>`).join('');
   $('#pages').classList.remove('hidden'); if(pagesIO) pagesIO.disconnect();
   pagesIO=new IntersectionObserver(es=>es.forEach(en=>{ if(!en.isIntersecting) return; const b=en.target; pagesIO.unobserve(b); const i=+b.dataset.p;
     thumb(i,20+i*.001).then(u=>{ b.querySelector('.th').innerHTML=`<img src="${u}" alt="">`; }).catch(()=>{}); }),{root:grid,rootMargin:'300px'});
@@ -1524,8 +1566,14 @@ function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.vi
 function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
   n.page=0; n.half=null;   // the next-issue card always starts that issue on its cover, not the saved page
   try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,atCover:true}); }
+
+// blank-black detection finished (or the setting changed) for the open comic: rebuild the page sequence in place, keeping the reader on the same page
+function reseq(){ if(!R.comic||!R.doc||!R.views.length) return; if(flip||animating||landing){ clearTimeout(R.reseqT); R.reseqT=setTimeout(reseq,250); return; }
+  const was=R.skip?[...R.skip].join():''; const cur=pagesOf(R.views[R.vi]).filter(p=>p!=null&&p<=R.n), p=cur.length?cur[0]:0, h=halfOf(R.vi);
+  buildViews(); if([...R.skip].join()===was){ return; } R.vi=clamp(viewOfPage(p,h),0,R.views.length-1); renderView(); }
+addEventListener('cr-black',e=>{ if(R.comic&&e.detail===R.comic.id) reseq(); });
 /* ================= boot ================= */
-window.__cr={drive:Drive,issueNo,isRangeName,series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),CF,SCF,go,jumpTo,toggleUI};
+window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),CF,SCF,go,jumpTo,toggleUI,get comics(){return comics},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);
