@@ -183,7 +183,7 @@ const Drive=(()=>{
         else { fail++; r.st='fail'; const quota=err&&(err.name==='QuotaExceededError'||/quota/i.test(err.message||'')); r.msg=quota?'Out of storage space':/Invalid PDF|PDF header|InvalidPDF/i.test(err.message||'')?'Not a valid PDF':(err.message||'Download failed'); console.warn('drive import failed',err); } }
       paint(true);
     }
-    importing=false; ctl=null; renderShelf(); try{ wl&&wl.release(); }catch(e){}
+    importing=false; ctl=null; renderShelf(); if(ok) kickBlack(); try{ wl&&wl.release(); }catch(e){}
     w.querySelector('#dlHead').textContent=signal.aborted?'Import cancelled':fail?'Import finished with problems':'Import complete';
     w.querySelector('#dlSub').textContent=[ok&&`${ok} imported`,skip&&`${skip} already in library`,fail&&`${fail} failed`,signal.aborted&&'cancelled'].filter(Boolean).join(' · ')||'Nothing imported';
     const b=w.querySelector('#dlCancel'); b.textContent='Done'; b.className='btn'; b.id='dlDone'; b.onclick=()=>w.remove();

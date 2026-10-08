@@ -135,3 +135,31 @@ async function turnIsFold(doc,c){ const m=c.turnMode||'auto'; if(m==='fold') ret
 // Drive subfolder names that are just an issue range / era ('150-199', "300's", '1-50', '1990s', '#1-#25', '300+') aren't series names
 function isRangeName(n){ const s=String(n||'').trim().replace(/[’‘]/g,"'");
   return /^(?:(?:issues?|nos?\.?|#)\s*)?#?\d{1,4}\s*(?:-|–|—|to|thru|through)\s*#?\d{1,4}$/i.test(s) || /^\d{1,4}\s*'?\s*s$/i.test(s) || /^#?\d{1,4}\s*\+?$/.test(s); }
+
+/* ---- blank black pages (scanned "TM & ©" pages between ads) ----
+   A page is "blank black" when, on a small render (page 1 never counts):
+   - at least 95% of it is near-black (luma < 32), ignoring a thin 3% border (scanner edges);
+   - everything bright is one small blob (the copyright box: at most 3.5% of the page), with almost nothing bright outside it (<= 0.03%: no stars, windows, rain);
+   - the black outside that blob is flat: dark mean <= 22 and spread (std) <= 4.5. Night-scene art has gradients/texture (std 5.8+ on our dark test pages). */
+const BLACK_V=1;
+function blackStats(d,W,H){
+  const m=Math.round(Math.min(W,H)*.03), x0=m, y0=m, x1=W-m, y1=H-m, w=x1-x0, h=y1-y0, N=w*h, L=new Float32Array(N), bright=new Uint8Array(N);
+  let dark=0; for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=((y+y0)*W+(x+x0))*4, l=.299*d[i]+.587*d[i+1]+.114*d[i+2], k=y*w+x; L[k]=l; if(l<32) dark++; else bright[k]=1; }
+  const share=dark/N; let best=null;
+  if(share>=0.95){ const seen=new Uint8Array(N), st=[];                        // largest bright blob (4-connected)
+    for(let k=0;k<N;k++){ if(!bright[k]||seen[k]) continue; let n=0,l=w,r=-1,t=h,b=-1; st.push(k); seen[k]=1;
+      while(st.length){ const q=st.pop(), x=q%w, y=(q-x)/w; n++; if(x<l) l=x; if(x>r) r=x; if(y<t) t=y; if(y>b) b=y;
+        for(const nb of [x>0?q-1:-1,x<w-1?q+1:-1,y>0?q-w:-1,y<h-1?q+w:-1]) if(nb>=0&&bright[nb]&&!seen[nb]){ seen[nb]=1; st.push(nb); } }
+      if(!best||n>best.n) best={n,l,r,t,b}; } }
+  const pad=2, bx=best?{l:best.l-pad,r:best.r+pad,t:best.t-pad,b:best.b+pad}:null, inBox=(x,y)=>bx&&x>=bx.l&&x<=bx.r&&y>=bx.t&&y<=bx.b;
+  let out=0, sum=0, sq=0, nd=0; for(let y=0;y<h;y++) for(let x=0;x<w;x++){ if(inBox(x,y)) continue; const k=y*w+x; if(bright[k]) out++; else { const l=L[k]; sum+=l; sq+=l*l; nd++; } }
+  const mean=nd?sum/nd:0, std=nd?Math.sqrt(Math.max(0,sq/nd-mean*mean)):0, boxArea=bx?((bx.r-bx.l+1)*(bx.b-bx.t+1))/N:0;
+  const black=share>=0.95&&boxArea<=0.035&&out<=N*0.0003&&mean<=22&&std<=4.5;
+  return {share,boxArea,outside:out/N,mean,std,black}; }
+async function pageBlackStats(page){ const vp=page.getViewport({scale:1}), wide=vp.width>vp.height;
+  const c=await renderToCanvas(page,wide?192:96,wide?144:144,1,40000); const x=c.getContext('2d',{willReadFrequently:true});
+  const d=x.getImageData(0,0,c.width,c.height).data, s=blackStats(d,c.width,c.height); freeCanvas(c); return s; }
+// all blank-black page indices of a document (never page 0). Yields between pages; gives up (returns []) if a quarter of the pages look black.
+async function scanBlack(doc,{alive=()=>true,pause=()=>new Promise(r=>setTimeout(r,16))}={}){ const n=doc.numPages, hits=[];
+  for(let i=1;i<n;i++){ if(!alive()) return null; await pause(); const page=await doc.getPage(i+1); try{ if((await pageBlackStats(page)).black) hits.push(i); } finally{ page.cleanup(); } }
+  return hits.length>Math.max(3,n*.25)?[]:hits; }
