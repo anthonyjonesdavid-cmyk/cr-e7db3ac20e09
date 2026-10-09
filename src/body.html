@@ -28,16 +28,18 @@
     <div class="rtitle" id="rTitle"></div>
     <button class="rbtn" id="rRtl" aria-pressed="false" title="Right-to-left (manga)"><svg class="i" viewBox="0 0 24 24"><path d="M20 7H5m0 0 4-4M5 7l4 4M4 17h15m0 0-4-4m4 4-4 4"/></svg>RTL</button>
     <button class="rbtn" id="rSpread" title="Single page or two-page spread in landscape"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg><span id="rSpreadTxt">2-up</span></button>
+    <button class="rbtn" id="rMore" title="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
     <button class="rbtn" id="rGrid" title="All pages" aria-label="All pages"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
   </div></div>
   <div class="rbar bot" id="rbot"><div class="brow">
     <div class="scrub"><input type="range" id="scrub" min="1" max="1" value="1" step="1" aria-label="Page"><div id="bubble" class="hidden"><div class="bt"><img alt=""></div><span></span></div></div>
     <span id="pgText">1 / 1</span>
   </div></div>
+  <button id="pExit" class="pexit hidden" aria-label="Exit panel view, show the full page"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Full Page<span></span></button>
   <div id="pages" class="hidden"><div class="ph"><button class="icbtn" id="pagesClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button><h3>All Pages</h3></div><div id="pgrid"></div></div>
 </section>
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=20',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=21',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>

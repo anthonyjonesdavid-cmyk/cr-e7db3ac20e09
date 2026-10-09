@@ -107,7 +107,7 @@ FILES=sorted(f for f in os.listdir(T) if f.endswith('.pdf') and (BIG or f!='Atla
 with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     ctx=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2)
-    ctx.add_init_script('window.__crNoScan=true')   # timing-sensitive gesture tests: no background blank-page scan here (it has its own tests in c3)
+    ctx.add_init_script('window.__crNoScan=true; try{ if(!sessionStorage.__pv){ sessionStorage.__pv=1; localStorage.setItem("cr.panelView","false"); } }catch(e){}')   # double-tap = plain 2.5x zoom here; guided panel view has its own suite (test/e2e_v21.py)   # timing-sensitive gesture tests: no background blank-page scan here (it has its own tests in c3)
     pg=ctx.new_page()
     pg.on('pageerror',lambda e:errors.append('pageerror: '+str(e)))
     # hermetic: Google (GIS / Picker) is blocked here; the live check exercises the real sign-in popup
@@ -159,8 +159,8 @@ with sync_playwright() as p:
     pg.locator('#pgrid button[data-p="9"]').click(); wait_render(pg); ok('page grid jump to 10',state(pg)['first']==9)
     pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(250)
     pg.evaluate(TAP,{'x':x0+W*0.5,'y':y0+H*0.35,'n':2}); pg.wait_for_timeout(900)
-    s=state(pg); hi=pg.evaluate("Math.max(...[...document.querySelectorAll('.view .pg canvas')].map(c=>c.width))")
-    ok('double-tap zooms 2.5x',abs(s['z']-2.5)<0.01,json.dumps(s)); ok('zoomed page re-rendered at higher resolution',hi>1600,f'canvas width {hi}'); shot(pg,'08-zoomed')
+    s=state(pg); hi=pg.evaluate("(()=>{const t=document.querySelector('.view .pg canvas.tile'); return t?Math.round(t.width/parseFloat(t.style.width)*parseFloat(t.parentElement.style.width)):0})()")
+    ok('double-tap zooms 2.5x',abs(s['z']-2.5)<0.01,json.dumps(s)); ok('zoomed page re-rendered at higher resolution (visible-region tile)',hi>1600,f'equivalent page width {hi}'); shot(pg,'08-zoomed')
     r=pg.evaluate(GEST,{'x':x0+W*0.6,'y':y0+H*0.5,'pts':[[-5,0,15],[-10,0,15],[-15,0,15],[-20,0,15]],'hold':0,'noup':False})
     ok('no page turn while zoomed (pans instead)',r['first']==9 and r['frames']==0,json.dumps(r))
     pg.evaluate(TAP,{'x':x0+W*0.5,'y':y0+H*0.5,'n':2}); ok('double-tap resets zoom',state(pg)['z']==1)
@@ -334,8 +334,8 @@ with sync_playwright() as p:
     pg.evaluate("(()=>{const s=document.querySelector('#scrub'); s.value=8; s.dispatchEvent(new Event('input')); s.dispatchEvent(new Event('change'));})()"); pg.wait_for_timeout(700); h4=pg.evaluate(HS)
     ok('scrubber jumps by halves',h4['vi']==7 and (h4['s'],h4['h'])==(4,'L') and h4['txt']==f"8 / {h4['n']}",json.dumps(h4))
     z=pg.evaluate(PINCH,{'cx':x0+W/2,'cy':y0+H/2,'d0':100,'d1':260}); pg.wait_for_timeout(1500)
-    zh=pg.evaluate("(()=>{const d=document.querySelector('.view .pg'); const c=d.querySelector('canvas'); return {hi:d.dataset.hi||null,half:d.dataset.half,cw:c.width,w:+d.dataset.w}})()")
-    ok('zoom works on the half (sharper half re-render)',z>1.5 and zh['half']=='L' and zh['hi'] and zh['cw']>zh['w']*1.4,json.dumps([z,zh]))
+    zh=pg.evaluate("(()=>{const d=document.querySelector('.view .pg'); const c=d.querySelector('canvas:not(.tile)'), t=d.querySelector('canvas.tile'); return {hi:d.dataset.hi||null,half:d.dataset.half,base:c.width/parseFloat(c.style.width),k:t?t.width/parseFloat(t.style.width):0}})()")
+    ok('zoom works on the half (sharp region tile of that half)',z>1.5 and zh['half']=='L' and zh['hi'] and zh['k']>zh['base']*1.4,json.dumps([z,zh]))
     pg.evaluate(TAP,{'x':x0+W*0.5,'y':y0+H*0.5,'n':2}); pg.wait_for_timeout(500)
     # rotation keeps the place: half <-> sheet
     pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(600); wait_render(pg); l=pg.evaluate(HS)

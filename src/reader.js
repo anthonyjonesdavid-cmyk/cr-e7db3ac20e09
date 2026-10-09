@@ -95,7 +95,7 @@ function renderView(){
   const view=document.createElement('div'); view.className='view';
   vis.forEach((p,k)=>{ const r=g[k]; const d=pageEl(p,r,v.length===2?(k===0?'r':'l'):'c','pg',hv); d.style.left=r.x+'px'; d.style.top=r.y+'px'; view.appendChild(d); });
   zoomer.replaceChildren(view); R.viewEl=view; Z.s=1; Z.tx=0; Z.ty=0; applyZoom(false);
-  updateChrome(); prefetch(); saveSoon();
+  updateChrome(); prefetch(); saveSoon(); panelsAfterRender();
 }
 function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
   [1,-1,2,-2].forEach((d,k)=>{ const v=R.views[R.vi+d]; if(!v) return; const hv=halfOf(R.vi+d), g=geom(v,hv), vis=visualPages(v);
@@ -118,6 +118,8 @@ addEventListener('pagehide',saveNow); document.addEventListener('visibilitychang
 async function openReader(id,opts={}){ const {push=true}=opts;
   const c=comics.find(x=>x.id===id); if(!c){ toast('Comic not found'); return; }
   if(push) try{ history.pushState({r:id},'','#/read/'+id); }catch(e){}
+  // reading list context: opened from a list row -> that list's order decides the next issue (remembered for Continue reading / reload)
+  if('queue' in opts){ c.lastQueue=opts.queue||null; } const lq=queues.find(q=>q.id===c.lastQueue&&q.items.includes(c.id)); R.queue=lq?lq.id:null;
   R.gen++; R.comic=c; R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
   hideToast(); readerEl.classList.remove('hidden'); readerEl.classList.add('ui'); $('#shelf').classList.add('hidden'); $('#rTitle').textContent=c.title; zoomer.replaceChildren(); R.viewEl=null;
   let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); }catch(err){ console.warn(err); toast('Could not open this comic: '+(err.message||err)); closeReader(); return; }
@@ -129,7 +131,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-function closeReader(){ saveNow(); cancelFlipNow(); R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
+function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
   readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
@@ -258,17 +260,21 @@ function stagePt(e){ const b=stage.getBoundingClientRect(); return {x:e.clientX-
 stage.addEventListener('pointerdown',e=>{
   if(!R.doc||(e.pointerType==='mouse'&&e.button!==0)) return;
   ptrs.set(e.pointerId,stagePt(e)); try{ stage.setPointerCapture(e.pointerId); }catch(_){}
-  if(ptrs.size===2){ if(drag&&drag.mode==='flip'&&flip&&!animating) animateP(flip.p,0,160,easeOut,()=>finishFlip(false)); drag=null; startPinch(); return; }
+  if(ptrs.size===2){ if(drag&&drag.mode==='flip'&&flip&&!animating) animateP(flip.p,0,160,easeOut,()=>finishFlip(false)); drag=null; if(P.on){ if(P.busy) return; dropPanels(); } startPinch(); return; }
   if(ptrs.size>2||suppressUntilAllUp) return;
   if(animating) fastForward();
-  drag={id:e.pointerId,x0:e.clientX,y0:e.clientY,t0:tstamp(e),mode:null,s:[[tstamp(e),e.clientX]],zoomed:Z.s>1.01,tx0:Z.tx,ty0:Z.ty};
+  drag={id:e.pointerId,x0:e.clientX,y0:e.clientY,t0:tstamp(e),mode:null,s:[[tstamp(e),e.clientX]],zoomed:Z.s>1.01,panel:P.on,tx0:Z.tx,ty0:Z.ty};
 });
 stage.addEventListener('pointermove',e=>{
   if(!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,stagePt(e));
   if(pinch){ movePinch(); return; }
   const d=drag; if(!d||e.pointerId!==d.id) return;
   const dx=e.clientX-d.x0, dy=e.clientY-d.y0; pushS(d,e);
-  if(d.zoomed){ if(!d.mode&&Math.hypot(dx,dy)<G.SLOP) return; d.mode='pan'; Z.tx=d.tx0+dx; Z.ty=d.ty0+dy; clampZoom(); applyZoom(false); return; }
+  if(d.zoomed){ if(!d.mode&&Math.hypot(dx,dy)<G.SLOP) return;
+    if(d.panel&&P.on){ if(!d.mode) d.mode=Math.abs(dx)>Math.abs(dy)*G.AXIS?'pswipe':'pan';
+      if(d.mode==='pswipe'){ Z.tx=d.tx0+dx*.35; applyZoom(false); placeMask(false); return; }
+      Z.tx=d.tx0+dx; Z.ty=d.ty0+dy; applyZoom(false); placeMask(false); return; }   // panel mode: free pan (no clamp to the page edges)
+    d.mode='pan'; Z.tx=d.tx0+dx; Z.ty=d.ty0+dy; clampZoom(); applyZoom(false); return; }
   if(!d.mode){ if(Math.abs(dx)<G.SLOP&&Math.abs(dy)<G.SLOP) return;
     if(Math.abs(dx)>Math.abs(dy)*G.AXIS){ d.dir=dx<0?-1:1; d.mode=startFlip(d.dir)?'flip':'rubber'; } else { d.mode='vert'; return; } }
   if(d.mode==='flip'&&flip) flip.setP(flip.track(d.dir<0?-dx:dx));
@@ -282,6 +288,9 @@ function pointerEnd(e,cancelled){
   if(!cancelled) pushS(d,e);
   const dx=e.clientX-d.x0, dy=e.clientY-d.y0, dt=tstamp(e)-d.t0;
   if(!d.mode&&!cancelled&&Math.hypot(dx,dy)<G.TAP_SLOP&&dt<G.TAP_MS){ onTap(stagePt(e)); return; }
+  if(d.panel&&P.on&&(d.mode==='pswipe'||(!d.mode&&!cancelled&&Math.abs(dx)>=G.SLOP&&Math.abs(dx)>Math.abs(dy)*G.AXIS))){
+    const v=Math.abs(vel(d,tstamp(e))), quick=dt<=G.QUICK_MS&&Math.abs(dx)>=G.QUICK_MIN;
+    if(!cancelled&&(quick||v>=G.FLICK_VEL||Math.abs(dx)>=Math.min(60,stage.clientWidth*.12))){ const vdir=dx<0?-1:1; stepPanel(R.rtl?vdir>0:vdir<0); } else showPanel(true); return; }
   if(d.mode==='pan'){ scheduleHi(); return; }
   if(d.zoomed) return;
   if(!d.mode&&!cancelled&&Math.abs(dx)>=G.SLOP&&Math.abs(dx)>Math.abs(dy)*G.AXIS){   // whole flick landed between move events
@@ -302,16 +311,19 @@ stage.addEventListener('pointerup',e=>pointerEnd(e,false));
 stage.addEventListener('pointercancel',e=>pointerEnd(e,true));
 document.addEventListener('gesturestart',e=>e.preventDefault()); document.addEventListener('gesturechange',e=>e.preventDefault());
 stage.addEventListener('contextmenu',e=>e.preventDefault());
-stage.addEventListener('wheel',e=>{ if(!R.doc) return; e.preventDefault(); if(e.ctrlKey){ zoomAt(stagePt(e),Z.s*Math.exp(-e.deltaY*.01),false); if(Z.s<1.02) resetZoom(false); else scheduleHi(); } else if(Z.s>1.01){ Z.tx-=e.deltaX; Z.ty-=e.deltaY; clampZoom(); applyZoom(false); scheduleHi(); } },{passive:false});
+stage.addEventListener('wheel',e=>{ if(!R.doc) return; e.preventDefault(); if(e.ctrlKey){ dropPanels(); zoomAt(stagePt(e),Z.s*Math.exp(-e.deltaY*.01),false); if(Z.s<1.02) resetZoom(false); else scheduleHi(); } else if(Z.s>1.01){ Z.tx-=e.deltaX; Z.ty-=e.deltaY; if(!P.on) clampZoom(); applyZoom(false); placeMask(false); scheduleHi(); } },{passive:false});
 
 let lastTap=null;
 function onTap(pt){ if(endTap(pt)) return; const now=performance.now();
   if(lastTap&&now-lastTap.t<G.DTAP_MS+40&&Math.hypot(pt.x-lastTap.x,pt.y-lastTap.y)<40){ clearTimeout(lastTap.timer); lastTap=null; doubleTap(pt); return; }
   const tp={t:now,x:pt.x,y:pt.y}; tp.timer=setTimeout(()=>{ if(lastTap===tp) lastTap=null; singleTap(pt); },G.DTAP_MS); lastTap=tp; }
 function singleTap(pt){ const W=stage.clientWidth, edge=Math.min(W*.28,240);
+  if(P.on){ if(pt.x<edge) stepPanel(R.rtl); else if(pt.x>W-edge) stepPanel(!R.rtl); else toggleUI(); return; }
   if(Z.s<=1.01&&pt.x<edge) go(1); else if(Z.s<=1.01&&pt.x>W-edge) go(-1); else toggleUI(); }
 function toggleUI(force){ const on=force??!readerEl.classList.contains('ui'); readerEl.classList.toggle('ui',on); clearTimeout(R.uiT); }
-function doubleTap(pt){ if(flip) return; if(Z.s>1.01) resetZoom(true); else { zoomAt(pt,2.5,true); scheduleHi(); } }
+function doubleTap(pt){ if(flip||P.busy) return; if(P.on){ exitPanels(true); return; } if(Z.s>1.01){ resetZoom(true); return; }
+  if(panelsOn()&&unitsOfView(R.vi).length){ enterPanels(pt).then(ok=>{ if(!ok&&Z.s<=1.01&&!P.on){ zoomAt(pt,2.5,true); scheduleHi(); } }); return; }
+  zoomAt(pt,2.5,true); scheduleHi(); }
 
 /* ---- zoom & pan (no page turns while zoomed) ---- */
 function contentBox(){ const g=geom(R.views[R.vi],halfOf(R.vi)); return {x0:g[0].x,y0:g[0].y,x1:g[g.length-1].x+g[g.length-1].w,y1:g[0].y+g[0].h}; }
@@ -321,28 +333,46 @@ function clampZoom(){ const W=stage.clientWidth,H=stage.clientHeight,b=contentBo
 function applyZoom(animate){ zoomer.classList.toggle('anim',!!animate); zoomer.style.transform=(Z.s===1&&Z.tx===0&&Z.ty===0)?'':`translate3d(${Z.tx}px,${Z.ty}px,0) scale(${Z.s})`;
   if(animate) setTimeout(()=>zoomer.classList.remove('anim'),280); }
 function zoomAt(pt,s,animate){ const cx=(pt.x-Z.tx)/Z.s, cy=(pt.y-Z.ty)/Z.s; Z.s=clamp(s,1,6); Z.tx=pt.x-cx*Z.s; Z.ty=pt.y-cy*Z.s; clampZoom(); applyZoom(animate); }
-function resetZoom(animate){ const was=Z.s>1.01; Z.s=1; Z.tx=0; Z.ty=0; applyZoom(animate&&was); restoreBase(); }
+function resetZoom(animate){ if(P.on){ P.on=false; P.key=null; panelUI(false); } const was=Z.s>1.01; Z.s=1; Z.tx=0; Z.ty=0; applyZoom(animate&&was); restoreBase(); }
 function startPinch(){ const [a,b]=[...ptrs.values()]; pinch={d0:Math.hypot(a.x-b.x,a.y-b.y)||1,s0:Z.s,cx:((a.x+b.x)/2-Z.tx)/Z.s,cy:((a.y+b.y)/2-Z.ty)/Z.s}; zoomer.classList.remove('anim'); }
 function movePinch(){ const [a,b]=[...ptrs.values()]; if(!b) return; const d=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
   Z.s=clamp(pinch.s0*d/pinch.d0,.85,6); Z.tx=mx-pinch.cx*Z.s; Z.ty=my-pinch.cy*Z.s; if(Z.s>=1) clampZoom(); applyZoom(false); }
 function endPinch(){ pinch=null; if(Z.s<1.06) resetZoom(true); else { clampZoom(); applyZoom(true); scheduleHi(); } }
-/* sharper re-render of the visible page(s) while zoomed; released on zoom-out or page change */
-let hiT=0, hiCanvases=[];
-function scheduleHi(){ clearTimeout(hiT); hiT=setTimeout(doHi,220); }
-function doHi(){ if(!R.viewEl||Z.s<=1.01) return; const mul=Math.min(4,Math.ceil(Z.s*2)/2), doc=R.doc, viewEl=R.viewEl;
-  viewEl.querySelectorAll('.pg[data-p]').forEach(d=>{ if(+(d.dataset.hi||0)>=mul||+d.dataset.p>=R.n) return; const i=+d.dataset.p, w=+d.dataset.w, h=+d.dataset.h, half=d.dataset.half||'', fw=half?w*2:w;
-    enqueue(`hi|${i}|${fw}x${h}|${mul}|${half}`,'hi',i,-1,async()=>{ const page=await doc.getPage(i+1); let c=await renderToCanvas(page,fw,h,DPR*mul,HI_MAX_PX*(half?2:1)); page.cleanup();
-      if(half){ const hc=halfCopy({canvas:c},half); freeCanvas(c); c=hc; } return {canvas:c,px:c.width*c.height}; })
-    .then(ent=>{ if(R.viewEl!==viewEl||Z.s<=1.01||!d.isConnected){ freeCanvas(ent.canvas); return; }
-      const old=d.querySelector('canvas'); placeCanvas(ent.canvas,w,h,d.dataset.a); d.classList.remove('loading'); d.querySelectorAll('.phn').forEach(x=>x.remove());
-      if(old){ old.replaceWith(ent.canvas); if(hiCanvases.includes(old)) hiCanvases=hiCanvases.filter(x=>x!==old); freeCanvas(old); } else d.prepend(ent.canvas);
-      hiCanvases.push(ent.canvas); d.dataset.hi=mul; }).catch(()=>{}); }); }
-function freeHi(){ clearTimeout(hiT); hiCanvases.forEach(freeCanvas); hiCanvases=[]; dropJobs(j=>j.kind==='hi'); }
-function restoreBase(){ if(!R.viewEl) return; const had=hiCanvases.length; freeHi(); if(!had) return;
-  R.viewEl.querySelectorAll('.pg[data-p]').forEach(d=>{ delete d.dataset.hi; fillPage(d,+d.dataset.p,+d.dataset.w,+d.dataset.h,d.dataset.a,0,d.dataset.half||''); }); }
+/* ---- sharp zoom: once a zoom/pan settles (150 ms), only the visible region of each visible page is re-rendered from the PDF at
+   devicePixelRatio x zoom into an overlay tile canvas (plus a small margin so short pans stay sharp). Newer requests cancel older
+   renders (pdf.js RenderTask.cancel); tiles are capped (~12 MP iOS / 16 MP) and dropped when the zoom resets or the page changes. ---- */
+let hiT=0, hiGen=0, tileTasks=new Set();
+const TILE_MAX_PX=IS_IOS?12e6:16e6;
+function scheduleHi(){ clearTimeout(hiT); hiGen++; cancelTiles(); hiT=setTimeout(doHi,150); }
+function cancelTiles(){ tileTasks.forEach(t=>{ try{ t.cancel(); }catch(_){} }); tileTasks.clear(); dropJobs(j=>j.kind==='hi'); }
+function doHi(){ if(!R.viewEl||Z.s<=1.01||!R.doc) return; const gen=hiGen, doc=R.doc, viewEl=R.viewEl, zs=Z.s, W=stage.clientWidth, H=stage.clientHeight;
+  const dpr=Math.min(window.devicePixelRatio||1,3);
+  // visible stage area in view coordinates, with a 15% margin
+  const vx0=(0-Z.tx)/zs, vy0=(0-Z.ty)/zs, vw=W/zs, vh=H/zs, mx=vw*.15, my=vh*.15;
+  viewEl.querySelectorAll('.pg[data-p]').forEach(d=>{ const i=+d.dataset.p; if(i>=R.n) return; const cv=d.querySelector('canvas:not(.tile)'); if(!cv) return;
+    const ex=parseFloat(d.style.left)||0, ey=parseFloat(d.style.top)||0, cx=ex+(parseFloat(cv.style.left)||0), cy=ey+(parseFloat(cv.style.top)||0), cw=parseFloat(cv.style.width), ch=parseFloat(cv.style.height);
+    if(!(cw>0&&ch>0)) return; const half=d.dataset.half||'';
+    const sx=half==='R'?cx-cw:cx, sw=half?cw*2:cw;                        // whole sheet in view coords (a half page shows one half of it)
+    const x0=Math.max(cx,vx0-mx), y0=Math.max(cy,vy0-my), x1=Math.min(cx+cw,vx0+vw+mx), y1=Math.min(cy+ch,vy0+vh+my); if(x1-x0<2||y1-y0<2) return;
+    let k=dpr*zs; const px=(x1-x0)*(y1-y0)*k*k; if(px>TILE_MAX_PX) k*=Math.sqrt(TILE_MAX_PX/px);
+    if(k<=cv.width/cw*1.05) return;                                         // the base render is already this sharp
+    enqueue(`hi|${gen}|${i}|${half}`,'hi',i,-1,async()=>{ if(gen!==hiGen) throw {stale:true};
+      const page=await doc.getPage(i+1), vp1=page.getViewport({scale:1}), S=sw*k/vp1.width, vp=page.getViewport({scale:S});
+      const rx=Math.floor((x0-sx)*k), ry=Math.floor((y0-cy)*k), rw=Math.ceil((x1-x0)*k), rh=Math.ceil((y1-y0)*k);
+      const c=document.createElement('canvas'); c.width=rw; c.height=rh; const ctx=c.getContext('2d',{alpha:false}); ctx.fillStyle='#fff'; ctx.fillRect(0,0,rw,rh);
+      const task=page.render({canvasContext:ctx,viewport:vp,transform:[1,0,0,1,-rx,-ry],intent:'display'}); tileTasks.add(task);
+      try{ await task.promise; } catch(e){ freeCanvas(c); throw {stale:true}; } finally{ tileTasks.delete(task); }
+      return {canvas:c,px:rw*rh,box:{x:sx+rx/k-ex,y:cy+ry/k-ey,w:rw/k,h:rh/k},k}; })
+    .then(ent=>{ if(gen!==hiGen||R.viewEl!==viewEl||Z.s<=1.01||!d.isConnected){ freeCanvas(ent.canvas); return; }
+      const t=ent.canvas; t.className='tile'; Object.assign(t.style,{left:ent.box.x+'px',top:ent.box.y+'px',width:ent.box.w+'px',height:ent.box.h+'px'}); t.dataset.k=ent.k.toFixed(3);
+      d.querySelectorAll('canvas.tile').forEach(o=>{ o.remove(); freeCanvas(o); }); d.appendChild(t); d.dataset.hi=ent.k.toFixed(2); }).catch(()=>{}); }); }
+function freeHi(){ clearTimeout(hiT); hiGen++; cancelTiles(); document.querySelectorAll('#zoomer canvas.tile').forEach(t=>{ t.remove(); freeCanvas(t); }); if(R.viewEl) R.viewEl.querySelectorAll('.pg[data-hi]').forEach(d=>delete d.dataset.hi); }
+function restoreBase(){ freeHi(); }
 
 /* ---- keyboard (desktop / iPad keyboard) ---- */
 document.addEventListener('keydown',e=>{ if(!R.comic||document.querySelector('.mwrap')||e.target.matches('input[type=text],input[type=search]')) return;
+  if(P.on&&(e.key==='ArrowLeft'||e.key==='ArrowRight'||e.key===' ')){ stepPanel((e.key==='ArrowLeft')===R.rtl); e.preventDefault(); return; }
+  if(P.on&&e.key==='Escape'){ exitPanels(true); return; }
   if(e.key==='ArrowLeft'){ go(1); e.preventDefault(); } else if(e.key==='ArrowRight'||e.key===' '){ go(-1); e.preventDefault(); }
   else if(e.key==='Escape'){ if(!$('#pages').classList.contains('hidden')) $('#pages').classList.add('hidden'); else if(Z.s>1.01) resetZoom(true); else $('#rBack').click(); } });
 
@@ -359,7 +389,7 @@ function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.seq.len
 const hideBubble=ms=>setTimeout(()=>{ bubble.classList.add('hidden'); scrubbing=false; },ms);
 scrub.addEventListener('input',()=>{ scrubbing=true; clearTimeout(R.uiT); showBubble(); });
 scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(R.seq[+scrub.value-1]??0); hideBubble(600); });
-$('#rGrid').onclick=openPages; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
+$('#rGrid').onclick=openPages; $('#rMore').onclick=e=>{ e.stopPropagation(); const c=R.comic; if(!c) return; openMenu($('#rMore'),[{label:'Add to Reading List…',icon:IC.list,id:'rmQueue',run:()=>addToQueue(c.id)}]); }; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
 let pagesIO=null;
 function openPages(){ const grid=$('#pgrid'), cur=new Set(pagesOf(R.views[R.vi]));
   grid.innerHTML=R.seq.map((i,k)=>`<button data-p="${i}" class="${cur.has(i)?'cur':''}"><div class="th"></div><span>${k+1}</span></button>`).join('');
@@ -372,7 +402,10 @@ $('#pgrid').addEventListener('click',e=>{ const b=e.target.closest('button[data-
 
 
 /* ---- end of comic: next issue card / End page (drawn like a page, so turns, cache and layout just work) ---- */
-function nextIssue(c){ const s=(c&&c.series||'').trim(); if(!s) return null; const L=comics.filter(x=>(x.series||'').trim()===s).sort(byIssue); const k=L.findIndex(x=>x.id===c.id); return k>=0&&k<L.length-1?L[k+1]:null; }
+const activeQueue=()=>R.queue?queues.find(q=>q.id===R.queue)||null:null;
+function nextIssue(c){ const q=activeQueue();
+  if(q&&c&&q.items.includes(c.id)){ const k=q.items.indexOf(c.id); for(const id of q.items.slice(k+1)){ const n=comics.find(x=>x.id===id); if(n) return n; } return null; }   // reading list order wins
+  const s=(c&&c.series||'').trim(); if(!s) return null; const L=comics.filter(x=>(x.series||'').trim()===s).sort(byIssue); const k=L.findIndex(x=>x.id===c.id); return k>=0&&k<L.length-1?L[k+1]:null; }
 const nextImgs=new Map();
 async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.has(key)) return nextImgs.get(key);
   const doc=await openPdf(new IDBSource(n.id,n.size)); try{ const page=await doc.getPage(1), vp=page.getViewport({scale:1}), cr=n.coverCrop||{x:0,y:0,w:1,h:1};
@@ -383,13 +416,13 @@ const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-
 async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
   const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
   if(n){ const pad=Math.round(Math.max(16,h*.03)*k), gap=Math.round(18*k);
-    const no=issueNo(n.title), label=`${n.series}${no!==Infinity?' #'+no:''}`;
+    const no=issueNo(n.title), qn=activeQueue(), label=qn?n.title:`${n.series}${no!==Infinity?' #'+no:''}`;
     const capH=Math.round(108*k), mw=Math.round(W*.62), mh=Math.min(Math.round(H*.62), H-capH-gap-pad*2);
     let img=null; try{ img=await nextCover(n,mw,mh); }catch(e){ console.warn(e); }
     let cw=mw, ch=mh; if(img){ const a=img.width/img.height; ch=mh; cw=ch*a; if(cw>mw){ cw=mw; ch=cw/a; } }
     const block=capH+gap+ch, y0=Math.max(pad,Math.round((H-block)/2));
     const ty=y0+Math.round(62*k);
-    x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#bdbdbd'; x.letterSpacing=`${2.4*k}px`; x.fillText('NEXT',W/2,ty-Math.round(36*k)); x.letterSpacing='0px';
+    x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#bdbdbd'; x.letterSpacing=`${2.4*k}px`; x.fillText(qn?fitText(x,`NEXT IN ${qn.name.toUpperCase()}`,W*.9):'NEXT',W/2,ty-Math.round(36*k)); x.letterSpacing='0px';
     x.font=`650 ${Math.round(32*k)}px ${F}`; x.fillStyle='#f4f4f4'; x.fillText(fitText(x,label,W*.92),W/2,ty);
     x.font=`500 ${Math.round(20*k)}px ${F}`; x.fillStyle='#a3a3a3'; x.fillText(R.rtl?'\u2190  Turn the page to start':'Turn the page to start  \u2192',W/2,ty+Math.round(34*k));
     const cy=y0+capH+gap, cx=(W-cw)/2;
@@ -398,7 +431,7 @@ async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR),
   } else { const t=R.comic.title, cy=H*.44;
     x.font=`400 ${Math.round(12*k)}px ${F}`; x.fillStyle='#7a7a7a'; x.letterSpacing=`${1.6*k}px`; x.fillText('THE END',W/2,cy-Math.round(34*k)); x.letterSpacing='0px';
     x.font=`600 ${Math.round(22*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,`End of ${t}`,W*.86),W/2,cy);
-    x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; x.fillText(R.comic.series?`No later issue of ${R.comic.series} in your library`:`${R.n} pages`,W/2,cy+Math.round(26*k));
+    x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; { const qe=activeQueue(); x.fillText(fitText(x,qe?`Last comic in “${qe.name}”`:R.comic.series?`No later issue of ${R.comic.series} in your library`:`${R.n} pages`,W*.9),W/2,cy+Math.round(26*k)); }
     const bw=Math.round(168*k), bh=Math.round(40*k), bx=(W-bw)/2, by=cy+Math.round(56*k); x.strokeStyle='rgba(255,255,255,.28)'; x.lineWidth=k; x.beginPath(); x.roundRect(bx+.5*k,by+.5*k,bw-k,bh-k,bh/2); x.stroke();
     x.font=`500 ${Math.round(15*k)}px ${F}`; x.fillStyle='#e6e6e6'; x.textBaseline='middle'; x.fillText('Back to Library',W/2,by+bh/2);
     R.endBtn={x:bx/W,y:by/H,w:bw/W,h:bh/H}; }
@@ -409,10 +442,83 @@ function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.vi
   if(px>=b.x*r.width-8&&px<=(b.x+b.w)*r.width+8&&py>=b.y*r.height-8&&py<=(b.y+b.h)*r.height+8){ $('#rBack').click(); return true; } return false; }
 function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
   n.page=0; n.half=null;   // the next-issue card always starts that issue on its cover, not the saved page
-  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,atCover:true}); }
+  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,atCover:true,queue:R.queue}); }
 
 // blank-black detection finished (or the setting changed) for the open comic: rebuild the page sequence in place, keeping the reader on the same page
 function reseq(){ if(!R.comic||!R.doc||!R.views.length) return; if(flip||animating||landing){ clearTimeout(R.reseqT); R.reseqT=setTimeout(reseq,250); return; }
   const was=R.skip?[...R.skip].join():''; const cur=pagesOf(R.views[R.vi]).filter(p=>p!=null&&p<=R.n), p=cur.length?cur[0]:0, h=halfOf(R.vi);
   buildViews(); if([...R.skip].join()===was){ return; } R.vi=clamp(viewOfPage(p,h),0,R.views.length-1); renderView(); }
 addEventListener('cr-black',e=>{ if(R.comic&&e.detail===R.comic.id) reseq(); });
+
+/* ================= Guided panel view ================= */
+// double-tap a panel: the page glides in until that panel fills the screen (everything else dimmed); swipe or tap the edges for the next /
+// previous panel in reading order, across page turns; double-tap again (or Full Page) for the whole page. Pinch leaves it for free zoom.
+const P={on:false,busy:false,internal:false,list:[],i:0,vi:-1,key:null};
+const pmask=document.createElement('div'); pmask.id='pmask'; pmask.className='hidden'; stage.appendChild(pmask);
+const pexit=$('#pExit');
+const panelsOn=()=>store.get('panelView',true);
+const PANEL_PAD=6;
+function panelCache(){ const c=R.comic; if(c.panelV!==PANEL_V||!c.panels){ c.panels={}; c.panelV=PANEL_V; } return c.panels; }
+let panelSaveT=0; function panelSave(){ clearTimeout(panelSaveT); const c=R.comic; panelSaveT=setTimeout(()=>{ if(c) dbPut(c).catch(()=>{}); },1500); }
+// units of a view in reading order: {p, h ('' | 'L' | 'R'), slot (index of the .pg element), crop (the half sits inside a whole-sheet canvas)}
+function unitsOfView(k){ const v=R.views[k]; if(!v) return []; const out=[];
+  if(v.length===2){ const vis=visualPages(v), order=R.rtl?[1,0]:[0,1]; order.forEach(j=>{ if(vis[j]!=null&&vis[j]<R.n) out.push({p:vis[j],h:'',slot:j,crop:false}); }); return out; }
+  const p=v[0]; if(p==null||p>=R.n) return out;
+  if(R.half){ out.push({p,h:R.vh[k]||'',slot:0,crop:false}); return out; }
+  if(R.fold&&p>0&&(R.aspects[p]||0)>WIDE){ (R.rtl?['R','L']:['L','R']).forEach(h=>out.push({p,h,slot:0,crop:true})); return out; }
+  out.push({p,h:'',slot:0,crop:false}); return out; }
+const unitKey=u=>u.p+u.h;
+function unitPanels(u,prio=0){ const pc=panelCache(), rtl=R.rtl, key=unitKey(u)+(rtl?'~r':''); if(key in pc) return Promise.resolve(pc[key]); const doc=R.doc, c=R.comic;   // RTL reading order is cached separately
+  return enqueue('pn|'+key,'panel',u.p,prio,async()=>{ const page=await doc.getPage(u.p+1), vp=page.getViewport({scale:1}), wide=!!u.h&&vp.width>vp.height;
+    const cv=await renderToCanvas(page,wide?760:380,560,1,wide?420000:220000); page.cleanup(); let b=null; try{ b=panelsOfCanvas(cv,u.h,rtl); }finally{ freeCanvas(cv); }
+    if(R.comic===c){ panelCache()[key]=b||0; panelSave(); } return b||0; }); }
+// where a unit's image sits in view coordinates (unzoomed)
+function unitRect(u){ const el=R.viewEl&&R.viewEl.querySelectorAll('.pg')[u.slot]; if(!el) return null; const cv=el.querySelector('canvas');
+  let x=parseFloat(el.style.left)||0, y=parseFloat(el.style.top)||0, w=el.offsetWidth, h=el.offsetHeight;
+  if(cv){ x+=parseFloat(cv.style.left)||0; y+=parseFloat(cv.style.top)||0; w=parseFloat(cv.style.width)||w; h=parseFloat(cv.style.height)||h; }
+  if(u.crop){ w/=2; if(u.h==='R') x+=w; } return {x,y,w,h}; }
+const painted=()=>R.viewEl&&!R.viewEl.querySelector('.pg.loading');
+function whenPainted(ms=2500){ return new Promise(res=>{ const t0=performance.now(); const f=()=>{ if(painted()||performance.now()-t0>ms) res(); else requestAnimationFrame(f); }; f(); }); }
+async function panelList(k){ const us=unitsOfView(k), out=[];
+  const boxes=await Promise.all(us.map(u=>unitPanels(u,0).catch(()=>0)));
+  if(R.vi!==k) return null; await whenPainted();
+  us.forEach((u,j)=>{ const r=unitRect(u); if(!r) return; const B=boxes[j]||panelThirds(r.w/r.h,R.rtl);
+    B.forEach((b,bi)=>out.push({key:unitKey(u),bi,fb:!boxes[j],r:{x:r.x+b.x*r.w,y:r.y+b.y*r.h,w:b.w*r.w,h:b.h*r.h}})); });
+  return out; }
+function panelFit(r){ const W=stage.clientWidth, H=stage.clientHeight, m=Math.min(20,W*.03), pad=PANEL_PAD;
+  const x=r.x-pad, y=r.y-pad, w=r.w+pad*2, h=r.h+pad*2, s=clamp(Math.min((W-2*m)/w,(H-2*m)/h),1,6);
+  return {s,tx:W/2-(x+w/2)*s,ty:H/2-(y+h/2)*s,x,y,w,h}; }
+function placeMask(animate){ if(!P.on||!P.list[P.i]){ pmask.classList.add('hidden'); return; } const f=panelFit(P.list[P.i].r);
+  pmask.classList.toggle('anim',!!animate); pmask.classList.remove('hidden');
+  Object.assign(pmask.style,{left:(f.x*Z.s+Z.tx)+'px',top:(f.y*Z.s+Z.ty)+'px',width:(f.w*Z.s)+'px',height:(f.h*Z.s)+'px'}); }
+function showPanel(animate){ const pn=P.list[P.i]; if(!pn) return; const f=panelFit(pn.r); Z.s=f.s; Z.tx=f.tx; Z.ty=f.ty; applyZoom(animate); placeMask(animate);
+  P.key={k:pn.key,bi:pn.bi}; pexit.querySelector('span').textContent=`${P.i+1} / ${P.list.length}`; scheduleHi(); }
+function panelUI(on){ pexit.classList.toggle('hidden',!on); if(!on) pmask.classList.add('hidden'); readerEl.classList.toggle('panels',on); }
+async function enterPanels(pt,want){ if(!R.doc||flip||animating||P.busy) return false; const k=R.vi; P.busy=true;
+  try{ const L=await panelList(k); if(!L||!L.length||R.vi!==k||flip||Z.s>1.01) return false;
+    let i=0;
+    if(want){ const j=L.findIndex(p=>p.key===want.k&&p.bi===want.bi); i=j>=0?j:want.last?L.length-1:0; }
+    else if(pt){ const hit=L.map((p,j)=>({j,in:pt.x>=p.r.x&&pt.x<=p.r.x+p.r.w&&pt.y>=p.r.y&&pt.y<=p.r.y+p.r.h,d:Math.hypot(pt.x-(p.r.x+p.r.w/2),pt.y-(p.r.y+p.r.h/2)),a:p.r.w*p.r.h}));
+      const ins=hit.filter(h=>h.in).sort((a,b)=>a.a-b.a); i=ins.length?ins[0].j:hit.sort((a,b)=>a.d-b.d)[0].j; }
+    P.on=true; P.list=L; P.i=i; P.vi=k; panelUI(true); showPanel(!want); toggleUI(false); return true; }
+  finally{ P.busy=false; } }
+function exitPanels(animate=true){ if(!P.on) return; P.on=false; P.key=null; panelUI(false); resetZoom(animate); }
+function dropPanels(){ if(!P.on) return; P.on=false; P.key=null; panelUI(false); }   // leave panel mode but keep the current zoom (pinch, ctrl-wheel)
+async function stepPanel(fwd){ if(!P.on||P.busy) return; const ni=P.i+(fwd?1:-1);
+  if(ni>=0&&ni<P.list.length){ P.i=ni; showPanel(true); return; }
+  const t=R.vi+(fwd?1:-1);
+  if(t>=R.views.length){ if(R.next){ exitPanels(false); openNext(); } else bouncePanel(-1); return; }
+  if(t<0){ bouncePanel(1); return; }
+  if(!unitsOfView(t).length){ exitPanels(false); jumpToView(t); return; }   // the end card is shown as a whole page
+  P.busy=true; const fade=a=>new Promise(r=>{ if(!stage.animate){ r(); return; } const an=stage.animate([{opacity:a?1:0},{opacity:a?0:1}],{duration:a?110:170,easing:'ease-out',fill:'forwards'}); an.onfinish=()=>{ r(); if(!a) an.cancel(); }; });
+  try{ await fade(true); P.internal=true; R.vi=t; renderView(); P.internal=false; const L=await panelList(t);
+    if(!L||!L.length||R.vi!==t){ P.on=false; panelUI(false); }
+    else { P.list=L; P.i=fwd?0:L.length-1; P.vi=t; showPanel(false); } await fade(false); }
+  finally{ P.internal=false; P.busy=false; stage.getAnimations&&stage.getAnimations().forEach(a=>a.cancel()); } }
+function bouncePanel(vdir){ if(zoomer.animate) zoomer.animate([{translate:'0 0'},{translate:`${vdir*14}px 0`},{translate:'0 0'}],{duration:280,easing:'ease-out'}); }
+// a re-render (rotation, resize, settings) while in panel mode comes back to the same panel when it is still on screen
+function panelsAfterRender(){ if(P.internal||!P.on) return; const want=P.key; P.on=false; panelUI(false);
+  if(!want) return; const k=R.vi; if(!unitsOfView(k).some(u=>unitKey(u)===want.k)) return;
+  setTimeout(()=>{ if(R.vi===k&&!P.on&&Z.s<=1.01) enterPanels(null,want); },60); }
+pexit.addEventListener('click',()=>exitPanels(true));
+addEventListener('resize',()=>{ if(P.on) placeMask(false); });

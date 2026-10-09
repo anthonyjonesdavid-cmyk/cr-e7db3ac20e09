@@ -19,8 +19,9 @@ function titleFromName(n){ return n.replace(/\.pdf$/i,'').replace(/_+/g,' ').rep
 
 /* ================= IndexedDB ================= */
 let dbp=null;
-function db(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ const r=indexedDB.open('comic-reader',1);
-  r.onupgradeneeded=()=>{ const d=r.result; if(!d.objectStoreNames.contains('comics')) d.createObjectStore('comics',{keyPath:'id'}); if(!d.objectStoreNames.contains('chunks')) d.createObjectStore('chunks',{keyPath:['id','i']}); };
+function db(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ const r=indexedDB.open('comic-reader',2);   // v2: + reading lists ('queues')
+  r.onupgradeneeded=()=>{ const d=r.result; if(!d.objectStoreNames.contains('comics')) d.createObjectStore('comics',{keyPath:'id'}); if(!d.objectStoreNames.contains('chunks')) d.createObjectStore('chunks',{keyPath:['id','i']});
+    if(!d.objectStoreNames.contains('queues')) d.createObjectStore('queues',{keyPath:'id'}); };
   r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return dbp; }
 const req2p=r=>new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
 const txDone=t=>new Promise((res,rej)=>{ t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('aborted')); });
@@ -28,6 +29,10 @@ async function dbAll(){ const d=await db(); return req2p(d.transaction('comics')
 async function dbPut(rec){ const d=await db(); const t=d.transaction('comics','readwrite'); t.objectStore('comics').put(rec); return txDone(t); }
 async function dbPutChunk(id,i,data){ const d=await db(); const t=d.transaction('chunks','readwrite'); t.objectStore('chunks').put({id,i,data}); return txDone(t); }
 async function dbGetChunk(id,i){ const d=await db(); const r=await req2p(d.transaction('chunks').objectStore('chunks').get([id,i])); return r&&r.data; }
+// reading lists: {id, name, items:[comic ids in reading order], created, updated}
+async function qAll(){ const d=await db(); return req2p(d.transaction('queues').objectStore('queues').getAll()); }
+async function qPut(q){ const d=await db(); const t=d.transaction('queues','readwrite'); t.objectStore('queues').put(q); return txDone(t); }
+async function qDel(id){ const d=await db(); const t=d.transaction('queues','readwrite'); t.objectStore('queues').delete(id); return txDone(t); }
 async function dbDelete(id){ const d=await db(); const t=d.transaction(['comics','chunks'],'readwrite'); t.objectStore('comics').delete(id); t.objectStore('chunks').delete(IDBKeyRange.bound([id,0],[id,Infinity])); return txDone(t); }
 
 /* ================= PDF sources: range reads, never the whole file in memory ================= */
@@ -170,3 +175,41 @@ async function scanBlack(doc,{alive=()=>true,pause=()=>new Promise(r=>setTimeout
   const order=[]; for(let i=f;i<n;i++) order.push(i); for(let i=1;i<f;i++) order.push(i);
   for(const i of order){ if(!alive()) return null; await pause(); const page=await doc.getPage(i+1); try{ const s=await pageBlackStats(page); if(s.black) black.push(i); else if(s.white) white.push(i); } finally{ page.cleanup(); } }
   black.sort((a,b)=>a-b); white.sort((a,b)=>a-b); return {black:black.length>Math.max(3,n*.25)?[]:black, white}; }
+
+/* ---- guided panel view: panel boxes by recursive XY-cut on gutters ----
+   A gutter row/column is (almost) all paper-white or all black across the region. Rows split first (reading order is rows
+   top-to-bottom), then columns (left-to-right; reversed for right-to-left comics). Leaves smaller than 1.2% of the page are noise
+   (page numbers, specks). Detection "fails" (null) with <2 or >30 panels; the reader then uses page thirds.
+   Boxes are fractions of the analysed image: {x,y,w,h}. */
+const PANEL_V=1;   /* bump to re-detect every comic */
+function detectPanels(d,W,H,rtl=false){
+  const N=W*H, cls=new Uint8Array(N);   // 1 = paper white, 2 = black, 0 = art
+  for(let k=0,i=0;k<N;k++,i+=4){ const l=.299*d[i]+.587*d[i+1]+.114*d[i+2]; cls[k]=l>=200?1:l<=40?2:0; }
+  // the page's gutter colour = what its outer frame mostly is (paper or black): dark art next to a black panel border is then not taken for a gutter
+  let fw=0,fb=0; const fm=Math.max(1,Math.round(Math.min(W,H)*.02));
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ if(y>=fm&&y<H-fm&&x>=fm&&x<W-fm) continue; const c=cls[y*W+x]; if(c===1) fw++; else if(c===2) fb++; }
+  const GC=fb>fw*1.5?2:1;
+  const minGapY=Math.max(2,Math.round(H*.006)), minGapX=Math.max(2,Math.round(W*.006)), TOL=.975;
+  const rowGut=(y,x0,x1)=>{ let g=0; const o=y*W; for(let x=x0;x<x1;x++) if(cls[o+x]===GC) g++; return g>=(x1-x0)*TOL; };
+  const colGut=(x,y0,y1)=>{ let g=0; for(let y=y0;y<y1;y++) if(cls[y*W+x]===GC) g++; return g>=(y1-y0)*TOL; };
+  // runs of content along one axis; gutter runs shorter than minGap don't split (thin panel borders, art lines)
+  const runs=(a0,a1,isGut,minGap)=>{ const out=[]; let s=-1, g=0;
+    for(let a=a0;a<a1;a++){ if(isGut(a)){ g++; if(s>=0&&g>=minGap){ out.push([s,a-g+1]); s=-1; } } else { if(s<0) s=a; g=0; } }
+    if(s>=0) out.push([s,a1-(g>0?g:0)]); return out; };
+  const leaves=[];
+  const cut=(x0,y0,x1,y1,depth)=>{ if(x1-x0<4||y1-y0<4) return;
+    const rs=runs(y0,y1,y=>rowGut(y,x0,x1),minGapY); if(!rs.length) return;
+    if(rs.length>1&&depth<10){ rs.forEach(([a,b])=>cut(x0,a,x1,b,depth+1)); return; }
+    const [ty,by]=rs[0]; const cs=runs(x0,x1,x=>colGut(x,ty,by),minGapX); if(!cs.length) return;
+    if(cs.length>1&&depth<10){ (rtl?cs.slice().reverse():cs).forEach(([a,b])=>cut(a,ty,b,by,depth+1)); return; }
+    leaves.push({x0:cs[0][0],y0:ty,x1:cs[0][1],y1:by}); };
+  cut(0,0,W,H,0);
+  const big=leaves.filter(b=>(b.x1-b.x0)*(b.y1-b.y0)>=N*.012&&(b.x1-b.x0)>=W*.06&&(b.y1-b.y0)>=H*.04);
+  if(big.length<2||big.length>30) return null;
+  const r4=v=>Math.round(v*1e4)/1e4;
+  return big.map(b=>({x:r4(b.x0/W),y:r4(b.y0/H),w:r4((b.x1-b.x0)/W),h:r4((b.y1-b.y0)/H)})); }
+// fallback when detection fails: thirds (rows on upright pages, columns on wide ones), in reading order
+function panelThirds(aspect,rtl){ if(aspect>1.2){ const c=[0,1,2].map(k=>({x:k/3,y:0,w:1/3,h:1})); return rtl?c.reverse():c; } return [0,1,2].map(k=>({x:0,y:k/3,w:1,h:1/3})); }
+// analyse a rendered page canvas (whole, or its left/right half)
+function panelsOfCanvas(c,half,rtl){ const x=c.getContext('2d',{willReadFrequently:true}); const hw=Math.ceil(c.width/2), sx=half==='R'?c.width-hw:0, w=half?hw:c.width;
+  const d=x.getImageData(sx,0,w,c.height).data; return detectPanels(d,w,c.height,rtl); }
