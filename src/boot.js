@@ -4,6 +4,7 @@ window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOf
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);
   if(m&&comics.find(c=>c.id===m[1])){ try{ history.replaceState(null,'',location.pathname+location.search); history.pushState({r:m[1]},'','#/read/'+m[1]); }catch(e){} openReader(m[1],{push:false}); }
-  else if(m){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
+  else if(location.hash){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }   // stale / unknown hash: plain Home
+  launchHome();
   document.documentElement.dataset.ready='1';
 })();

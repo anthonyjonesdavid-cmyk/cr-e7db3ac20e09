@@ -189,6 +189,29 @@ with sync_playwright() as p:
     # deleting a comic removes it from lists; delete list
     pg.click('.qrow .row-more'); pg.click('#qmDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(300); ok('delete reading list (comics stay)',pg.locator('.qrow').count()==0 and pg.evaluate('__cr.comics.length')==len(files))
 
+    # ======== 5b. cr-v22: every launch lands on Home; in-session navigation unchanged ========
+    TABST="(()=>({tab:document.querySelector('#tabs .on').dataset.tab,home:!document.querySelector('#home').classList.contains('hidden'),lib:!document.querySelector('#library').classList.contains('hidden'),scoped:document.querySelector('#shelf').classList.contains('scoped'),hash:location.hash,saved:localStorage.getItem('cr.tab'),reader:!document.querySelector('#reader').classList.contains('hidden')}))()"
+    def home_ok(st): return st['tab']=='home' and st['home'] and not st['lib'] and not st['scoped'] and not st['reader']
+    pg.click('#tabs [data-tab=library]'); pg.wait_for_timeout(200); open_comic(pg,'Panel Lab 01'); back(pg); st=pg.evaluate(TABST)
+    ok('in session: closing a comic opened from Library returns to Library (unchanged)',st['tab']=='library' and st['lib'],json.dumps(st))
+    ok('the last tab is no longer saved',st['saved'] is None,json.dumps(st))
+    pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(400); st=pg.evaluate(TABST); ok('reopen after leaving it on Library -> Home',home_ok(st),json.dumps(st))
+    pg.click('#tabs [data-tab=home]'); pg.locator('.row-h',has_text='Nightfall').click(); pg.wait_for_timeout(300); ok('series page (scoped Library) in session',pg.evaluate(TABST)['scoped'])
+    pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(400); st=pg.evaluate(TABST); ok('reopen from a series page -> Home',home_ok(st),json.dumps(st))
+    pg.evaluate("localStorage.setItem('cr.tab',JSON.stringify('library'))"); pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(400); st=pg.evaluate(TABST)
+    ok('old saved last-tab ("library" from cr-v21) is ignored and cleared -> Home',home_ok(st) and st['saved'] is None,json.dumps(st))
+    pg.goto(URL+'#/library'); pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(400); st=pg.evaluate(TABST); ok('unknown restored hash -> Home, hash cleared',home_ok(st) and st['hash']=='',json.dumps(st))
+    pg.goto(URL+'#/read/no-such-comic'); pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(400); st=pg.evaluate(TABST); ok('stale reader hash (deleted comic) -> Home',home_ok(st) and st['hash']=='',json.dumps(st))
+    pg.click('#tabs [data-tab=library]'); pg.wait_for_timeout(200); pg.evaluate("dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))"); pg.wait_for_timeout(300); st=pg.evaluate(TABST)
+    ok('restore from the back-forward cache (pageshow persisted) -> Home',home_ok(st),json.dumps(st))
+    pg.click('#tabs [data-tab=library]'); pg.wait_for_timeout(200); p3=ctx.new_page(); p3.goto(URL); p3.wait_for_selector('html[data-ready]'); p3.wait_for_timeout(600); st=p3.evaluate(TABST)
+    ok('fresh open (new window, same storage) -> Home',home_ok(st),json.dumps(st)); p3.evaluate("document.querySelector('#homeScroll').scrollTop=0"); p3.wait_for_timeout(500)
+    p3.screenshot(path=f'{SH}/{ENG}-v22-launch-home-ipad-portrait.png'); p3.close()
+    pg.goto(URL); pg.wait_for_selector('html[data-ready]')
+    open_comic(pg,'Panel Lab 01'); pg.evaluate('__cr.jumpTo(3)'); wait_render(pg); pg.wait_for_timeout(500); pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
+    ok('in-page reload while reading still resumes the comic (Home underneath)',pg.evaluate("__cr.R.comic.title==='Panel Lab 01'&&document.querySelector('#tabs .on').dataset.tab==='home'"))
+    back(pg); st=pg.evaluate(TABST); ok('closing it then shows Home',home_ok(st),json.dumps(st))
+
     # ======== 6. phones (standalone insets) ========
     for (w,h,lab) in [(390,844,'iphone-390'),(430,932,'iphone-430')]:
         c2=b.new_context(viewport={'width':w,'height':h},has_touch=True,device_scale_factor=3,is_mobile=(ENG=='chromium'))

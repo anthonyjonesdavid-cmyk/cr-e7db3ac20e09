@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v22 (Oct 9, 2026)
+- **The app always opens on Home.** Before this, the last tab was saved on the device (localStorage `cr.tab`), so reopening the Home Screen app landed on Library if that was the last tab you used. The tab is no longer saved, and the old saved value is ignored and cleared.
+  - Opening the app fresh, reopening it, or restoring it from the back-forward cache all land on Home at the top: no series page and no search.
+  - An unknown or stale address (for example, a deleted comic) is cleared and Home is shown.
+  - Switching tabs during a session works as before. Closing a comic you opened from Library still returns you to Library.
+  - Reloading the page while reading still reopens that comic, with Home underneath it.
+
 ## cr-v21 (Oct 9, 2026)
 - **Guided panel view.** Double-tap a panel and the page zooms smoothly until that panel fills the screen. Everything else is dimmed.
   - Swipe, tap the edges, or use the arrow keys to move to the next or previous panel. Panels go in reading order: rows top to bottom, then left to right, or right to left in RTL mode. After the last panel, the next page opens on its first panel.

@@ -1,7 +1,9 @@
 
 /* ================= Shelf: Home (coverflow + rows) and Library (grid) ================= */
 let comics=[]; const coverURL=new Map();
-const ui={tab:store.get('tab','home'), sort:store.get('sort','recent'), filter:'all', series:null, q:''};
+// every launch starts on Home: the last tab is NOT restored (it used to be saved in localStorage 'cr.tab', which made reopening the app land on Library)
+try{ localStorage.removeItem('cr.tab'); }catch(e){}
+const ui={tab:'home', sort:store.get('sort','recent'), filter:'all', series:null, q:''};
 const IC={
   chev:'<svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
   check:'<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -66,8 +68,11 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
   for(const c of todo){ if(!comics.includes(c)) continue; while(R&&R.comic) await new Promise(r=>setTimeout(r,1500));   // don't compete with the reader
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
+// app launch / restore from the back-forward cache: back to Home (no series page, no search), at the top
+function launchHome(){ ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
+addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
-function setTab(t){ ui.tab=t; store.set('tab',t); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
+function setTab(t){ ui.tab=t; document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); scopeUI(); if(t==='home') CF.size(); else SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
