@@ -176,7 +176,7 @@ const Drive=(()=>{
         doc=await openPdf(new IDBSource(id,got));
         const meta=await coverMeta(doc);
         const pages=doc.numPages; await doc.destroy(); doc=null;
-        const t0=titleFromName(r.name); const rec={id,title:t0,series:r.series||seriesGuess(t0),fileName:r.name,size:got,pages,...meta,added:Date.now()+r.k,lastRead:0,page:0,progress:0,rtl:false,driveId:r.id,source:'drive'};
+        const t0=titleFromName(r.name); const rec=withSeriesOverride({id,title:t0,series:r.series||seriesGuess(t0),fileName:r.name,size:got,pages,...meta,added:Date.now()+r.k,lastRead:0,page:0,progress:0,rtl:false,driveId:r.id,source:'drive'});
         await dbPut(rec); comics.push(rec); ok++; r.st='done'; r.msg=`${pages} pages · ${fmtBytes(got)}`; renderShelf();
       }catch(err){ try{ if(doc) await doc.destroy(); }catch(e){} try{ await dbDelete(id); }catch(e){}
         if(signal.aborted||err.name==='AbortError'){ r.st='cancel'; r.msg='Cancelled'; }

@@ -34,6 +34,16 @@ const byIssue=(a,b)=>{ const x=issueNo(a.title), y=issueNo(b.title); return x!==
 function seriesGuess(t){ const s=t.replace(/[([].*?[)\]]/g,' ').replace(/\s+/g,' ').trim();
   const m=s.match(/^(.*?)[\s,_-]*(?:#|no\.?\s*|issue\s*|vol(?:ume)?\.?\s*|v|ch(?:apter)?\.?\s*|book\s*)?(\d{1,4})(?:\s*of\s*\d+)?$/i);
   return m&&m[1].trim().length>=2&&/[a-z]/i.test(m[1])? m[1].replace(/[\s,_#-]+$/,'').trim() : ''; }
+/* ---- manual series: a series set by hand (Move to Series, Rename/Merge, Edit) is remembered per file (Drive id, or file name + size),
+   so deleting and re-importing / re-syncing from Drive keeps it instead of re-grouping by folder or file name.
+   c.autoSeries = what automatic grouping gave at import; Remove from Series goes back to it. ---- */
+const fileKeys=c=>[c.driveId?'d:'+c.driveId:null,c.fileName?'f:'+c.fileName+'|'+(c.size||0):null].filter(Boolean);
+const seriesOv=()=>store.get('seriesOv',{})||{};
+const autoSeriesOf=c=>c.autoSeries!=null?c.autoSeries:seriesGuess(titleFromName(c.fileName||c.title));
+function setSeriesManual(c,to){ c.series=to; c.seriesManual=true; const ov=seriesOv(); fileKeys(c).forEach(k=>ov[k]=to); store.set('seriesOv',ov); }
+function clearSeriesManual(c){ c.series=autoSeriesOf(c); delete c.seriesManual; const ov=seriesOv(); fileKeys(c).forEach(k=>delete ov[k]); store.set('seriesOv',ov); }
+// new record (Files or Drive import): remember the automatic series, then apply a saved manual series for this file
+function withSeriesOverride(rec){ rec.autoSeries=rec.series||''; const ov=seriesOv(), k=fileKeys(rec).find(k=>k in ov); if(k!=null){ rec.series=ov[k]; rec.seriesManual=true; } return rec; }
 async function loadLibrary(){ comics=await dbAll(); try{ queues=await qAll(); }catch(e){ console.warn('reading lists unavailable',e); queues=[]; } renderShelf(); setTimeout(migrateCovers,400); kickBlack(5000); }
 /* ---- background blank-black page detection, cached per comic (c.blackPages, c.blackV) ----
    newest-read first, one comic at a time, idle-paced; while a comic is open only that comic is scanned */
@@ -72,7 +82,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
 function launchHome(){ ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
-function setTab(t){ ui.tab=t; document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
+function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); scopeUI(); if(t==='home') CF.size(); else SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
@@ -216,7 +226,7 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
         const proj=v*300*(1+Math.min(2.5,Math.abs(v))*.45); const target=Math.round(this.pos-proj/this.sp); const dist=Math.abs(clamp(target,0,this.items.length-1)-this.pos); this.to(target,clamp(300+dist*75,300,1400)); return; }
       if(cancel||lpFired) return; if(e.timeStamp-g.t0>600) return;
       const it=e.target.closest('.cf-item'); if(!it) return; const i=+it.dataset.i;
-      if(i===Math.round(this.pos)) openReader(it.dataset.id); else this.to(i,420); };
+      if(SEL.on) return; if(i===Math.round(this.pos)) openReader(it.dataset.id); else this.to(i,420); };
     el.addEventListener('pointerup',e=>end(e,false)); el.addEventListener('pointercancel',e=>end(e,true));
     let wt=0; el.addEventListener('wheel',e=>{ if(Math.abs(e.deltaX)<=Math.abs(e.deltaY)) return; e.preventDefault(); this.stop(); this.moving(true); const n=this.items.length-1;
       this.pos=clamp(this.pos+e.deltaX/this.sp,-.3,n+.3); this.layout(); clearTimeout(wt); wt=setTimeout(()=>this.to(Math.round(this.pos),300),120); },{passive:false}); }
@@ -242,9 +252,10 @@ function renderLibrary(){ scopeUI();
   $('#library .libbar').classList.remove('hidden'); $('#libScroll .empty')?.remove(); grid.style.display='';
   renderSeriesHero(); const L=libList(); const seen=new Set();
   grid.innerHTML=L.length? L.map(c=>{ const l=letterOf(c.title); const first=ui.sort==='title'&&!seen.has(l)&&(seen.add(l),true);
-    return `<button class="lc" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}"${first?` data-letter="${l}"`:''}>${coverBox(c)}</button>`; }).join('')
+    return `<button class="lc${SEL.ids.has(c.id)?' on':''}" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}"${first?` data-letter="${l}"`:''}>${coverBox(c)}<span class="ck" aria-hidden="true">${IC.check}</span></button>`; }).join('')
     : `<div class="lempty" style="grid-column:1/-1">No comics here${ui.q?` matching “${esc(ui.q)}”`:''}.</div>`;
   const showAZ=ui.sort==='title'&&ui.series==null&&L.length>0; az.classList.toggle('hidden',!showAZ); grid.style.setProperty('--azw',showAZ?'14px':'0px');
+  if(SEL.on) syncSel();
   if(showAZ) az.innerHTML=[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'].map(l=>`<span data-l="${l}" class="${seen.has(l)?'':'off'}">${l}</span>`).join('');
 }
 $('#q').addEventListener('input',e=>{ ui.q=e.target.value; renderLibrary(); });
@@ -272,14 +283,15 @@ function cancelLP(){ if(lp){ clearTimeout(lp.t); lp=null; } }
 const shelfEl=$('#shelf');
 const lpTarget=e=>e.target.closest('[data-id]')||e.target.closest('#homeScroll .row-h');
 const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id) : t.dataset.kind==='queue'? queueMenu(t,t.dataset.q) : seriesMenu(t,t.dataset.kind==='series'?t.dataset.series:'');
-shelfEl.addEventListener('pointerdown',e=>{ lpFired=false; const t=lpTarget(e); if(!t||e.button>0) return; cancelLP();
+shelfEl.addEventListener('pointerdown',e=>{ lpFired=false; if(SEL.on) return; const t=lpTarget(e); if(!t||e.button>0) return; cancelLP();
   lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ lp=null; lpFired=true; try{navigator.vibrate&&navigator.vibrate(8)}catch(_){} lpRun(t); },520)}; });
 shelfEl.addEventListener('pointermove',e=>{ if(lp&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>9) cancelLP(); });
 shelfEl.addEventListener('pointerup',cancelLP); shelfEl.addEventListener('pointercancel',cancelLP);
 shelfEl.addEventListener('scroll',cancelLP,true);
-shelfEl.addEventListener('contextmenu',e=>{ const t=lpTarget(e); e.preventDefault(); if(t&&!lpFired){ cancelLP(); lpFired=true; lpRun(t); } });
+shelfEl.addEventListener('contextmenu',e=>{ e.preventDefault(); if(SEL.on) return; const t=lpTarget(e); if(t&&!lpFired){ cancelLP(); lpFired=true; lpRun(t); } });
 shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefault(); e.stopPropagation(); return; }
   const a=e.target.closest('[data-act]'); if(!a) return; const k=a.dataset.act;
+  if(SEL.on&&a.classList.contains('lc')){ e.preventDefault(); e.stopPropagation(); toggleSel(a.dataset.id); return; }
   if(k==='open') openReader(a.dataset.id,a.dataset.q?{queue:a.dataset.q}:{queue:null}); else if(k==='qedit') editQueue(a.dataset.q); else if(k==='qmenu') queueMenu(a,a.dataset.q); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
   else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope') unscope();
   else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
@@ -330,14 +342,14 @@ async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
        ['#eCover','#eTurn','#eFoldP','#eSkip'].forEach(sel=>w.querySelector(sel).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; w.querySelectorAll(sel+' button').forEach(x=>{ x.classList.toggle('on',x===b); x.setAttribute('aria-checked',x===b); });
          if(sel==='#eTurn') w.querySelector('#eFoldPW').style.display=(b.dataset.v==='fold'||(b.dataset.v==='auto'&&c.foldAuto))?'':'none'; }));
        w.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); w.querySelector('#eSave').click(); } })); });
-  if(r==='save'){ c.title=vals.t.trim()||c.title; c.series=vals.s.trim(); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; if(vals.sk!==skipVal(c)) c.skipBlack=vals.sk==='on'; await dbPut(c); renderShelf(); dispatchEvent(new CustomEvent('cr-black',{detail:c.id}));
+  if(r==='save'){ c.title=vals.t.trim()||c.title; if(vals.s.trim()!==(c.series||'')) setSeriesManual(c,vals.s.trim()); c.rtl=vals.r; c.turnMode=vals.tm; c.foldPortrait=vals.fp; if(vals.sk!==skipVal(c)) c.skipBlack=vals.sk==='on'; await dbPut(c); renderShelf(); dispatchEvent(new CustomEvent('cr-black',{detail:c.id}));
     if(vals.cv!==(c.coverMode||'auto')){ try{ await recover(c,vals.cv); toast('Cover updated'); }catch(e){ console.warn(e); toast("Couldn't update the cover"); } } }
   else if(r==='delete') deleteComic(id); }
 /* ---------- series: rename (renaming onto an existing name merges) and multi-merge ---------- */
 const seriesCounts=()=>{ const m=new Map(); comics.forEach(c=>{ const s=(c.series||'').trim(); if(s) m.set(s,(m.get(s)||0)+1); }); return [...m].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})); };
 const canonSeries=n=>{ n=n.trim().replace(/\s+/g,' '); const hit=seriesCounts().find(([s])=>s.toLowerCase()===n.toLowerCase()); return hit?hit[0]:n; };
 async function applySeries(from,to){ const F=new Set(from); let n=0; carryRow(from.filter(f=>f!==to),to);
-  for(const c of comics){ const s=(c.series||'').trim(); if(F.has(s)&&s!==to){ c.series=to; await dbPut(c); n++; } }
+  for(const c of comics){ const s=(c.series||'').trim(); if(F.has(s)&&s!==to){ setSeriesManual(c,to); await dbPut(c); n++; } }
   if(ui.series!=null&&F.has(ui.series)) ui.series=to; renderShelf(); return n; }
 function seriesMenu(anchor,s){ const arr={label:'Arrange Categories…',icon:IC.arrange,id:'smArrange',run:()=>arrangeRows()};
   openMenu(anchor,s?[{label:'Rename Series…',icon:IC.edit,id:'smRename',run:()=>renameSeries(s)},{label:'Merge Series…',icon:IC.merge,id:'smMerge',run:()=>mergeSeries([s])},arr]:[arr]); }
@@ -432,6 +444,47 @@ async function openSettings(){
   if(r==='merge'){ mergeSeries(); return; } if(r==='arrange'){ arrangeRows(); return; }
   if(r==='persist'){ try{ const ok=await navigator.storage.persist(); toast(ok?'Storage marked persistent':'The browser declined for now. It often allows it in the Home Screen app.'); }catch(e){ toast('Not supported here'); } } }
 
+/* ---------- multi-select (Library and series pages): Select -> tap covers -> Move to Series… / Remove from Series ---------- */
+const SEL={on:false,ids:new Set()};
+const visIds=()=>libList().map(c=>c.id);
+function enterSel(){ if(ui.tab!=='library'||!comics.length) return; SEL.on=true; SEL.ids.clear(); $('#shelf').classList.add('selecting'); $('#selBar').classList.remove('hidden');
+  const b=$('#selBtn'); b.textContent='Done'; b.setAttribute('aria-pressed','true'); cancelLP(); syncSel(); }
+function exitSel(){ SEL.on=false; SEL.ids.clear(); $('#shelf').classList.remove('selecting'); $('#selBar').classList.add('hidden'); const b=$('#selBtn'); b.textContent='Select'; b.setAttribute('aria-pressed','false');
+  document.querySelectorAll('#libGrid .lc.on').forEach(x=>x.classList.remove('on')); }
+function toggleSel(id){ if(SEL.ids.has(id)) SEL.ids.delete(id); else SEL.ids.add(id); syncSel(); }
+function syncSel(){ const vis=visIds(); for(const id of [...SEL.ids]) if(!comics.some(c=>c.id===id)) SEL.ids.delete(id);
+  document.querySelectorAll('#libGrid .lc').forEach(x=>{ const on=SEL.ids.has(x.dataset.id); x.classList.toggle('on',on); x.setAttribute('aria-pressed',on); });
+  const n=SEL.ids.size, all=vis.length>0&&vis.every(id=>SEL.ids.has(id));
+  $('#selCount').textContent=`${n} selected`; $('#selAll').textContent=all?'Select None':'Select All';
+  $('#selMove').disabled=!n; $('#selRemove').disabled=!comics.some(c=>SEL.ids.has(c.id)&&(c.seriesManual||c.series)); }
+$('#selBtn').addEventListener('click',()=>SEL.on?exitSel():enterSel());
+$('#selAll').addEventListener('click',()=>{ const vis=visIds(); if(vis.length&&vis.every(id=>SEL.ids.has(id))) vis.forEach(id=>SEL.ids.delete(id)); else vis.forEach(id=>SEL.ids.add(id)); syncSel(); });
+$('#selMove').addEventListener('click',()=>moveToSeries([...SEL.ids]));
+$('#selRemove').addEventListener('click',()=>removeFromSeries([...SEL.ids]));
+const volName=(n,v)=>{ n=n.trim().replace(/\s+/g,' '); v=String(v||'').trim().replace(/^vol(?:ume)?\.?\s*/i,''); return v?`${n} Vol. ${v}`:n; };
+// after a move: a series page whose series emptied follows its comics to the destination
+function afterSeriesChange(to){ if(ui.series!=null&&!comics.some(c=>(c.series||'')===ui.series)) ui.series=to||null; exitSel(); renderShelf(); }
+async function moveToSeries(ids){ const L=comics.filter(c=>ids.includes(c.id)); if(!L.length) return; document.querySelector('.mwrap')?.remove();
+  const S=seriesCounts(), from=new Set(L.map(c=>c.series||''));
+  const {r,vals}=await modal(`<div class="mh"><h3>Move to Series</h3><p class="dlsub">${L.length} comic${L.length===1?'':'s'} selected</p></div>
+    <div class="dllist" id="mvList">${S.map(([s,n],i)=>`<label class="mvr"><input type="radio" name="mvs" value="${i}"><span class="ckt"><b>${esc(s)}</b><small>${n} comic${n===1?'':'s'}${from.has(s)?' · current':''}</small></span></label>`).join('')}
+      <label class="mvr"><input type="radio" name="mvs" value="new" id="mvNewR" ${S.length?'':'checked'}><span class="ckt"><b>New Series…</b><small>Name and optional volume</small></span></label>
+      <div class="mvnew" id="mvNew"><input type="text" id="mvName" placeholder="Series name, e.g. Uncanny X-Men" maxlength="80" autocomplete="off" autocapitalize="words" aria-label="New series name"><input type="text" id="mvVol" placeholder="Vol." maxlength="8" inputmode="numeric" autocomplete="off" aria-label="Volume (optional)"></div>
+      <div class="mvprev" id="mvPrev"></div></div>
+    <div class="mf"><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="go" id="mvGo" disabled>Move</button></div>`,
+  w=>{ const go=w.querySelector('#mvGo'), nm=w.querySelector('#mvName'), vo=w.querySelector('#mvVol'), pv=w.querySelector('#mvPrev');
+    const target=()=>{ const r=w.querySelector('input[name=mvs]:checked'); if(!r) return ''; if(r.value==='new') return nm.value.trim()?canonSeries(volName(nm.value,vo.value)):''; return S[+r.value][0]; };
+    const sync=()=>{ const t=target(), same=t&&L.every(c=>(c.series||'')===t); go.disabled=!t||same; const gt=t&&!same?`Move ${L.length}`:'Move', pt=t?(same?'Already in this series.':`→ “${t}”${seriesCounts().some(([s])=>s===t)?' (existing series)':' (new series)'}`):'';
+      if(go.textContent!==gt) go.textContent=gt; if(pv.textContent!==pt) pv.textContent=pt; };   // don't touch the button's text node when nothing changed: a tap that blurs the field would lose its click (WebKit)
+    [nm,vo].forEach(i=>{ i.addEventListener('focus',()=>{ w.querySelector('#mvNewR').checked=true; sync(); }); i.addEventListener('input',sync); i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!go.disabled) go.click(); } }); });
+    w.addEventListener('change',sync); w._vals=()=>({to:target()}); sync(); },'drv ckm mvm');
+  if(r!=='go'||!vals.to) return; const to=vals.to; let n=0;
+  for(const c of L){ if((c.series||'')===to) continue; setSeriesManual(c,to); await dbPut(c); n++; }
+  afterSeriesChange(to); toast(`Moved ${n} comic${n===1?'':'s'} to “${to}”`); }
+async function removeFromSeries(ids){ const L=comics.filter(c=>ids.includes(c.id)); let n=0;
+  for(const c of L){ clearSeriesManual(c); await dbPut(c); n++; }
+  afterSeriesChange(null); toast(`${n} comic${n===1?'':'s'} back to automatic series`); }
+
 /* ---------- toast ---------- */
 let toastEl=null,toastT=0;
 function toast(msg,{progress=null,sticky=false}={}){ if(!toastEl){ toastEl=document.createElement('div'); toastEl.className='toast'; toastEl.setAttribute('role','status'); document.body.appendChild(toastEl); }
@@ -457,7 +510,7 @@ async function importFiles(files){
         toast(`Saving ${f.name}${tag}…`,{progress:(i+1)/n,sticky:true}); }
       doc=await openPdf(new IDBSource(id,f.size));                    // cover from the stored copy (same path as Drive import/migration)
       const meta=await coverMeta(doc); const pages=doc.numPages; await doc.destroy(); doc=null;
-      const t0=titleFromName(f.name); const rec={id,title:t0,series:seriesGuess(t0),fileName:f.name,size:f.size,pages,...meta,added:Date.now()+k,lastRead:0,page:0,progress:0,rtl:false};
+      const t0=titleFromName(f.name); const rec=withSeriesOverride({id,title:t0,series:seriesGuess(t0),fileName:f.name,size:f.size,pages,...meta,added:Date.now()+k,lastRead:0,page:0,progress:0,rtl:false});
       await dbPut(rec); comics.push(rec); ok++; renderShelf();
     }catch(err){ console.warn('import failed',err); try{ if(doc) await doc.destroy(); }catch(e){} try{ await dbDelete(id); }catch(e){}
       const quota=err&&(err.name==='QuotaExceededError'||/quota/i.test(err.message||''));

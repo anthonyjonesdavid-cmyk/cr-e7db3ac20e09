@@ -17,7 +17,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 /* ---------- top bar ---------- */
 .topbar{flex:none;background:var(--bar);padding:var(--sat) var(--padr) 0 var(--padx);border-bottom:.5px solid var(--sep);position:relative;z-index:5}
-.tb-row{height:50px;display:grid;grid-template-columns:44px 1fr 44px;align-items:center}
+.tb-row{height:50px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
 .segctl{justify-self:center;display:inline-flex;background:var(--el);border-radius:9px;padding:2px;gap:2px}
 .segctl button{min-width:96px;height:30px;border-radius:7px;font-size:14px;font-weight:600;color:var(--mut);transition:background .15s,color .15s}
 .segctl button.on{background:var(--el3);color:#fff}
@@ -87,7 +87,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;padding:6px calc(var(--padr) + var(--azw,0px)) calc(24px + var(--sab)) var(--padx)}
 @media (min-width:600px){.lgrid{grid-template-columns:repeat(5,1fr);gap:12px 8px}}
 @media (min-width:1000px){.lgrid{grid-template-columns:repeat(7,1fr)}}
-.lc{display:block;text-align:left;min-width:0}
+.lc{display:block;text-align:left;min-width:0;position:relative}
 .lc:active .cvr{opacity:.75}
 .lhead{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--mut);padding:8px 0 0;letter-spacing:.04em}
 .lempty{color:var(--mut);text-align:center;padding:60px 20px;font-size:15px}
@@ -312,3 +312,33 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .qi .qx svg{width:18px;height:18px}.qi .qx:active{background:var(--el2)}
 .qem .mh .fld input{width:100%;height:42px;border-radius:10px;border:0;background:var(--el2);color:#fff;padding:0 12px;font-size:17px;font-weight:600;outline:none}
 
+
+/* ---------- multi-select (Library + series pages) ---------- */
+.tb-r{justify-self:end;display:flex;align-items:center;gap:2px}
+.tb-row>.icbtn{justify-self:start}
+.txtbtn{height:40px;min-width:40px;padding:0 12px;border-radius:20px;color:#fff;font-size:15px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.txtbtn:active{background:#ffffff1a}.txtbtn:disabled{opacity:.35}
+#selBtn{display:none}#shelf.libtab #selBtn{display:inline-flex}
+#shelf.selecting #importBtn,#shelf.selecting #settingsBtn,#shelf.selecting #libBack,#shelf.selecting #tabs{visibility:hidden}
+#shelf.selecting #selBtn{color:#fff;background:var(--el2)}
+.selbar{position:absolute;left:0;right:0;bottom:0;z-index:6;background:#000;border-top:.5px solid var(--sep);padding:0 var(--padr) var(--sab) var(--padx)}
+.selbar.hidden{display:none}
+.sb-row{height:56px;display:flex;align-items:center;gap:8px}
+.selcount{flex:1;text-align:center;color:var(--mut);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.selbar .pillbtn{height:40px;padding:0 16px;font-size:15px}.selbar .pillbtn:disabled{opacity:.35}
+#shelf.selecting .lgrid{padding-bottom:calc(80px + var(--sab))}
+.lc .ck{display:none;position:absolute;left:6px;top:6px;width:26px;height:26px;border-radius:13px;border:2px solid #fff;background:rgba(0,0,0,.45);align-items:center;justify-content:center}
+.lc .ck svg{width:15px;height:15px;stroke:#fff;stroke-width:3.2;opacity:0}
+#shelf.selecting .lc .ck{display:flex}
+#shelf.selecting .lc.on .ck{background:#0a84ff;border-color:#0a84ff}#shelf.selecting .lc.on .ck svg{opacity:1}
+#shelf.selecting .lc.on .cvr{outline:3px solid #0a84ff;outline-offset:-3px}
+#shelf.selecting .lc:not(.on) .cvr img{opacity:.8}
+.mvr{display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 0;border-bottom:.5px solid #2c2c2e;cursor:pointer}
+.mvr input{width:22px;height:22px;accent-color:#0a84ff;flex:none;margin:0}
+.mvr .ckt{flex:1}
+.mvnew{display:grid;grid-template-columns:1fr 92px;gap:8px;margin-top:6px}
+.mvnew input{width:100%;height:42px;border-radius:10px;border:0;background:var(--el2);color:#fff;padding:0 12px;font-size:16px;outline:none}
+.mvnew input:focus{box-shadow:0 0 0 2px var(--blue)}
+.mvprev{margin-top:8px;color:var(--mut);font-size:13px;min-height:18px}
+.chip.manual{font-weight:600}
+@media (max-width:560px){.selbar .w{display:none}.selbar .txtbtn{padding:0 8px}.selcount{font-size:13px}}

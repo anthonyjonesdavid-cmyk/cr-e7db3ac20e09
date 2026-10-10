@@ -15,6 +15,7 @@ An offline comic reader for PDF comics. You import PDFs with the iPad file picke
 - Tap the edges to turn pages. Tap the center to show or hide the slim, solid toolbars (title, back to shelf, a page scrubber with a thumbnail preview, a page grid, and "page x of y").
 - Guided panel view: double-tap a panel to zoom to it, then swipe panel by panel in reading order, across page turns. Panels are found on the device with a recursive XY-cut over the gutters, and pages without gutters are split into thirds. Double-tap again or tap Full Page to leave. It can be turned off in Settings.
 - Sharp zoom: when a zoom settles, the visible region is redrawn from the PDF at devicePixelRatio × zoom.
+- Multi-select with Move to Series… / Remove from Series (manual series survive re-import)
 - Reading lists: named reading orders across series, each with a Home row and progress. The end-of-comic card follows the list when the comic was opened from it.
 - Per-comic right-to-left (manga) mode. The app remembers your last page in each comic, including after a reload.
 - Performance: pages render at device pixel ratio (capped at 2) and the 2 neighbouring views on each side are pre-rendered. Rendered pages are kept in an LRU bitmap cache with a pixel budget (about 30 MP on iOS), and evicted canvases are zeroed so iPad memory gets released. PDFs are stored in 4 MB chunks and pdf.js reads them by byte range, so a 200 MB, 220-page PDF never loads into memory all at once.

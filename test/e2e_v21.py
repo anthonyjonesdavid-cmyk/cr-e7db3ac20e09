@@ -212,6 +212,63 @@ with sync_playwright() as p:
     ok('in-page reload while reading still resumes the comic (Home underneath)',pg.evaluate("__cr.R.comic.title==='Panel Lab 01'&&document.querySelector('#tabs .on').dataset.tab==='home'"))
     back(pg); st=pg.evaluate(TABST); ok('closing it then shows Home',home_ok(st),json.dumps(st))
 
+    # ======== 5c. cr-v23: multi-select + Move to Series / Remove from Series ========
+    def lib(): pg.click('#tabs [data-tab=library]'); pg.wait_for_timeout(200)
+    SNAP="(t=>{const c=__cr.comics.find(x=>x.title===t); return {series:c.series||'',manual:!!c.seriesManual,progress:c.progress||0,page:c.page||0,panels:Object.keys(c.panels||{}).length,blackV:c.blackV||0,lists:__cr.queues.filter(q=>q.items.includes(c.id)).map(q=>q.name)}})"
+    SELST="(()=>({on:__cr.series.SEL.on,n:__cr.series.SEL.ids.size,count:document.querySelector('#selCount').textContent,all:document.querySelector('#selAll').textContent,bar:!document.querySelector('#selBar').classList.contains('hidden'),checked:[...document.querySelectorAll('#libGrid .lc.on')].map(e=>e.dataset.title)}))()"
+    lib(); pg.locator('.lc[data-title="Nightfall 01"]').click(button='right'); pg.click('#aQueue'); pg.wait_for_selector('#qaName'); pg.fill('#qaName','Crossover'); pg.click('#qaDone'); pg.wait_for_timeout(300)
+    open_comic(pg,'Nightfall 01'); pg.evaluate('__cr.jumpTo(6)'); wait_render(pg); pg.wait_for_timeout(500); back(pg)
+    pg.evaluate("(()=>{const c=__cr.comics.find(x=>x.title==='Iron Tide 02'); c.blackV=c.blackV||2; c.blackPages=[5];})()")
+    before={t:pg.evaluate(SNAP,t) for t in ['Panel Lab 01','Nightfall 01','Iron Tide 02']}
+    ok('home: no Select button (Library / series pages only)',not pg.is_visible('#selBtn') if pg.evaluate("document.querySelector('#tabs .on').dataset.tab")=='home' else (pg.click('#tabs [data-tab=home]') or not pg.is_visible('#selBtn')))
+    lib(); bb=pg.locator('#selBtn').bounding_box(); ok('Library: Select button in the top bar, >=40px',pg.is_visible('#selBtn') and bb['height']>=40 and bb['width']>=40,json.dumps(bb))
+    pg.click('#selBtn'); pg.wait_for_timeout(200); st=pg.evaluate(SELST); ok('Select enters selection mode (bar, "0 selected", Done)',st['on'] and st['bar'] and st['count']=='0 selected' and pg.text_content('#selBtn')=='Done',json.dumps(st))
+    for t in ['Panel Lab 01','Nightfall 01','Iron Tide 02']: pg.locator(f'.lc[data-title="{t}"]').click()
+    pg.wait_for_timeout(200); st=pg.evaluate(SELST); ok('tap covers to check them; count updates; no comic opens',st['n']==3 and st['count']=='3 selected' and pg.is_visible('#shelf') and set(st['checked'])=={'Panel Lab 01','Nightfall 01','Iron Tide 02'},json.dumps(st))
+    pg.locator('.lc[data-title="Iron Tide 02"]').click(); ok('tap again unchecks',pg.evaluate(SELST)['n']==2); pg.locator('.lc[data-title="Iron Tide 02"]').click()
+    pg.screenshot(path=f'{SH}/{ENG}-v23-selection-mode-ipad-portrait.png')
+    sb=pg.evaluate("[...document.querySelectorAll('#selBar button')].map(b=>{const r=b.getBoundingClientRect(); return [r.width,r.height]})"); ok('selection bar buttons >=40px',all(w>=40 and h>=40 for w,h in sb),str(sb))
+    bar_bg=pg.evaluate("getComputedStyle(document.querySelector('#selBar')).backgroundColor"); ok('selection bar is solid black',bar_bg=='rgb(0, 0, 0)',bar_bg)
+    pg.click('#selAll'); st=pg.evaluate(SELST); ok('Select All selects every visible comic, label flips to Select None',st['n']==len(files) and st['all']=='Select None',json.dumps(st))
+    pg.click('#selAll'); st=pg.evaluate(SELST); ok('Select None clears',st['n']==0 and st['all']=='Select All' and pg.is_disabled('#selMove'),json.dumps(st))
+    for t in ['Panel Lab 01','Nightfall 01','Iron Tide 02']: pg.locator(f'.lc[data-title="{t}"]').click()
+    pg.click('#selMove'); pg.wait_for_selector('#mvList'); ok('Move sheet lists existing series + New Series',pg.locator('#mvList input[name=mvs]').count()==len(pg.evaluate('__cr.series.counts()'))+1)
+    pg.fill('#mvName','Uncanny Tests'); pg.fill('#mvVol','2'); pg.wait_for_timeout(150)
+    ok('new series name + volume preview',pg.text_content('#mvPrev').startswith('→ “Uncanny Tests Vol. 2”') and pg.text_content('#mvGo')=='Move 3',pg.text_content('#mvPrev'))
+    pg.screenshot(path=f'{SH}/{ENG}-v23-move-sheet-ipad-portrait.png')
+    pg.click('#mvGo'); pg.wait_for_timeout(500)
+    after={t:pg.evaluate(SNAP,t) for t in before}
+    ok('moved: series set by hand on all three',all(after[t]['series']=='Uncanny Tests Vol. 2' and after[t]['manual'] for t in after),json.dumps(after))
+    ok('moved issues keep progress, reading lists, blank-page + panel caches',all({k:v for k,v in after[t].items() if k not in('series','manual')}=={k:v for k,v in before[t].items() if k not in('series','manual')} for t in after),json.dumps([before,after]))
+    ok('selection mode ends after the move',not pg.evaluate(SELST)['on'])
+    pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300); rows=pg.eval_on_selector_all('#homeScroll .row-h h2','e=>e.map(x=>x.textContent)')
+    ok('Home: new series row appears',('Uncanny Tests Vol. 2' in rows),json.dumps(rows))
+    pg.locator('.row-h',has_text='Uncanny Tests Vol. 2').click(); pg.wait_for_timeout(400)
+    cf=pg.evaluate("__cr.SCF.items.map(c=>c.title)"); ok('series page carousel in issue order (ties by title)',cf==['Nightfall 01','Panel Lab 01','Iron Tide 02'],json.dumps(cf))
+    # series page: select all -> move the rest of Iron Tide here; the emptied source disappears
+    pg.click('#tabs [data-tab=home]'); pg.locator('.row-h',has_text='Iron Tide').click(); pg.wait_for_timeout(300)
+    ok('series page has Select',pg.is_visible('#selBtn')); pg.click('#selBtn'); pg.click('#selAll'); ok('series page: Select All = that series only',pg.evaluate(SELST)['n']==1)
+    pg.click('#selMove'); pg.wait_for_selector('#mvList'); i=pg.evaluate("[...document.querySelectorAll('#mvList .mvr b')].findIndex(b=>b.textContent==='Uncanny Tests Vol. 2')"); pg.locator('#mvList input[name=mvs]').nth(i).check(); pg.click('#mvGo'); pg.wait_for_timeout(500)
+    st=pg.evaluate("({series:__cr.series.counts(),scope:document.querySelector('#shelf').classList.contains('scoped'),cards:[...document.querySelectorAll('#libGrid .lc')].map(e=>e.dataset.title)})")
+    ok('empty source series disappears; the page follows its comics to the destination',not any(s0=='Iron Tide' for s0,_ in st['series']) and st['scope'] and len(st['cards'])==4,json.dumps(st))
+    pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(200); ok('Home: Iron Tide row gone','Iron Tide' not in pg.eval_on_selector_all('#homeScroll .row-h h2','e=>e.map(x=>x.textContent)'))
+    # rename integrates: the manual series follows the new name
+    pg.locator('.row-top',has_text='Uncanny Tests Vol. 2').locator('.row-more').click(); pg.click('#smRename'); pg.fill('#srName','Uncanny Tests Vol. 3'); pg.click('#srSave'); pg.wait_for_timeout(400)
+    ov=pg.evaluate("__cr.series.ov()"); ok('Rename keeps them manual and updates the saved override',set(ov.values())=={'Uncanny Tests Vol. 3'} and pg.evaluate(SNAP,'Iron Tide 01')['series']=='Uncanny Tests Vol. 3',json.dumps(ov))
+    # re-import / Drive re-sync keeps the manual series
+    lib(); pg.locator('.lc[data-title="Iron Tide 02"]').click(button='right'); pg.click('#aDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(400)
+    pg.set_input_files('#fileIn',[os.path.join(T,'Iron_Tide_02.pdf')]); pg.wait_for_function(f'document.querySelectorAll(".lc").length=={len(files)} && !document.querySelector(".toast .tb")',timeout=60000); pg.wait_for_timeout(300)
+    r2=pg.evaluate(SNAP,'Iron Tide 02'); ok('re-imported file keeps its manual series (not re-grouped by file name)',r2['series']=='Uncanny Tests Vol. 3' and r2['manual'],json.dumps(r2))
+    dr=pg.evaluate("(()=>{const r=__cr.series.override({driveId:'drv-x',fileName:'Iron_Tide_01.pdf',size:__cr.comics.find(c=>c.title==='Iron Tide 01').size,series:'Iron Tide'}); return [r.series,r.autoSeries,!!r.seriesManual]})()")
+    ok('Drive import of the same file keeps the manual series',dr==['Uncanny Tests Vol. 3','Iron Tide',True],json.dumps(dr))
+    # remove from series -> back to automatic grouping
+    pg.click('#selBtn'); pg.locator('.lc[data-title="Iron Tide 01"]').click(); pg.locator('.lc[data-title="Iron Tide 02"]').click(); pg.click('#selRemove'); pg.wait_for_timeout(400)
+    r3=pg.evaluate(SNAP,'Iron Tide 01'); ok('Remove from Series -> automatic series again (Iron Tide), override dropped',r3['series']=='Iron Tide' and not r3['manual'] and not any(k.startswith('f:Iron_Tide_01') for k in pg.evaluate('__cr.series.ov()')),json.dumps(r3))
+    pg.click('#selBtn'); pg.locator('.lc[data-title="Nightfall 02"]').click(); ok('tabs, + and settings are hidden while selecting',not pg.is_visible('#tabs') and not pg.is_visible('#importBtn'))
+    pg.click('#selBtn'); pg.wait_for_timeout(200); ok('Done leaves selection mode, nothing changed',not pg.evaluate(SELST)['on'] and pg.is_visible('#tabs') and pg.evaluate(SNAP,'Nightfall 02')['series']=='Nightfall')
+    # persisted
+    pg.reload(); pg.wait_for_selector('html[data-ready]'); ok('series changes persisted in IndexedDB',pg.evaluate(SNAP,'Panel Lab 01')['series']=='Uncanny Tests Vol. 3' and pg.evaluate(SNAP,'Iron Tide 01')['series']=='Iron Tide')
+
     # ======== 6. phones (standalone insets) ========
     for (w,h,lab) in [(390,844,'iphone-390'),(430,932,'iphone-430')]:
         c2=b.new_context(viewport={'width':w,'height':h},has_touch=True,device_scale_factor=3,is_mobile=(ENG=='chromium'))
@@ -222,7 +279,11 @@ with sync_playwright() as p:
         ok(f'{lab}: Full Page button >=40px, clear of the home indicator',s['btn'] and s['btn']['h']>=40 and s['btn']['bottom']>=34,json.dumps(s['btn']))
         top=Image.open(io.BytesIO(pg.screenshot(clip={'x':0,'y':0,'width':w,'height':47}))).convert('RGB'); mx=max(max(px) for px in top.get_flattened_data())
         ok(f'{lab}: nothing under the status bar in panel view',mx<=2,f'maxpx={mx}')
-        pg.wait_for_timeout(300); pg.screenshot(path=f'{SH}/{ENG}-v21-panel-{lab}.png'); pg=pg_; c2.close()
+        pg.wait_for_timeout(300); pg.screenshot(path=f'{SH}/{ENG}-v21-panel-{lab}.png')
+        pg.evaluate('__cr.panels.exit(false)'); back(pg); pg.click('#tabs [data-tab=library]'); pg.click('#selBtn'); pg.locator('.lc').first.click(); pg.wait_for_timeout(200)
+        fit=pg.evaluate("(()=>{const b=document.querySelector('#selBar .sb-row'), r=document.querySelector('#selBar').getBoundingClientRect(); return {sw:b.scrollWidth,cw:b.clientWidth,bottom:innerHeight-r.bottom,btn:Math.min(...[...b.querySelectorAll('button')].map(x=>x.getBoundingClientRect().height))}})()")
+        ok(f'{lab}: selection bar fits, buttons >=40px',fit['sw']<=fit['cw']+1 and fit['btn']>=40 and fit['bottom']<=1,json.dumps(fit)); pg.screenshot(path=f'{SH}/{ENG}-v23-selection-{lab}.png')
+        pg=pg_; c2.close()
 
     ok('no page errors',not errors,json.dumps(errors[:5]))
     b.close()

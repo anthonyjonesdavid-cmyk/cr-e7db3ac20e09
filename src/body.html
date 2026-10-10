@@ -5,7 +5,7 @@
     <button class="icbtn" id="libBack" aria-label="Back to Library"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     <div class="segctl" role="tablist" id="tabs"><button role="tab" data-tab="home" class="on">Home</button><button role="tab" data-tab="library">Library</button></div>
-    <div class="tb-r"><button class="icbtn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
+    <div class="tb-r"><button class="txtbtn" id="selBtn" aria-pressed="false">Select</button><button class="icbtn" id="importBtn" aria-label="Import PDFs"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
     <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden>
   </div></header>
   <main id="home" class="tabview"><div class="scrollv" id="homeScroll"></div></main>
@@ -17,6 +17,9 @@
     </div>
     <div class="scrollv" id="libScroll"><div id="seriesHero"></div><div class="lgrid" id="libGrid"></div></div>
     <nav id="azIndex" class="hidden" aria-label="Jump to letter"></nav>
+    <div id="selBar" class="selbar hidden" role="toolbar" aria-label="Selection"><div class="sb-row">
+      <button class="txtbtn" id="selAll">Select All</button><span id="selCount" class="selcount">0 selected</span>
+      <button class="txtbtn" id="selRemove" disabled aria-label="Remove from Series">Remove<span class="w">&nbsp;from Series</span></button><button class="pillbtn" id="selMove" disabled aria-label="Move to Series">Move<span class="w">&nbsp;to Series</span>…</button></div></div>
   </main>
 </section>
 
@@ -41,5 +44,5 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=22',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=23',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
