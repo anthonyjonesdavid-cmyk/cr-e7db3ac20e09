@@ -437,6 +437,8 @@ async function openSettings(){
     <div class="sgrp"><b>Google Drive folder</b><span id="sFolderCur">${esc(Drive.folder().name||'Folder')} · <code>${esc(Drive.folder().id)}</code>${store.get('driveFolder',null)?'':' (default)'}</span>
       <div class="frow"><input id="sFolder" type="url" placeholder="Paste a Drive folder link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn ghost" id="sFolderSave">Save</button></div>
       <small>Google Drive opens in this folder, and Import Entire Drive Folder lists it.${store.get('driveFolder',null)?' <button class="lnk" id="sFolderReset">Reset to default</button>':''}</small></div>
+    <div class="sgrp"><b>Release dates</b><span>${comics.filter(lkEligible).length} issue${comics.filter(lkEligible).length===1?'':'s'} with an unknown or estimated (≈) date. Looks up cover dates on the Fandom comics wikis; dates you set are kept.</span>
+      <div class="frow"><button class="btn ghost" data-r="lookup" id="sLookup">Look Up Release Dates…</button></div></div>
     <div class="sgrp"><b>Series</b><span>${seriesCounts().length} series. Combine series that came from separate folders (e.g. issue ranges) into one.</span>
       <div class="frow"><button class="btn ghost" data-r="merge" id="sMerge">Merge Series…</button><button class="btn ghost" data-r="arrange" id="sArrange">Arrange Categories…</button></div></div>
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
@@ -447,6 +449,7 @@ async function openSettings(){
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
     const rs=w.querySelector('#sFolderReset'); if(rs) rs.onclick=()=>{ Drive.setFolder(null); rs.remove(); cur(); toast('Using the default Drive folder'); }; });
+  if(r==='lookup'){ lookupAll(); return; }
   if(r==='merge'){ mergeSeries(); return; } if(r==='arrange'){ arrangeRows(); return; }
   if(r==='persist'){ try{ const ok=await navigator.storage.persist(); toast(ok?'Storage marked persistent':'The browser declined for now. It often allows it in the Home Screen app.'); }catch(e){ toast('Not supported here'); } } }
 
@@ -454,74 +457,113 @@ async function openSettings(){
 let dateOv=new Map();   // file key -> {y,m}: manual dates (IndexedDB 'overrides'), re-applied when the same file is imported again
 function applyDateOv(c){ const k=fileKeys(c).find(k=>dateOv.has(k)); if(k) c.dateManual=dateOv.get(k); return c; }
 function dateOf(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.metaDate&&c.metaDate.y) return c.metaDate;
-  return dateFromName(c.fileName)||dateFromName(c.title)||lookupDate(c.series,issueNo(c.title))||null; }
+  return dateFromName(c.fileName)||dateFromName(c.title)||(c.onlineDate&&c.onlineDate.y?c.onlineDate:null)||lookupDate(c.series,issueNo(c.title),c.title,c.fileName,c.autoSeries)||null; }
 async function setDate(c,d){ if(d) c.dateManual={y:d.y,m:d.m||0}; else delete c.dateManual;
   for(const k of fileKeys(c)){ if(d){ dateOv.set(k,c.dateManual); await ovPut({k,date:c.dateManual}); } else { dateOv.delete(k); await ovDel(k); } }
   await dbPut(c); renderShelf(); }
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const fmtDate=d=>d?`${d.src==='lookup'?'≈ ':''}${d.m?MONTHS[d.m-1].slice(0,3)+' ':''}${d.y}`:'Unknown';
-const SRC_TXT={manual:'Set by you',meta:'From the file’s metadata',name:'From the file name',lookup:'Estimated from series history'};
+const SRC_TXT={online:'Looked up online',manual:'Set by you',meta:'From the file’s metadata',name:'From the file name',lookup:'Estimated from series history'};
 // comics imported before v24: read embedded dates once, idle-paced
 async function backfillDates(){ for(const c of comics){ if(c.dateV===DATE_V||R&&R.comic) continue; let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); c.metaDate=await pdfDate(doc); }catch(e){} finally{ try{ doc&&await doc.destroy(); }catch(e){} }
   c.dateV=DATE_V; await dbPut(c); if(c.metaDate&&TL.on) renderTimeline(); await new Promise(r=>setTimeout(r,120)); } }
 function dateSheet(id){ const c=comics.find(x=>x.id===id); if(!c) return; const d=dateOf(c); document.querySelector('.mwrap')?.remove();
   return modal(`<div class="mh"><h3>Release Date</h3><p class="dlsub">${esc(c.title)} · ${d?esc(fmtDate(d))+' — '+SRC_TXT[d.src]:'Unknown'}</p></div><div class="mb">
     <div class="dtrow"><label class="fld"><span>Month</span><select id="dMonth"><option value="0">—</option>${MONTHS.map((m,i)=>`<option value="${i+1}"${d&&d.m===i+1?' selected':''}>${m}</option>`).join('')}</select></label>
-    <label class="fld"><span>Year</span><input type="text" id="dYear" inputmode="numeric" maxlength="4" placeholder="1983" value="${d?d.y:''}" autocomplete="off"></label></div></div>
+    <label class="fld"><span>Year</span><input type="text" id="dYear" inputmode="numeric" maxlength="4" placeholder="1983" value="${d?d.y:''}" autocomplete="off"></label></div>
+    <div class="frow" style="margin-top:10px"><button class="btn ghost" id="dLook" type="button">Look Up Online</button><small class="fhint" id="dLookTxt" style="flex:1">${esc(lkSeries(c))}${issueNo(c.title)!=null?' #'+issueNo(c.title):''}</small></div><div id="dLookRes" class="lkres" style="border:0"></div></div>
     <div class="mf">${c.dateManual?'<button class="btn ghost" data-r="clear" id="dClear">Automatic</button>':''}<button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="dSave">Save</button></div>`,
   w=>{ const y=w.querySelector('#dYear'), b=w.querySelector('#dSave'); const sync=()=>{ const v=+y.value; const ok=/^\d{4}$/.test(y.value)&&v>=1900&&v<=2100; if(b.disabled!==!ok) b.disabled=!ok; };
     y.addEventListener('input',sync); y.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!b.disabled){ e.preventDefault(); b.click(); } }); sync();
+    const lb=w.querySelector('#dLook'), res=w.querySelector('#dLookRes');
+    const use=async f=>{ if(c.dateManual){ res.innerHTML=`<div class="lkr"><b>${lkTxt(f)}</b><span>Your date is kept</span></div>`; return; } await lkSave(c,f); renderShelf(); res.innerHTML=`<div class="lkr ok"><b>${lkTxt(f)}</b><span>Saved</span></div>`; w.querySelector('.dlsub').textContent=`${c.title} · ${fmtDate(dateOf(c))} — ${SRC_TXT.online}`; };
+    lb.addEventListener('click',async()=>{ if(issueNo(c.title)==null){ res.innerHTML='<div class="lkr"><b>No issue number in the title</b></div>'; return; } lb.disabled=true; lb.textContent='Looking up…';
+      let r; try{ r=await lkRun(c); }catch(e){ r={error:1}; } lb.disabled=false; lb.textContent='Look Up Online';
+      if(r.found) use(r.found);
+      else if(r.candidates){ res.innerHTML=`<div class="lkr"><b>Several volumes match — which one?</b></div>`+r.candidates.map((f,i)=>`<div class="lkr"><b>${lkTxt(f)}</b><button class="btn ghost" type="button" data-i="${i}">Use</button></div>`).join('');
+        res.querySelectorAll('button[data-i]').forEach(x=>x.addEventListener('click',()=>use(r.candidates[+x.dataset.i]))); }
+      else res.innerHTML=`<div class="lkr"><b>${r.error?'Network error — are you online?':'Not found on the comics wikis'}</b></div>`; });
     w._vals=()=>({y:+y.value,m:+w.querySelector('#dMonth').value}); }).then(async({r,vals})=>{ if(r==='save') await setDate(c,vals); else if(r==='clear') await setDate(c,null); }); }
+/* ---- online lookup (manual only: Settings button, or Look Up Online in the Release Date sheet) ---- */
+const lkSeries=c=>c.series||seriesGuess(c.title)||'';
+const lkEligible=c=>{ if(c.dateManual) return false; const d=dateOf(c); return (!d||d.src==='lookup')&&lkSeries(c)&&issueNo(c.title)!=null&&isFinite(issueNo(c.title)); };
+async function lkRun(c,signal){ return onlineDate(lkSeries(c),issueNo(c.title),[c.title,c.fileName,c.autoSeries],signal); }
+async function lkSave(c,f){ if(c.dateManual) return false; c.onlineDate={y:f.y,m:f.m||0,src:'online',wiki:f.wiki,title:f.title,url:f.url,at:Date.now()}; await dbPut(c); return true; }
+const lkTxt=f=>`${f.m?MONTHS[f.m-1].slice(0,3)+' ':''}${f.y} · ${esc(f.wiki)} (${esc(f.title)})`;
+async function lookupAll(){ const L=comics.filter(lkEligible); document.querySelector('.mwrap')?.remove(); const ctl=new AbortController(); let done=false;
+  const p=modal(`<div class="mh"><h3>Look Up Release Dates</h3><p class="dlsub" id="lkSum">${L.length?`Checking ${L.length} issue${L.length===1?'':'s'} with unknown or estimated dates…`:'Every issue already has a date from its file or from you.'}</p></div>
+    <div class="mb"><div class="lkres" id="lkRes"></div><small class="fhint">Source: Fandom comics wikis (Marvel, DC, Image, Dark Horse Databases). Dates you set by hand are never changed.</small></div>
+    <div class="mf"><button class="btn" data-r="done" id="lkDone">${L.length?'Stop':'Done'}</button></div>`,null);
+  const box=()=>document.querySelector('#lkRes'); let n=0,f=0,amb=0;
+  (async()=>{ for(const c of L){ if(ctl.signal.aborted) break; const row=document.createElement('div'); row.className='lkr'; row.innerHTML=`<b>${esc(c.title)}</b><span>Looking up…</span>`; box()&&box().prepend(row);
+      let r; try{ r=await lkRun(c,ctl.signal); }catch(e){ r={error:e.message||String(e)}; } if(ctl.signal.aborted) break; n++;
+      if(r.found){ await lkSave(c,r.found); f++; row.classList.add('ok'); row.querySelector('span').innerHTML=lkTxt(r.found); }
+      else if(r.candidates){ amb++; row.querySelector('span').textContent=`${r.candidates.length} volumes match — pick in Release Date`; }
+      else row.querySelector('span').textContent=r.error?'Network error':'Not found';
+      const sm=document.querySelector('#lkSum'); if(sm) sm.textContent=`${n} of ${L.length} checked · ${f} found${amb?` · ${amb} need a volume`:''}`; await new Promise(r=>setTimeout(r,250)); }
+    done=true; const b=document.querySelector('#lkDone'); if(b) b.textContent='Done'; if(f) renderShelf(); })();
+  await p; ctl.abort(); if(f) renderShelf(); }
 const TL={on:false};
 function tlGroups(){ const by=new Map(), unk=[]; comics.forEach(c=>{ const d=dateOf(c); if(d){ if(!by.has(d.y)) by.set(d.y,[]); by.get(d.y).push({c,d}); } else unk.push(c); });
   const years=[...by.keys()].sort((a,b)=>a-b); years.forEach(y=>by.get(y).sort((a,b)=>(a.d.m||13)-(b.d.m||13)||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)));
   return {by,years,unk:unk.sort((a,b)=>(a.series||a.title).localeCompare(b.series||b.title)||byIssue(a,b))}; }
 function tlRange(){ const {years}=tlGroups(); return years.length?(years[0]===years.at(-1)?String(years[0]):`${years[0]} – ${years.at(-1)}`):''; }
-function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,years,unk}=tlGroups(), st=el.scrollTop;
-  const card=(c,d)=>`<button class="tc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}${d?', '+esc(fmtDate(d)):''}">${coverBox(c)}<span class="tt">${esc(c.title)}</span><span class="td${d&&d.src==='lookup'?' est':''}">${d?esc(d.m?MONTHS[d.m-1].slice(0,3):'—')+(d.src==='lookup'?' ≈':''):'Set date'}</span></button>`;
+function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,years,unk}=tlGroups(), st=el.scrollTop; let h='', ly=null;
+  const card=(c,d,lab)=>{ const ym=d?ymOf(d):0, dec=d?Math.floor(d.y/10)*10:'unk';
+    return `<div class="tc" data-dec="${dec}" data-ym="${ym}">${lab?`<button class="tyr" data-act="${d?'rack':'noop'}" data-ym="${ym}" aria-label="${d?`Spinner rack, ${lab}`:lab}">${lab}${d?IC.rack:''}</button>`:''}<button class="tcb" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}${d?', '+esc(fmtDate(d)):''}">${coverBox(c)}<span class="tt">${esc(c.title)}</span><span class="td${d&&d.src==='lookup'?' est':''}">${d?esc(fmtDate(d)):'Unknown date'}</span></button></div>`; };
+  for(const y of years) by.get(y).forEach((x,k)=>{ h+=card(x.c,x.d,k===0?String(y):''); });
+  unk.forEach((c,k)=>{ h+=card(c,null,k===0?'Unknown':''); });
   const decades=[...new Set(years.map(y=>Math.floor(y/10)*10))];
   $('#tlDec').innerHTML=decades.map(d=>`<button class="chip" data-dec="${d}">${d}s</button>`).join('')+(unk.length?'<button class="chip" data-dec="unk">Unknown</button>':'');
-  el.innerHTML=years.map(y=>`<section class="tly" data-y="${y}" data-dec="${Math.floor(y/10)*10}"><h3 class="tlh">${y}<small>${by.get(y).length} issue${by.get(y).length===1?'':'s'}</small><button class="rkbtn" data-act="rack" data-ym="${rackCenter(by.get(y))}" aria-label="Spinner rack, ${y}">${IC.rack}</button></h3><div class="tlg">${by.get(y).map(x=>card(x.c,x.d)).join('')}</div></section>`).join('')
-    +(unk.length?`<section class="tly" data-dec="unk" id="tlUnk"><h3 class="tlh">Unknown date<small>${unk.length} · long-press to set</small></h3><div class="tlg">${unk.map(c=>card(c,null)).join('')}</div></section>`:'')
-    +(!comics.length?'<p class="qempty">No comics yet.</p>':'');
+  el.innerHTML=comics.length?`<div class="tlg" id="tlGrid">${h}</div>${unk.length?'<p class="tlhint">Unknown dates: long-press an issue to set one, or use Look Up Release Dates in Settings.</p>':''}`:'<p class="qempty">No comics yet.</p>';
   $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
-function tlSpy(){ const el=$('#tlScroll'), top=el.getBoundingClientRect().top+4; let cur=null; for(const s of el.querySelectorAll('.tly')){ if(s.getBoundingClientRect().top<=top+40) cur=s.dataset.dec; else break; }
-  if(cur==null){ const f=el.querySelector('.tly'); cur=f&&f.dataset.dec; } $('#tlDec').querySelectorAll('.chip').forEach(b=>{ const on=b.dataset.dec===cur; if(b.classList.contains('on')!==on){ b.classList.toggle('on',on); if(on) b.scrollIntoView({inline:'nearest',block:'nearest'}); } }); }
+function tlFirstVisible(){ const el=$('#tlScroll'), top=el.getBoundingClientRect().top; for(const c of el.querySelectorAll('.tc')){ const r=c.getBoundingClientRect(); if(r.bottom>top+8) return c; } return null; }
+function tlSpy(){ const c=tlFirstVisible(), cur=c&&c.dataset.dec; $('#tlDec').querySelectorAll('.chip').forEach(b=>{ const on=b.dataset.dec===cur; if(b.classList.contains('on')!==on){ b.classList.toggle('on',on); if(on) b.scrollIntoView({inline:'nearest',block:'nearest'}); } }); }
 function openTimeline(){ TL.on=true; $('#timeline').classList.remove('hidden'); $('#tlScroll').scrollTop=0; renderTimeline(); }
 function closeTimeline(){ TL.on=false; $('#timeline').classList.add('hidden'); }
 $('#tlBack').addEventListener('click',closeTimeline);
 $('#tlScroll').addEventListener('scroll',()=>requestAnimationFrame(tlSpy),{passive:true});
-$('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tly[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:s.offsetTop,behavior:'smooth'}); });
+$('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tc[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:Math.max(0,s.offsetTop-8),behavior:reduced()?'auto':'smooth'}); });
+$('#tlRack').addEventListener('click',()=>{ const c=tlFirstVisible(); let ym=c&&+c.dataset.ym; if(!ym){ const d=comics.map(dateOf).filter(Boolean).map(ymOf).sort((a,b)=>a-b); ym=d[Math.floor((d.length-1)/2)]; } if(ym) openRack(ym); else toast('Set a release date on some issues first'); });
 
 /* ---------- spinner rack (v25): the issues that were "on the racks" around a month ---------- */
 const ymOf=d=>d.y*12+((d.m||6)-1);            // year-only dates count as June
 const ymLabel=i=>`${MONTHS[i%12].slice(0,3)} ${Math.floor(i/12)}`;
 function rackCenter(list){ const v=list.map(x=>ymOf(x.d)).sort((a,b)=>a-b); return v[Math.floor((v.length-1)/2)]; }
-const RK={on:false,ym:0,win:2,items:[],N:4,T:4,C:2,a:0,v:0,raf:0,drag:null,step:90};
+const RK={on:false,ym:0,win:0,items:[],N:6,T:8,a:0,v:0,raf:0,drag:null,step:60,front:0};
 const rmq=matchMedia('(prefers-reduced-motion: reduce)'); const reduced=()=>rmq.matches;
-function rackItems(ym){ const all=comics.map(c=>({c,d:dateOf(c)})).filter(x=>x.d).map(x=>({...x,i:ymOf(x.d)}));
-  let w=2, L=[]; for(;w<=6;w++){ L=all.filter(x=>Math.abs(x.i-ym)<=w); if(L.length>=6) break; } w=Math.min(w,6);
-  L.sort((a,b)=>a.i-b.i||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)); return {w,L}; }
+const TILT=16;   // covers lean back in their wire pockets
+// every pocket filled: nearest dates first (outward from the month), then undated issues; repeats only if the library is smaller than the rack
+function rackItems(ym,cap){ const all=comics.map(c=>({c,d:dateOf(c)})); const dated=all.filter(x=>x.d).map(x=>({...x,i:ymOf(x.d)})), und=all.filter(x=>!x.d);
+  dated.sort((a,b)=>Math.abs(a.i-ym)-Math.abs(b.i-ym)||a.i-b.i||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c));
+  let L=dated.concat(und.sort((a,b)=>(a.c.series||a.c.title).localeCompare(b.c.series||b.c.title)||byIssue(a.c,b.c)));
+  const uniq=L.length; if(!uniq) return {L:[],uniq:0,lo:0,hi:0,repeats:false}; const out=[]; for(let k=0;k<cap;k++) out.push(L[k%uniq]);
+  const used=out.slice(0,Math.min(cap,uniq)).filter(x=>x.d).map(x=>x.i); return {L:out,uniq:Math.min(cap,uniq),lo:Math.min(...used,ym),hi:Math.max(...used,ym),repeats:uniq<cap}; }
+// wing order: front first, then alternating right/left so the nearest dates sit in front
+const wingOrder=N=>{ const o=[0]; for(let k=1;o.length<N;k++){ o.push(k); if(o.length<N) o.push(N-k); } return o; };
 function rackLayout(){ const st=$('#rkStage'), W=st.clientWidth, H=st.clientHeight, T=RK.T;
-  const sign=Math.max(26,H*.05), base=Math.max(30,H*.06), gap=Math.max(6,W*.008);
-  let ph=(H*.9-sign-base)/T-gap, pw=ph/1.54; const fw0=RK.C*pw+(RK.C+1)*gap, maxF=Math.min(W*.62,560); if(fw0>maxF){ const k=maxF/fw0; pw*=k; ph*=k; }
-  const fw=RK.C*pw+(RK.C+1)*gap, r=fw/2/Math.tan(Math.PI/RK.N);
-  const sc=$('#rkScene'); sc.style.setProperty('--n',RK.N); Object.entries({'--pw':pw+'px','--ph':ph+'px','--gap':gap+'px','--fw':fw+'px','--r':r+'px','--sign':sign+'px','--base':base+'px','--fh':(T*(ph+gap)+gap)+'px'}).forEach(([k,v])=>sc.style.setProperty(k,v));
-  st.style.perspective=Math.max(900,r*5)+'px'; }
-function renderRack(){ const {w,L}=rackItems(RK.ym); RK.win=w; RK.items=L.map(x=>x.c); const per=RK.T*RK.C, n=L.length;
-  RK.N=Math.min(8,Math.max(4,Math.ceil(n/per))); RK.step=360/RK.N; RK.a=0; RK.v=0;
+  let ph=(H*.9)/((T-1)*.55+1+.62+.3), pw=ph/1.54; if(pw*3.3>W*.96){ pw=W*.96/3.3; ph=pw*1.54; }
+  const pitch=ph*.55, sign=ph*.62, base=ph*.3, R=pw*.95+8, rackH=(T-1)*pitch+ph;
+  Object.assign(RK,{pw,ph,pitch,R,sign});
+  const sc=$('#rkScene'); Object.entries({'--pw':pw+'px','--ph':ph+'px','--pitch':pitch+'px','--R':R+'px','--sign':sign+'px','--base':base+'px','--rh':rackH+'px'}).forEach(([k,v])=>sc.style.setProperty(k,v));
+  sc.style.height=(sign+rackH+base)+'px'; st.style.perspective=Math.max(900,ph*7)+'px';
+  for(const e of RK.els||[]) e._tf=null; rackApply(); }
+function renderRack(){ const cap=RK.N*RK.T, {L,uniq,lo,hi,repeats}=rackItems(RK.ym,cap); RK.items=L.map(x=>x.c); RK.win=Math.max(RK.ym-lo,hi-RK.ym); RK.step=360/RK.N; RK.a=0; RK.v=0; RK.repeats=repeats;
   $('#rkTitle').textContent=`On the racks · ${ymLabel(RK.ym)}`;
   const sh=i=>innerWidth<560?`${MONTHS[i%12].slice(0,3)} ’${String(Math.floor(i/12)).slice(2)}`:ymLabel(i);
-  $('#rkSub').textContent=n?`${n} issue${n===1?'':'s'} · ${sh(RK.ym-w)} – ${sh(RK.ym+w)}${w>2&&innerWidth>=560?' (widened)':''}`:'Nothing dated near this month';
-  const shown=L.slice(0,RK.N*per); let h='';
-  for(let f=0;f<RK.N;f++){ let pk=''; for(let t=0;t<RK.T;t++) for(let k=0;k<RK.C;k++){ const x=shown[f*per+t*RK.C+k];   // fill face by face so the front face is full
-      pk+=x?`<div class="pk" style="--t:${t};--k:${k}"><button class="pkc" data-rk="${x.c.id}" aria-label="${esc(x.c.title)}, ${esc(fmtDate(x.d))}"><img src="${cover(x.c)}" alt="" draggable="false"></button></div>`:`<div class="pk empty" style="--t:${t};--k:${k}"></div>`; }
-    h+=`<div class="rf" style="--f:${f}">${pk}</div>`; }
-  $('#rkRotor').innerHTML=h; $('#rkEmpty').classList.toggle('hidden',n>0); rackLayout(); rackApply(); }
-function rackApply(){ $('#rkRotor').style.transform=`translateZ(calc(var(--r) * -1)) rotateY(${RK.a}deg)`; const f=((Math.round(-RK.a/RK.step)%RK.N)+RK.N)%RK.N; RK.front=f;
-  // hide faces turned away and order the rest by depth in JS too, so the rack draws correctly even where backface-visibility / 3D depth sorting is flaky
-  $('#rkRotor').querySelectorAll('.rf').forEach((e,i)=>{ e.classList.toggle('front',i===f); const c=Math.cos((i*RK.step+RK.a)*Math.PI/180), vis=c>-0.02;
-    if(e._v!==vis){ e._v=vis; e.style.visibility=vis?'':'hidden'; } const z=Math.round(c*100)+100; if(e._z!==z){ e._z=z; e.style.zIndex=z; } }); }
+  $('#rkSub').textContent=uniq?`${uniq} issue${uniq===1?'':'s'} · ${lo===hi?sh(lo):`${sh(lo)} – ${sh(hi)}`}${repeats?(innerWidth<560?' · repeats':' · repeats to fill'):''}`:'No comics yet';
+  const ord=wingOrder(RK.N); let h=''; for(let w=0;w<RK.N;w++) h+=`<div class="wing" data-w="${w}"></div>`;
+  L.forEach((x,k)=>{ const w=ord[Math.floor(k/RK.T)], t=k%RK.T; h+=`<div class="pk" data-w="${w}" data-t="${t}"><button class="pkc" data-rk="${x.c.id}" aria-label="${esc(x.c.title)}${x.d?', '+esc(fmtDate(x.d)):''}"><img src="${cover(x.c)}" alt="" draggable="false"></button></div>`; });
+  $('#rkRotor').innerHTML=h+'<div class="rkpole"></div><div class="rksign"><span>COMICS</span></div>'; $('#rkEmpty').classList.toggle('hidden',uniq>0);
+  RK.els=[...$('#rkRotor').querySelectorAll('.pk,.wing')]; rackLayout(); rackApply(); }
+function rackApply(){ const a=RK.a;
+  // every pocket gets its full transform (wing angle + spin) so the rack is right even where nested preserve-3d gets flattened
+  RK.front=((Math.round(-a/RK.step)%RK.N)+RK.N)%RK.N;
+  // depth order + hide the far side in JS as well (works even where 3D depth sorting / backface culling is flaky)
+  for(const e of RK.els||[]){ const c=Math.cos((+e.dataset.w*RK.step+a)*Math.PI/180), vis=c>-0.55, isW=e.classList.contains('wing');
+    if(e._v!==vis){ e._v=vis; e.style.visibility=vis?'':'hidden'; }
+    if(vis){ const ang=+e.dataset.w*RK.step+a; e.style.transform=isW?`rotateY(${ang}deg) translateZ(${RK.R-3}px)`:`rotateY(${ang}deg) translateZ(${RK.R}px) translateY(${+e.dataset.t*RK.pitch}px) rotateX(${TILT}deg)`; } const z=1000+Math.round(c*400)+(isW?-50:+e.dataset.t); if(e._z!==z){ e._z=z; e.style.zIndex=z; }
+    if(!isW){ const dim=c<.75; if(e._d!==dim){ e._d=dim; e.classList.toggle('dim',dim); } const f=c>.97; if(e._f!==f){ e._f=f; e.classList.toggle('front',f); } } } }
 function rackSnap(){ cancelAnimationFrame(RK.raf); const tgt=Math.round(RK.a/RK.step)*RK.step;
   if(reduced()){ RK.a=tgt; RK.v=0; rackApply(); return; } const a0=RK.a, t0=performance.now(), D=320;
   const f=t=>{ const k=Math.min(1,(t-t0)/D), e=1-Math.pow(1-k,3); RK.a=a0+(tgt-a0)*e; rackApply(); if(k<1) RK.raf=requestAnimationFrame(f); else RK.raf=0; }; RK.raf=requestAnimationFrame(f); }
@@ -543,7 +585,7 @@ function rackPull(btn){ if(RK.pulling||(R&&R.comic)) return; const id=btn.datase
   st.addEventListener('pointermove',e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x; if(Math.abs(dx)>8||Math.abs(e.clientY-d.y)>8) d.moved=true; if(!d.moved) return;
     const now=performance.now(), deg=(st.clientWidth>0?180/Math.max(320,st.clientWidth*.9):.3); RK.a=d.a+dx*deg; const dt=Math.max(1,now-d.t); RK.v=Math.max(-1.1,Math.min(1.1,.7*RK.v+.3*((e.clientX-d.lx)*deg/dt))); d.t=now; d.lx=e.clientX; rackApply(); });
   const up=e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; RK.drag=null;
-    if(!d.moved){ if(d.tgt&&d.tgt.closest('.rf')?.classList.contains('front')) rackPull(d.tgt); else if(d.tgt){ const f=+d.tgt.closest('.rf').style.getPropertyValue('--f'); RK.a=-f*RK.step+Math.round((RK.a+f*RK.step)/360)*360; reduced()?rackApply():rackSnapTo(RK.a); } return; }
+    if(!d.moved){ const pk=d.tgt&&d.tgt.closest('.pk'); if(pk&&pk.classList.contains('front')) rackPull(d.tgt); else if(pk){ const f=+pk.dataset.w, t=-f*RK.step, k=Math.round((RK.a-t)/360); if(reduced()){ RK.a=t+k*360; rackApply(); } else rackSnapTo(t+k*360); } return; }
     if(performance.now()-d.t>90) RK.v=0; if(reduced()||Math.abs(RK.v)<.05) rackSnap(); else rackCoast(); };
   st.addEventListener('pointerup',up); st.addEventListener('pointercancel',up);
   $('#rkBack').addEventListener('click',closeRack);

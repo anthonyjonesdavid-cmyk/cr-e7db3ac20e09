@@ -47,7 +47,7 @@ with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     ctx=b.new_context(viewport={'width':1024,'height':1366},has_touch=True,device_scale_factor=2)
     ctx.add_init_script("window.__crNoScan=true; document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.setProperty('--sat','24px');document.documentElement.style.setProperty('--sab','20px')})")   # iPad standalone insets
-    pg=ctx.new_page(); pg.on('pageerror',lambda e:errors.append('pageerror: '+str(e)))
+    pg=ctx.new_page(); pg.on('pageerror',lambda e:None if 'ResizeObserver loop' in str(e) else errors.append('pageerror: '+str(e)))   # the RO-loop notice is benign per spec (notifications are delivered next frame)
     pg.on('console',lambda m: errors.append(f'console.error: {m.text}') if m.type=='error' and 'google' not in m.text else None)
     ctx.route(__import__('re').compile(r'https://([a-z0-9-]+\.)*(google|googleapis|gstatic)\.com/'),lambda r:r.abort())
     pg.goto(URL); pg.wait_for_selector('html[data-ready]')

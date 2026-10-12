@@ -134,7 +134,7 @@ async function coverMeta(doc,mode='auto'){
    publicationDate) > a year in the file name or title ("(1983)", "(Mar 1983)", "1983-03") > built-in table of well-known
    series (estimate from #1's cover date + monthly cadence) > Unknown.  PDF CreationDate/ModDate are NOT used: they are the
    scan/export date, not the cover date. */
-const DATE_V=1, MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const DATE_V=2, MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
 const okY=y=>y>=1930&&y<=2039;
 const monOf=t=>{ const i=MON.indexOf(String(t||'').slice(0,3).toLowerCase()); return i<0?0:i+1; };
 function dateFromName(n){ const s=String(n||'').replace(/_/g,' ');
@@ -158,8 +158,50 @@ const SERIES_DATES=[['amazing spider-man',1963,3,12],['fantastic four',1961,11,1
   ['daredevil',1964,4,12],['incredible hulk',1962,5,12],['watchmen',1986,9,12],['sandman',1989,1,12],['preacher',1995,4,12],['transmetropolitan',1997,9,12],
   ['y the last man',2002,9,12],['walking dead',2003,10,12],['saga',2012,3,12],['invincible',2003,1,12],['hellblazer',1988,1,12]];
 const normSeries=s=>String(s||'').toLowerCase().replace(/\(.*?\)/g,' ').replace(/[:,.!']/g,' ').replace(/^\s*the\s+/,'').replace(/\s+/g,' ').trim();
-function lookupDate(series,issue){ const n=normSeries(series); if(!n||!(issue>=1)) return null; const r=SERIES_DATES.find(x=>x[0]===n); if(!r) return null;
-  const idx=(r[2]-1)+Math.round((Math.floor(issue)-1)*12/r[3]); return {y:r[1]+Math.floor(idx/12),m:idx%12+1,src:'lookup'}; }
+/* hints that say WHICH run/volume an issue belongs to: "Vol 2", "v2", a start year "(1996)", or a known relaunch imprint.
+   The built-in table only knows each title's FIRST volume, so any of these (other than Vol 1 / a year matching vol 1) means: don't estimate. */
+const RELAUNCH=[[/heroes\s+reborn/i,1996],[/heroes\s+return/i,1998],[/marvel\s+now/i,2012],[/all[-\s]new/i,2014],[/\bnew\s*52\b/i,2011],[/\brebirth\b/i,2016],[/\blegacy\b/i,2017],[/\bultimate\b/i,2000],[/\bfresh\s+start\b/i,2018]];
+function volHints(...texts){ const t=texts.filter(Boolean).join(' | ').replace(/_/g,' '); let vol=0, year=0, tag='';
+  let m=t.match(/\bvol(?:ume)?\.?\s*(\d{1,2})\b/i)||t.match(/(?:^|[\s(])v(\d{1,2})(?=[\s)#]|$)/i); if(m) vol=+m[1];
+  m=t.match(/[([]\s*((?:19|20)\d\d)(?:\s*[-–]\s*(?:\d{2,4}))?\s*[)\]]/); if(m&&okY(+m[1])) year=+m[1];
+  for(const [re,y] of RELAUNCH) if(re.test(t)){ tag=t.match(re)[0]; if(!year) year=y; break; }
+  return {vol,year,tag}; }
+function lookupDate(series,issue,...hints){ const n=normSeries(String(series||'').replace(/\bvol(?:ume)?\.?\s*\d+\b/ig,' ')); if(!n||!(issue>=1)) return null; const r=SERIES_DATES.find(x=>x[0]===n); if(!r) return null;
+  const h=volHints(series,...hints); if(h.vol>1||h.tag) return null;            // another volume / a relaunch: unknown, let online lookup decide
+  const idx=(r[2]-1)+Math.round((Math.floor(issue)-1)*12/r[3]), y=r[1]+Math.floor(idx/12);
+  if(h.year&&Math.abs(h.year-r[1])>1&&!(h.vol===1)) return null;                 // "(1996)" names a different run than the 1961 one
+  return {y,m:idx%12+1,src:'lookup'}; }
+
+/* ================= online release-date lookup (manual, from Settings or the Release Date sheet) =================
+   Source: the Fandom comics wikis (Marvel Database, DC Database, Image Comics Database, Dark Horse Database) via the public
+   MediaWiki API. Keyless and CORS-enabled (origin=* -> Access-Control-Allow-Origin: *), so it works straight from the app.
+   Pages are named "<Series> Vol <n> <issue>"; the infobox has Month / Year (cover date). */
+const WIKIS=[['marvel','Marvel Database'],['dc','DC Database'],['imagecomics','Image Comics Database'],['darkhorse','Dark Horse Database']];
+const MONTHN={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,win:1,spr:4,sum:7,fal:10,aut:10,hol:12};
+async function wikiApi(w,params,signal){ const u=`https://${w}.fandom.com/api.php?`+new URLSearchParams({format:'json',formatversion:'2',origin:'*',...params});
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),12000); if(signal) signal.addEventListener('abort',()=>ctl.abort());
+  try{ const r=await fetch(u,{signal:ctl.signal,credentials:'omit'}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } finally{ clearTimeout(t); } }
+function wikiDate(txt){ const g=k=>{ const m=String(txt).match(new RegExp('\\|\\s*'+k+'\\s*=\\s*([^\\n|]*)','i')); return m?m[1].trim():''; };
+  const y=parseInt(g('Year'),10); if(!okY(y)) return null; const mo=g('Month'); let m=parseInt(mo,10); if(!(m>=1&&m<=12)) m=MONTHN[mo.slice(0,3).toLowerCase()]||0; return {y,m}; }
+// -> {found:{y,m,src:'online',wiki,title,url}} | {candidates:[...]} (several volumes, no hint to choose) | {none:true}
+async function onlineDate(series,issue,hintTexts=[],signal){
+  const h=volHints(series,...hintTexts); let base=String(series||'').replace(/\bvol(?:ume)?\.?\s*\d+\b/ig,' ').replace(/\(.*?\)/g,' ').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim();
+  if(!base||!(issue>=0)) return {none:true}; const num=String(issue).replace(/\.0+$/,'');
+  const names=[...new Set([base,base.replace(/^the\s+/i,''),/^the\s/i.test(base)?null:'The '+base].filter(Boolean))];
+  for(const [w,label] of WIKIS){
+    let vols=h.vol?[h.vol]:[];
+    if(!h.vol) vols=[1,2,3,4,5,6,7,8,9,10,11,12].slice(0,names.length>2?16:16);   // ask for every volume at once; the wiki says which exist
+    const titles=[]; for(const n of names) for(const v of vols) titles.push(`${n} Vol ${v} ${num}`);
+    const j=await wikiApi(w,{action:'query',prop:'revisions',rvprop:'content',rvslots:'main',redirects:'1',titles:titles.slice(0,50).join('|')},signal).catch(()=>null);
+    const hits=[]; for(const pg of (j&&j.query&&j.query.pages)||[]){ if(pg.missing) continue; const c=pg.revisions&&pg.revisions[0]&&pg.revisions[0].slots.main.content; const d=c&&wikiDate(c); const vm=pg.title.match(/ Vol (\d+) /);
+      if(d) hits.push({...d,src:'online',wiki:label,title:pg.title,vol:vm?+vm[1]:0,url:`https://${w}.fandom.com/wiki/${encodeURIComponent(pg.title.replace(/ /g,'_'))}`}); }
+    const uniq=[...new Map(hits.map(x=>[x.title,x])).values()];
+    if(!uniq.length) continue;
+    if(uniq.length===1&&(h.vol||!h.year||Math.abs(uniq[0].y-h.year)<=3)) return {found:uniq[0]};
+    if(h.year){ const best=uniq.slice().sort((a,b)=>Math.abs(a.y-h.year)-Math.abs(b.y-h.year))[0]; if(Math.abs(best.y-h.year)<=3) return {found:best}; return {candidates:uniq}; }
+    if(uniq.length===1) return {found:uniq[0]};
+    return {candidates:uniq.sort((a,b)=>a.vol-b.vol)}; }
+  return {none:true}; }
 
 /* ================= page-turn style: fold in the middle for wide two-page scans ================= */
 // a page is "wide" if width > height*1.15 once black letterbox bands are ignored

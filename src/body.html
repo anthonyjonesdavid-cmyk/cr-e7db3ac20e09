@@ -5,11 +5,11 @@
     <button class="icbtn" id="rkBack" aria-label="Back to Timeline"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
     <div class="rkt"><h2 id="rkTitle">On the racks</h2><small id="rkSub"></small></div>
     <div class="rknav"><button class="icbtn" id="rkPrev" aria-label="Previous month"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn" id="rkNext" aria-label="Next month"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></div></header>
-    <div id="rkStage"><div id="rkScene"><div class="rksign"><span>ON THE RACKS</span></div><div class="rkpole"></div><div id="rkRotor"></div><div class="rkbase"></div></div>
-      <p id="rkEmpty" class="rkempty hidden">Nothing on the racks this month.<br>Use the arrows to look at nearby months.</p>
+    <div id="rkStage"><div id="rkScene"><div id="rkRotor"></div><div class="rkbase"><i></i></div></div>
+      <p id="rkEmpty" class="rkempty hidden">No comics yet — import some to fill the rack.</p>
       <button class="icbtn rkspin" id="rkLeft" aria-label="Spin left"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn rkspin" id="rkRight" aria-label="Spin right"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></section>
   <section id="timeline" class="hidden" aria-label="Timeline"><header class="tlbar"><div class="tb-row tl-row">
-      <button class="icbtn" id="tlBack" aria-label="Back to Home"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Timeline</h2><span id="tlCount" class="tlcount"></span></div>
+      <button class="icbtn" id="tlBack" aria-label="Back to Home"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Timeline</h2><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div>
       <div class="tldec" id="tlDec" aria-label="Jump to decade"></div></header><div class="scrollv" id="tlScroll"></div></section>
   <header class="topbar"><div class="tb-row">
     <button class="icbtn" id="libBack" aria-label="Back to Library"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -54,5 +54,5 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=25',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=26',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>

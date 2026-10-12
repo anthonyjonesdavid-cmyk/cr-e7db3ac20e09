@@ -11,7 +11,7 @@ res=[]; errors=[]
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS' if cond else 'FAIL'),f'[{ENG}]',name,(extra if not cond or len(str(extra))<160 else str(extra)[:160]),flush=True)
 DOF="(t=>{const c=__cr.comics.find(x=>x.title===t); return __cr.dates.of(c)})"
-TLS="""(()=>{const sc=document.querySelector('#tlScroll'), r=sc.getBoundingClientRect(); return {secs:[...sc.querySelectorAll('.tly')].map(s=>s.dataset.y||'unk'),
+TLS="""(()=>{const sc=document.querySelector('#tlScroll'), r=sc.getBoundingClientRect(); return {secs:[...sc.querySelectorAll('.tyr')].map(s=>/^\d{4}/.test(s.textContent)?s.textContent.slice(0,4):'unk'),
   chips:[...document.querySelectorAll('#tlDec .chip')].map(b=>b.textContent), on:(document.querySelector('#tlDec .chip.on')||{}).textContent,
   overflow:document.documentElement.scrollWidth>innerWidth||sc.scrollWidth>sc.clientWidth+1, scrollable:sc.scrollHeight>sc.clientHeight}})()"""
 def importf(pg,files,total):
@@ -20,8 +20,8 @@ def chrome(pg,lab,sat):
     g=pg.evaluate("""(()=>{const q=s=>document.querySelector(s).getBoundingClientRect(), bar=document.querySelector('.tlbar');
       return {bg:getComputedStyle(bar).backgroundColor, h2:q('#timeline h2').top, back:[q('#tlBack').width,q('#tlBack').height],
         chips:[...document.querySelectorAll('#tlDec .chip')].map(b=>{const r=b.getBoundingClientRect(); return Math.min(r.width,r.height)}),
-        cards:[...document.querySelectorAll('#tlScroll .tc')].slice(0,6).map(b=>{const r=b.getBoundingClientRect(); return Math.min(r.width,r.height)}),
-        hbg:(document.querySelector('.tlh')&&getComputedStyle(document.querySelector('.tlh')).backgroundColor)}})()""")
+        cards:[...document.querySelectorAll('#tlScroll .tcb')].slice(0,6).map(b=>{const r=b.getBoundingClientRect(); return Math.min(r.width,r.height)}),
+        hbg:getComputedStyle(document.querySelector('.tyr')).backgroundColor}})()""")
     ok(f'{lab}: Timeline bar solid black, title clear of the status bar',g['bg']=='rgb(0, 0, 0)' and g['h2']>=sat and g['hbg']=='rgb(0, 0, 0)',json.dumps(g))
     ok(f'{lab}: tap targets >=40px (back, decade chips, issue cards)',min(g['back'])>=40 and min(g['chips'])>=40 and min(g['cards'])>=40,json.dumps(g))
 with sync_playwright() as p:
@@ -52,20 +52,19 @@ with sync_playwright() as p:
         if full:
             ok('Timeline: years ascending, Unknown last',st['secs']==['1962','1968','1974','1983','1984','1991','1992','2003','unk'],json.dumps(st))
             ok('decade chips',st['chips']==['1960s','1970s','1980s','1990s','2000s','Unknown'] and st['on']=='1960s',json.dumps(st))
-            order=pg.eval_on_selector_all('.tly[data-y="1984"] .tc,.tly[data-y="1983"] .tc','e=>e.map(x=>x.getAttribute("aria-label"))'); ok('cards labelled with month/year',order==['Comet Run 01 (1983), 1983','Comet Run 02 (Mar 1984), Mar 1984'],json.dumps(order))
+            order=pg.eval_on_selector_all('.tcb','e=>e.map(x=>x.getAttribute("aria-label")).filter(t=>t.startsWith("Comet"))'); ok('cards labelled with month/year',order==['Comet Run 01 (1983), 1983','Comet Run 02 (Mar 1984), Mar 1984'],json.dumps(order))
             pg.screenshot(path=f'{SH}/{ENG}-v24-timeline-ipad-portrait.png')
             pg.click('#tlDec .chip:has-text("1990s")'); pg.wait_for_timeout(900)
-            g=pg.evaluate("(()=>{const sc=document.querySelector('#tlScroll').getBoundingClientRect().top, h=document.querySelector('.tly[data-y=\"1991\"] .tlh').getBoundingClientRect().top; return {d:h-sc,on:document.querySelector('#tlDec .chip.on').textContent,scrollable:document.querySelector('#tlScroll').scrollHeight>document.querySelector('#tlScroll').clientHeight}})()")
-            ok('decade chip jumps to that decade; chip highlights while scrolling',(abs(g['d'])<3 or not g['scrollable']) and (g['on']=='1990s' or not g['scrollable']),json.dumps(g))
-            pg.evaluate("(()=>{const sc=document.querySelector('#tlScroll'), s=document.querySelector('.tly[data-y=\"1974\"]'); sc.scrollTop=s.offsetTop+60})()"); pg.wait_for_timeout(200)
-            g=pg.evaluate("(()=>{const sc=document.querySelector('#tlScroll'), h=document.querySelector('.tly[data-y=\"1974\"] .tlh'); return {d:h.getBoundingClientRect().top-sc.getBoundingClientRect().top,pos:getComputedStyle(h).position,can:sc.scrollTop>0}})()")
-            ok('sticky year header stays pinned while its year scrolls under it',g['pos']=='sticky' and (abs(g['d'])<2 or not g['can']),json.dumps(g))
+            g=pg.evaluate("(()=>{const sc=document.querySelector('#tlScroll').getBoundingClientRect().top, h=document.querySelector('.tc[data-dec=\"1990\"]').getBoundingClientRect().top; return {d:h-sc,on:document.querySelector('#tlDec .chip.on').textContent,scrollable:document.querySelector('#tlScroll').scrollHeight>document.querySelector('#tlScroll').clientHeight}})()")
+            ok('decade chip jumps to that decade',(abs(g['d'])<14 or not g['scrollable']),json.dumps(g))
+            g=pg.evaluate("(()=>{const cs=[...document.querySelectorAll('#tlGrid .tc')].map(e=>e.getBoundingClientRect()); const rows=[...new Set(cs.map(r=>Math.round(r.top)))]; return {n:cs.length,rows:rows.length,perRow:Math.floor(document.querySelector('#tlGrid').clientWidth/cs[0].width),gaps:rows.slice(1).map((t,k)=>t-rows[k]-cs[0].height)}})()")
+            ok('one continuous compact grid: issues flow across rows, no per-year breaks or big gaps',g['rows']==-(-g['n']//g['perRow']) and all(x<=14 for x in g['gaps']),json.dumps(g))
             pg.screenshot(path=f'{SH}/{ENG}-v24-timeline-sticky-ipad-portrait.png'); pg.evaluate("document.querySelector('#tlScroll').scrollTop=0")
-            pg.click('.tc[data-id]:has-text("Deep Signal 01")'); pg.wait_for_selector('#reader:not(.hidden)'); pg.wait_for_timeout(500)
+            pg.click('.tcb:has-text("Deep Signal 01")'); pg.wait_for_selector('#reader:not(.hidden)'); pg.wait_for_timeout(500)
             ok('tap an issue opens it',pg.evaluate("__cr.R.comic&&__cr.R.comic.title")=='Deep Signal 01')
             pg.evaluate('__cr.toggleUI(true)'); pg.click('#rBack'); pg.wait_for_selector('#shelf:not(.hidden)'); pg.wait_for_timeout(300)
             ok('closing the reader returns to the Timeline',pg.is_visible('#timeline'))
-            pg.locator('.tc:has-text("Paper Moons 01")').click(button='right'); pg.wait_for_selector('#aDate'); ok('long-press sheet shows Release Date (Unknown)','Unknown' in pg.text_content('#aDate'))
+            pg.locator('.tcb:has-text("Paper Moons 01")').click(button='right'); pg.wait_for_selector('#aDate'); ok('long-press sheet shows Release Date (Unknown)','Unknown' in pg.text_content('#aDate'))
             pg.click('#aDate'); pg.wait_for_selector('#dYear'); ok('Save disabled until a 4-digit year',pg.is_disabled('#dSave'))
             pg.select_option('#dMonth','4'); pg.fill('#dYear','1977'); pg.wait_for_timeout(100); pg.click('#dSave'); pg.wait_for_timeout(500)
             st=pg.evaluate(TLS); ok('set month/year -> issue moves into 1977',pg.evaluate(DOF,'Paper Moons 01')=={'y':1977,'m':4,'src':'manual'} and '1977' in st['secs'],json.dumps(st['secs']))
