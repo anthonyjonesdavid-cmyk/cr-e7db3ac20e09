@@ -35,6 +35,7 @@ python3 test/gen_pdfs.py                     # original test comics -> testpdfs/
 python3 -m http.server 8823 --bind 127.0.0.1 &
 pip install playwright reportlab pillow && playwright install chromium webkit
 python3 test/e2e.py chromium --big           # or: webkit; screenshots -> shots/
-python3 test/e2e_v21.py`, `test/e2e_v24.py webkit               # panel view, sharp zoom tiles, reading lists (fixtures: test/gen_panels.py)
+python3 test/e2e_v21.py webkit               # panel view, sharp zoom tiles, reading lists, multi-select (fixtures: test/gen_panels.py)
+python3 test/e2e_v24.py webkit               # Timeline / release dates, 4 sizes standalone (fixtures: test/gen_dates.py)
 ```
 See CHANGELOG.md for the history.
