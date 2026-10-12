@@ -19,12 +19,15 @@ function titleFromName(n){ return n.replace(/\.pdf$/i,'').replace(/_+/g,' ').rep
 
 /* ================= IndexedDB ================= */
 let dbp=null;
-function db(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ const r=indexedDB.open('comic-reader',2);   // v2: + reading lists ('queues')
+function db(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ const r=indexedDB.open('comic-reader',3);   // v2: + reading lists ('queues'); v3: + per-file overrides ('overrides': manual dates)
   r.onupgradeneeded=()=>{ const d=r.result; if(!d.objectStoreNames.contains('comics')) d.createObjectStore('comics',{keyPath:'id'}); if(!d.objectStoreNames.contains('chunks')) d.createObjectStore('chunks',{keyPath:['id','i']});
-    if(!d.objectStoreNames.contains('queues')) d.createObjectStore('queues',{keyPath:'id'}); };
+    if(!d.objectStoreNames.contains('queues')) d.createObjectStore('queues',{keyPath:'id'}); if(!d.objectStoreNames.contains('overrides')) d.createObjectStore('overrides',{keyPath:'k'}); };
   r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); return dbp; }
 const req2p=r=>new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
 const txDone=t=>new Promise((res,rej)=>{ t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('aborted')); });
+async function ovAll(){ const d=await db(); return req2p(d.transaction('overrides').objectStore('overrides').getAll()); }
+async function ovPut(rec){ const d=await db(); const t=d.transaction('overrides','readwrite'); t.objectStore('overrides').put(rec); return txDone(t); }
+async function ovDel(k){ const d=await db(); const t=d.transaction('overrides','readwrite'); t.objectStore('overrides').delete(k); return txDone(t); }
 async function dbAll(){ const d=await db(); return req2p(d.transaction('comics').objectStore('comics').getAll()); }
 async function dbPut(rec){ const d=await db(); const t=d.transaction('comics','readwrite'); t.objectStore('comics').put(rec); return txDone(t); }
 async function dbPutChunk(id,i,data){ const d=await db(); const t=d.transaction('chunks','readwrite'); t.objectStore('chunks').put({id,i,data}); return txDone(t); }
@@ -123,7 +126,40 @@ async function coverMeta(doc,mode='auto'){
   const page=await doc.getPage(1); const vp=page.getViewport({scale:1}); const cv=await makeCover(page,mode); page.cleanup();
   let aspect=vp.width/vp.height;
   if(cv.wide&&doc.numPages>1){ try{ const p2=await doc.getPage(2); const v2=p2.getViewport({scale:1}); aspect=v2.width/v2.height; p2.cleanup(); }catch(e){} }
-  return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect}; }
+  let metaDate=null; try{ metaDate=await pdfDate(doc); }catch(e){}
+  return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect,metaDate,dateV:DATE_V}; }
+
+/* ================= release dates (Timeline) =================
+   Order of trust: manual (set by David) > embedded metadata (ComicInfo.xml attached to the PDF, XMP prism:coverDate /
+   publicationDate) > a year in the file name or title ("(1983)", "(Mar 1983)", "1983-03") > built-in table of well-known
+   series (estimate from #1's cover date + monthly cadence) > Unknown.  PDF CreationDate/ModDate are NOT used: they are the
+   scan/export date, not the cover date. */
+const DATE_V=1, MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const okY=y=>y>=1930&&y<=2039;
+const monOf=t=>{ const i=MON.indexOf(String(t||'').slice(0,3).toLowerCase()); return i<0?0:i+1; };
+function dateFromName(n){ const s=String(n||'').replace(/_/g,' ');
+  let m=s.match(/[([]\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s,-]*((?:19|20)\d\d)\s*[)\]]/i); if(m&&okY(+m[2])) return {y:+m[2],m:monOf(m[1]),src:'name'};
+  m=s.match(/[([]\s*((?:19|20)\d\d)[-./](0?[1-9]|1[0-2])\s*[)\]]/); if(m&&okY(+m[1])) return {y:+m[1],m:+m[2],src:'name'};
+  m=s.match(/[([]\s*((?:19|20)\d\d)\s*[)\]]/); if(m&&okY(+m[1])) return {y:+m[1],m:0,src:'name'};
+  m=s.match(/(?:^|[\s-])((?:19|20)\d\d)-(0[1-9]|1[0-2])(?:[\s-]|$)/); if(m&&okY(+m[1])) return {y:+m[1],m:+m[2],src:'name'};
+  return null; }
+function comicInfoDate(xml){ const g=k=>{ const m=String(xml).match(new RegExp('<'+k+'>\\s*(\\d+)\\s*</'+k+'>','i')); return m?+m[1]:0; };
+  const y=g('Year'), m=g('Month'); return okY(y)?{y,m:m>=1&&m<=12?m:0,src:'meta'}:null; }
+function isoDate(v,src){ const m=String(v||'').match(/((?:19|20)\d\d)(?:-(\d\d))?/); return m&&okY(+m[1])?{y:+m[1],m:m[2]&&+m[2]<=12?+m[2]:0,src}:null; }
+async function pdfDate(doc){
+  try{ const at=await doc.getAttachments(); if(at) for(const k in at){ const a=at[k]; if(/comicinfo\.xml$/i.test(a.filename||k)){ const d=comicInfoDate(new TextDecoder().decode(a.content)); if(d) return d; } } }catch(e){}
+  try{ const md=await doc.getMetadata(); const x=md&&md.metadata;
+    if(x) for(const k of ['prism:coverdate','prism:coverDate','prism:publicationdate','prism:publicationDate']){ const v=x.get(k); const d=v&&isoDate(v,'meta'); if(d) return d; }
+    const raw=md&&md.metadata&&md.metadata.getRaw&&md.metadata.getRaw(); if(raw){ const m=raw.match(/prism:(?:coverDate|publicationDate)[^>]*>\s*([^<]+)/i)||raw.match(/prism:(?:coverDate|publicationDate)="([^"]+)"/i); const d=m&&isoDate(m[1],'meta'); if(d) return d; }
+    const ci=md&&md.info&&md.info.Custom; if(ci){ const y=+ci.Year||0, mo=+ci.Month||0; if(okY(y)) return {y,m:mo>=1&&mo<=12?mo:0,src:'meta'}; } }catch(e){}
+  return null; }
+// well-known series: cover date of #1, issues per year (estimate; shown with "≈"). Names matched case-insensitively, "The" ignored.
+const SERIES_DATES=[['amazing spider-man',1963,3,12],['fantastic four',1961,11,12],['x-men',1963,9,12],['uncanny x-men',1963,9,12],['avengers',1963,9,12],
+  ['daredevil',1964,4,12],['incredible hulk',1962,5,12],['watchmen',1986,9,12],['sandman',1989,1,12],['preacher',1995,4,12],['transmetropolitan',1997,9,12],
+  ['y the last man',2002,9,12],['walking dead',2003,10,12],['saga',2012,3,12],['invincible',2003,1,12],['hellblazer',1988,1,12]];
+const normSeries=s=>String(s||'').toLowerCase().replace(/\(.*?\)/g,' ').replace(/[:,.!']/g,' ').replace(/^\s*the\s+/,'').replace(/\s+/g,' ').trim();
+function lookupDate(series,issue){ const n=normSeries(series); if(!n||!(issue>=1)) return null; const r=SERIES_DATES.find(x=>x[0]===n); if(!r) return null;
+  const idx=(r[2]-1)+Math.round((Math.floor(issue)-1)*12/r[3]); return {y:r[1]+Math.floor(idx/12),m:idx%12+1,src:'lookup'}; }
 
 /* ================= page-turn style: fold in the middle for wide two-page scans ================= */
 // a page is "wide" if width > height*1.15 once black letterbox bands are ignored

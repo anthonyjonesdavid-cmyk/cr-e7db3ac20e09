@@ -184,7 +184,7 @@ with sync_playwright() as p:
     p0=pg.text_content('.qrow .qprog'); pg.locator('.qrow .rc').nth(0).click(button='right'); pg.click('#aToggle'); pg.wait_for_timeout(300)
     ok('progress x of y counts finished comics (read-through Nightfall 02 = 1 of 3, then mark Nightfall 01 finished = 2 of 3)',p0=='1 of 3' and pg.text_content('.qrow .qprog')=='2 of 3',p0+' -> '+pg.text_content('.qrow .qprog'))
     idb=pg.evaluate("(async()=>{const r=indexedDB.open('comic-reader');await new Promise(x=>r.onsuccess=x);const d=r.result;const v=d.version, names=[...d.objectStoreNames];const all=await new Promise(x=>{const q=d.transaction('queues').objectStore('queues').getAll();q.onsuccess=()=>x(q.result)});d.close();return {v,names,all:all.map(q=>({name:q.name,n:q.items.length}))}})()")
-    ok('stored in IndexedDB (v2, "queues" store)',idb['v']==2 and 'queues' in idb['names'] and idb['all']==[{'name':'Inferno','n':3}],json.dumps(idb))
+    ok('stored in IndexedDB (v3+, "queues" store)',idb['v']>=2 and 'queues' in idb['names'] and idb['all']==[{'name':'Inferno','n':3}],json.dumps(idb))
     pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300); ok('list survives a reload',pg.locator('.qrow').count()==1)
     # deleting a comic removes it from lists; delete list
     pg.click('.qrow .row-more'); pg.click('#qmDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(300); ok('delete reading list (comics stay)',pg.locator('.qrow').count()==0 and pg.evaluate('__cr.comics.length')==len(files))

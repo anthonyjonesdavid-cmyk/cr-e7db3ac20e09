@@ -15,6 +15,7 @@ An offline comic reader for PDF comics. You import PDFs with the iPad file picke
 - Tap the edges to turn pages. Tap the center to show or hide the slim, solid toolbars (title, back to shelf, a page scrubber with a thumbnail preview, a page grid, and "page x of y").
 - Guided panel view: double-tap a panel to zoom to it, then swipe panel by panel in reading order, across page turns. Panels are found on the device with a recursive XY-cut over the gutters, and pages without gutters are split into thirds. Double-tap again or tap Full Page to leave. It can be turned off in Settings.
 - Sharp zoom: when a zoom settles, the visible region is redrawn from the PDF at devicePixelRatio × zoom.
+- Timeline by release date (metadata / file name / built-in series table / manual)
 - Multi-select with Move to Series… / Remove from Series (manual series survive re-import)
 - Reading lists: named reading orders across series, each with a Home row and progress. The end-of-comic card follows the list when the comic was opened from it.
 - Per-comic right-to-left (manga) mode. The app remembers your last page in each comic, including after a reload.
@@ -34,6 +35,6 @@ python3 test/gen_pdfs.py                     # original test comics -> testpdfs/
 python3 -m http.server 8823 --bind 127.0.0.1 &
 pip install playwright reportlab pillow && playwright install chromium webkit
 python3 test/e2e.py chromium --big           # or: webkit; screenshots -> shots/
-python3 test/e2e_v21.py webkit               # panel view, sharp zoom tiles, reading lists (fixtures: test/gen_panels.py)
+python3 test/e2e_v21.py`, `test/e2e_v24.py webkit               # panel view, sharp zoom tiles, reading lists (fixtures: test/gen_panels.py)
 ```
 See CHANGELOG.md for the history.

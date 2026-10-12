@@ -21,6 +21,8 @@ const IC={
   arrange:'<svg class="i" viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h11M19 4v16M16.5 6.5 19 4l2.5 2.5M16.5 17.5 19 20l2.5-2.5"/></svg>',
   merge:'<svg class="i" viewBox="0 0 24 24"><path d="M6 3v6a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 3v6a6 6 0 0 1-6 6"/></svg>',
   list:'<svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3"/></svg>',
+  clock:'<svg class="i" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M7 9v6M12 7v10M17 9v6"/></svg>',
+  cal:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   grid:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 10h18M12 10v11"/></svg>',
 };
 function cover(c){ if(!c.cover) return ''; let u=coverURL.get(c.id); if(!u){ u=URL.createObjectURL(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); coverURL.set(c.id,u); } return u; }
@@ -43,8 +45,8 @@ const autoSeriesOf=c=>c.autoSeries!=null?c.autoSeries:seriesGuess(titleFromName(
 function setSeriesManual(c,to){ c.series=to; c.seriesManual=true; const ov=seriesOv(); fileKeys(c).forEach(k=>ov[k]=to); store.set('seriesOv',ov); }
 function clearSeriesManual(c){ c.series=autoSeriesOf(c); delete c.seriesManual; const ov=seriesOv(); fileKeys(c).forEach(k=>delete ov[k]); store.set('seriesOv',ov); }
 // new record (Files or Drive import): remember the automatic series, then apply a saved manual series for this file
-function withSeriesOverride(rec){ rec.autoSeries=rec.series||''; const ov=seriesOv(), k=fileKeys(rec).find(k=>k in ov); if(k!=null){ rec.series=ov[k]; rec.seriesManual=true; } return rec; }
-async function loadLibrary(){ comics=await dbAll(); try{ queues=await qAll(); }catch(e){ console.warn('reading lists unavailable',e); queues=[]; } renderShelf(); setTimeout(migrateCovers,400); kickBlack(5000); }
+function withSeriesOverride(rec){ applyDateOv(rec); rec.autoSeries=rec.series||''; const ov=seriesOv(), k=fileKeys(rec).find(k=>k in ov); if(k!=null){ rec.series=ov[k]; rec.seriesManual=true; } return rec; }
+async function loadLibrary(){ comics=await dbAll(); try{ dateOv=new Map((await ovAll()).filter(o=>o.date).map(o=>[o.k,o.date])); }catch(e){ dateOv=new Map(); } comics.forEach(applyDateOv); try{ queues=await qAll(); }catch(e){ console.warn('reading lists unavailable',e); queues=[]; } renderShelf(); setTimeout(migrateCovers,400); kickBlack(5000); setTimeout(backfillDates,2500); }
 /* ---- background blank-black page detection, cached per comic (c.blackPages, c.blackV) ----
    newest-read first, one comic at a time, idle-paced; while a comic is open only that comic is scanned */
 const needsBlack=c=>c.blackV!==BLACK_V;
@@ -79,9 +81,9 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
 // app launch / restore from the back-forward cache: back to Home (no series page, no search), at the top
-function launchHome(){ ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
+function launchHome(){ closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
-function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); }
+function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); scopeUI(); if(t==='home') CF.size(); else SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
@@ -179,7 +181,7 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${rows}</div>`;
+  const tr=tlRange(); el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="hlinks"><button class="hlink" data-act="timeline" id="tlOpen">${IC.clock}<span>Timeline</span>${tr?`<small>${tr}</small>`:''}${IC.chev}</button></div><div class="rows">${rows}</div>`;
   CF.mount($('#cf'),cf);
 }
 
@@ -292,6 +294,7 @@ shelfEl.addEventListener('contextmenu',e=>{ e.preventDefault(); if(SEL.on) retur
 shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefault(); e.stopPropagation(); return; }
   const a=e.target.closest('[data-act]'); if(!a) return; const k=a.dataset.act;
   if(SEL.on&&a.classList.contains('lc')){ e.preventDefault(); e.stopPropagation(); toggleSel(a.dataset.id); return; }
+  if(k==='timeline'){ openTimeline(); return; }
   if(k==='open') openReader(a.dataset.id,a.dataset.q?{queue:a.dataset.q}:{queue:null}); else if(k==='qedit') editQueue(a.dataset.q); else if(k==='qmenu') queueMenu(a,a.dataset.q); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
   else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope') unscope();
   else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
@@ -318,10 +321,11 @@ async function actionSheet(id){ const c=comics.find(x=>x.id===id); if(!c) return
     <button class="act" data-r="read" id="aRead">${IC.book}${c.lastRead&&!isDone(c)?'Continue Reading':'Read'}</button>
     <button class="act" data-r="queue" id="aQueue">${IC.list}Add to Reading List…</button>
     <button class="act" data-r="edit" id="aEdit">${IC.edit}Edit Title &amp; Series</button>
+    <button class="act" data-r="date" id="aDate">${IC.cal}Release Date<small class="actv">${esc(fmtDate(dateOf(c)))}</small></button>
     <button class="act" data-r="toggle" id="aToggle">${isDone(c)?IC.undo+'Mark as Unread':IC.done+'Mark as Finished'}</button>
     <button class="act red" data-r="delete" id="aDelete">${IC.trash}Delete from Device</button></div>
     <button class="cancel" data-r="cancel">Cancel</button>`,null,'sheet');
-  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='delete') deleteComic(id);
+  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id);
   else if(r==='toggle'){ if(isDone(c)){ c.progress=0; c.page=0; c.lastRead=0; } else { c.progress=1; } await dbPut(c); renderShelf(); } }
 async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   const series=[...new Set(comics.map(x=>x.series).filter(Boolean))].sort();
@@ -443,6 +447,49 @@ async function openSettings(){
     const rs=w.querySelector('#sFolderReset'); if(rs) rs.onclick=()=>{ Drive.setFolder(null); rs.remove(); cur(); toast('Using the default Drive folder'); }; });
   if(r==='merge'){ mergeSeries(); return; } if(r==='arrange'){ arrangeRows(); return; }
   if(r==='persist'){ try{ const ok=await navigator.storage.persist(); toast(ok?'Storage marked persistent':'The browser declined for now. It often allows it in the Home Screen app.'); }catch(e){ toast('Not supported here'); } } }
+
+/* ---------- release dates + Timeline ---------- */
+let dateOv=new Map();   // file key -> {y,m}: manual dates (IndexedDB 'overrides'), re-applied when the same file is imported again
+function applyDateOv(c){ const k=fileKeys(c).find(k=>dateOv.has(k)); if(k) c.dateManual=dateOv.get(k); return c; }
+function dateOf(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.metaDate&&c.metaDate.y) return c.metaDate;
+  return dateFromName(c.fileName)||dateFromName(c.title)||lookupDate(c.series,issueNo(c.title))||null; }
+async function setDate(c,d){ if(d) c.dateManual={y:d.y,m:d.m||0}; else delete c.dateManual;
+  for(const k of fileKeys(c)){ if(d){ dateOv.set(k,c.dateManual); await ovPut({k,date:c.dateManual}); } else { dateOv.delete(k); await ovDel(k); } }
+  await dbPut(c); renderShelf(); }
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const fmtDate=d=>d?`${d.src==='lookup'?'≈ ':''}${d.m?MONTHS[d.m-1].slice(0,3)+' ':''}${d.y}`:'Unknown';
+const SRC_TXT={manual:'Set by you',meta:'From the file’s metadata',name:'From the file name',lookup:'Estimated from series history'};
+// comics imported before v24: read embedded dates once, idle-paced
+async function backfillDates(){ for(const c of comics){ if(c.dateV===DATE_V||R&&R.comic) continue; let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); c.metaDate=await pdfDate(doc); }catch(e){} finally{ try{ doc&&await doc.destroy(); }catch(e){} }
+  c.dateV=DATE_V; await dbPut(c); if(c.metaDate&&TL.on) renderTimeline(); await new Promise(r=>setTimeout(r,120)); } }
+function dateSheet(id){ const c=comics.find(x=>x.id===id); if(!c) return; const d=dateOf(c); document.querySelector('.mwrap')?.remove();
+  return modal(`<div class="mh"><h3>Release Date</h3><p class="dlsub">${esc(c.title)} · ${d?esc(fmtDate(d))+' — '+SRC_TXT[d.src]:'Unknown'}</p></div><div class="mb">
+    <div class="dtrow"><label class="fld"><span>Month</span><select id="dMonth"><option value="0">—</option>${MONTHS.map((m,i)=>`<option value="${i+1}"${d&&d.m===i+1?' selected':''}>${m}</option>`).join('')}</select></label>
+    <label class="fld"><span>Year</span><input type="text" id="dYear" inputmode="numeric" maxlength="4" placeholder="1983" value="${d?d.y:''}" autocomplete="off"></label></div></div>
+    <div class="mf">${c.dateManual?'<button class="btn ghost" data-r="clear" id="dClear">Automatic</button>':''}<button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="save" id="dSave">Save</button></div>`,
+  w=>{ const y=w.querySelector('#dYear'), b=w.querySelector('#dSave'); const sync=()=>{ const v=+y.value; const ok=/^\d{4}$/.test(y.value)&&v>=1900&&v<=2100; if(b.disabled!==!ok) b.disabled=!ok; };
+    y.addEventListener('input',sync); y.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!b.disabled){ e.preventDefault(); b.click(); } }); sync();
+    w._vals=()=>({y:+y.value,m:+w.querySelector('#dMonth').value}); }).then(async({r,vals})=>{ if(r==='save') await setDate(c,vals); else if(r==='clear') await setDate(c,null); }); }
+const TL={on:false};
+function tlGroups(){ const by=new Map(), unk=[]; comics.forEach(c=>{ const d=dateOf(c); if(d){ if(!by.has(d.y)) by.set(d.y,[]); by.get(d.y).push({c,d}); } else unk.push(c); });
+  const years=[...by.keys()].sort((a,b)=>a-b); years.forEach(y=>by.get(y).sort((a,b)=>(a.d.m||13)-(b.d.m||13)||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)));
+  return {by,years,unk:unk.sort((a,b)=>(a.series||a.title).localeCompare(b.series||b.title)||byIssue(a,b))}; }
+function tlRange(){ const {years}=tlGroups(); return years.length?(years[0]===years.at(-1)?String(years[0]):`${years[0]} – ${years.at(-1)}`):''; }
+function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,years,unk}=tlGroups(), st=el.scrollTop;
+  const card=(c,d)=>`<button class="tc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}${d?', '+esc(fmtDate(d)):''}">${coverBox(c)}<span class="tt">${esc(c.title)}</span><span class="td${d&&d.src==='lookup'?' est':''}">${d?esc(d.m?MONTHS[d.m-1].slice(0,3):'—')+(d.src==='lookup'?' ≈':''):'Set date'}</span></button>`;
+  const decades=[...new Set(years.map(y=>Math.floor(y/10)*10))];
+  $('#tlDec').innerHTML=decades.map(d=>`<button class="chip" data-dec="${d}">${d}s</button>`).join('')+(unk.length?'<button class="chip" data-dec="unk">Unknown</button>':'');
+  el.innerHTML=years.map(y=>`<section class="tly" data-y="${y}" data-dec="${Math.floor(y/10)*10}"><h3 class="tlh">${y}<small>${by.get(y).length} issue${by.get(y).length===1?'':'s'}</small></h3><div class="tlg">${by.get(y).map(x=>card(x.c,x.d)).join('')}</div></section>`).join('')
+    +(unk.length?`<section class="tly" data-dec="unk" id="tlUnk"><h3 class="tlh">Unknown date<small>${unk.length} · long-press to set</small></h3><div class="tlg">${unk.map(c=>card(c,null)).join('')}</div></section>`:'')
+    +(!comics.length?'<p class="qempty">No comics yet.</p>':'');
+  $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
+function tlSpy(){ const el=$('#tlScroll'), top=el.getBoundingClientRect().top+4; let cur=null; for(const s of el.querySelectorAll('.tly')){ if(s.getBoundingClientRect().top<=top+40) cur=s.dataset.dec; else break; }
+  if(cur==null){ const f=el.querySelector('.tly'); cur=f&&f.dataset.dec; } $('#tlDec').querySelectorAll('.chip').forEach(b=>{ const on=b.dataset.dec===cur; if(b.classList.contains('on')!==on){ b.classList.toggle('on',on); if(on) b.scrollIntoView({inline:'nearest',block:'nearest'}); } }); }
+function openTimeline(){ TL.on=true; $('#timeline').classList.remove('hidden'); $('#tlScroll').scrollTop=0; renderTimeline(); }
+function closeTimeline(){ TL.on=false; $('#timeline').classList.add('hidden'); }
+$('#tlBack').addEventListener('click',closeTimeline);
+$('#tlScroll').addEventListener('scroll',()=>requestAnimationFrame(tlSpy),{passive:true});
+$('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tly[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:s.offsetTop,behavior:'smooth'}); });
 
 /* ---------- multi-select (Library and series pages): Select -> tap covers -> Move to Series… / Remove from Series ---------- */
 const SEL={on:false,ids:new Set()};

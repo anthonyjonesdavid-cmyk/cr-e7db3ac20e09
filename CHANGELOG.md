@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v24 — 2026-10-12
+- **Timeline**: every issue arranged by original cover/release date, oldest first, with sticky year headers, decade jump chips (highlight follows scrolling) and an "Unknown date" section last. Tap an issue to open it; closing the reader returns to the Timeline. Compact **Timeline** entry on Home under the carousel, showing the year range.
+- **How dates are found** (first match wins): date you set by hand → embedded metadata (ComicInfo.xml attached to the PDF, XMP `prism:coverDate` / `prism:publicationDate`, Info Year/Month) → year in the file name/title (`(1983)`, `(Mar 1984)`, `(1983-04)`) → built-in offline table of well-known series (estimated from #1's cover date + monthly cadence, shown with ≈) → Unknown. PDF CreationDate/ModDate are ignored (they're scan/export dates).
+- **Release Date…** in the long-press sheet: set month (optional) + year, or go back to Automatic. Stored in IndexedDB (DB v3, new `overrides` store, keyed by file) so it survives delete + re-import and Drive re-sync.
+- Comics imported before v24 get their embedded dates read once in the background.
+
 ## cr-v23 — 2026-10-10
 - **Multi-select** on the Library and series pages: **Select** in the top bar, tap covers to check, Select All / Select None, live count; solid black selection bar with 40px+ targets (compact labels on iPhone).
 - **Move to Series…**: pick an existing series or create a new one with a name and optional volume (e.g. “Uncanny X-Men” + 2 → “Uncanny X-Men Vol. 2”). Moved issues keep progress, reading lists, blank-page and panel caches; Home rows, series carousel and issue order update; an emptied series disappears (its open series page follows the comics).
