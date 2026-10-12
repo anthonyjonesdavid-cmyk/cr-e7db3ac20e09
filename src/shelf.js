@@ -23,6 +23,7 @@ const IC={
   list:'<svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3"/></svg>',
   clock:'<svg class="i" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M7 9v6M12 7v10M17 9v6"/></svg>',
   cal:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  rack:'<svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg>',
   grid:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 10h18M12 10v11"/></svg>',
 };
 function cover(c){ if(!c.cover) return ''; let u=coverURL.get(c.id); if(!u){ u=URL.createObjectURL(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); coverURL.set(c.id,u); } return u; }
@@ -81,7 +82,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
 // app launch / restore from the back-forward cache: back to Home (no series page, no search), at the top
-function launchHome(){ closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
+function launchHome(){ closeRack(); closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
@@ -295,6 +296,7 @@ shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefau
   const a=e.target.closest('[data-act]'); if(!a) return; const k=a.dataset.act;
   if(SEL.on&&a.classList.contains('lc')){ e.preventDefault(); e.stopPropagation(); toggleSel(a.dataset.id); return; }
   if(k==='timeline'){ openTimeline(); return; }
+  if(k==='rack'){ openRack(+a.dataset.ym); return; }
   if(k==='open') openReader(a.dataset.id,a.dataset.q?{queue:a.dataset.q}:{queue:null}); else if(k==='qedit') editQueue(a.dataset.q); else if(k==='qmenu') queueMenu(a,a.dataset.q); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
   else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope') unscope();
   else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
@@ -479,7 +481,7 @@ function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,ye
   const card=(c,d)=>`<button class="tc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}${d?', '+esc(fmtDate(d)):''}">${coverBox(c)}<span class="tt">${esc(c.title)}</span><span class="td${d&&d.src==='lookup'?' est':''}">${d?esc(d.m?MONTHS[d.m-1].slice(0,3):'—')+(d.src==='lookup'?' ≈':''):'Set date'}</span></button>`;
   const decades=[...new Set(years.map(y=>Math.floor(y/10)*10))];
   $('#tlDec').innerHTML=decades.map(d=>`<button class="chip" data-dec="${d}">${d}s</button>`).join('')+(unk.length?'<button class="chip" data-dec="unk">Unknown</button>':'');
-  el.innerHTML=years.map(y=>`<section class="tly" data-y="${y}" data-dec="${Math.floor(y/10)*10}"><h3 class="tlh">${y}<small>${by.get(y).length} issue${by.get(y).length===1?'':'s'}</small></h3><div class="tlg">${by.get(y).map(x=>card(x.c,x.d)).join('')}</div></section>`).join('')
+  el.innerHTML=years.map(y=>`<section class="tly" data-y="${y}" data-dec="${Math.floor(y/10)*10}"><h3 class="tlh">${y}<small>${by.get(y).length} issue${by.get(y).length===1?'':'s'}</small><button class="rkbtn" data-act="rack" data-ym="${rackCenter(by.get(y))}" aria-label="Spinner rack, ${y}">${IC.rack}</button></h3><div class="tlg">${by.get(y).map(x=>card(x.c,x.d)).join('')}</div></section>`).join('')
     +(unk.length?`<section class="tly" data-dec="unk" id="tlUnk"><h3 class="tlh">Unknown date<small>${unk.length} · long-press to set</small></h3><div class="tlg">${unk.map(c=>card(c,null)).join('')}</div></section>`:'')
     +(!comics.length?'<p class="qempty">No comics yet.</p>':'');
   $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
@@ -490,6 +492,65 @@ function closeTimeline(){ TL.on=false; $('#timeline').classList.add('hidden'); }
 $('#tlBack').addEventListener('click',closeTimeline);
 $('#tlScroll').addEventListener('scroll',()=>requestAnimationFrame(tlSpy),{passive:true});
 $('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tly[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:s.offsetTop,behavior:'smooth'}); });
+
+/* ---------- spinner rack (v25): the issues that were "on the racks" around a month ---------- */
+const ymOf=d=>d.y*12+((d.m||6)-1);            // year-only dates count as June
+const ymLabel=i=>`${MONTHS[i%12].slice(0,3)} ${Math.floor(i/12)}`;
+function rackCenter(list){ const v=list.map(x=>ymOf(x.d)).sort((a,b)=>a-b); return v[Math.floor((v.length-1)/2)]; }
+const RK={on:false,ym:0,win:2,items:[],N:4,T:4,C:2,a:0,v:0,raf:0,drag:null,step:90};
+const rmq=matchMedia('(prefers-reduced-motion: reduce)'); const reduced=()=>rmq.matches;
+function rackItems(ym){ const all=comics.map(c=>({c,d:dateOf(c)})).filter(x=>x.d).map(x=>({...x,i:ymOf(x.d)}));
+  let w=2, L=[]; for(;w<=6;w++){ L=all.filter(x=>Math.abs(x.i-ym)<=w); if(L.length>=6) break; } w=Math.min(w,6);
+  L.sort((a,b)=>a.i-b.i||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)); return {w,L}; }
+function rackLayout(){ const st=$('#rkStage'), W=st.clientWidth, H=st.clientHeight, T=RK.T;
+  const sign=Math.max(26,H*.05), base=Math.max(30,H*.06), gap=Math.max(6,W*.008);
+  let ph=(H*.9-sign-base)/T-gap, pw=ph/1.54; const fw0=RK.C*pw+(RK.C+1)*gap, maxF=Math.min(W*.62,560); if(fw0>maxF){ const k=maxF/fw0; pw*=k; ph*=k; }
+  const fw=RK.C*pw+(RK.C+1)*gap, r=fw/2/Math.tan(Math.PI/RK.N);
+  const sc=$('#rkScene'); sc.style.setProperty('--n',RK.N); Object.entries({'--pw':pw+'px','--ph':ph+'px','--gap':gap+'px','--fw':fw+'px','--r':r+'px','--sign':sign+'px','--base':base+'px','--fh':(T*(ph+gap)+gap)+'px'}).forEach(([k,v])=>sc.style.setProperty(k,v));
+  st.style.perspective=Math.max(900,r*5)+'px'; }
+function renderRack(){ const {w,L}=rackItems(RK.ym); RK.win=w; RK.items=L.map(x=>x.c); const per=RK.T*RK.C, n=L.length;
+  RK.N=Math.min(8,Math.max(4,Math.ceil(n/per))); RK.step=360/RK.N; RK.a=0; RK.v=0;
+  $('#rkTitle').textContent=`On the racks · ${ymLabel(RK.ym)}`;
+  const sh=i=>innerWidth<560?`${MONTHS[i%12].slice(0,3)} ’${String(Math.floor(i/12)).slice(2)}`:ymLabel(i);
+  $('#rkSub').textContent=n?`${n} issue${n===1?'':'s'} · ${sh(RK.ym-w)} – ${sh(RK.ym+w)}${w>2&&innerWidth>=560?' (widened)':''}`:'Nothing dated near this month';
+  const shown=L.slice(0,RK.N*per); let h='';
+  for(let f=0;f<RK.N;f++){ let pk=''; for(let t=0;t<RK.T;t++) for(let k=0;k<RK.C;k++){ const x=shown[f*per+t*RK.C+k];   // fill face by face so the front face is full
+      pk+=x?`<div class="pk" style="--t:${t};--k:${k}"><button class="pkc" data-rk="${x.c.id}" aria-label="${esc(x.c.title)}, ${esc(fmtDate(x.d))}"><img src="${cover(x.c)}" alt="" draggable="false"></button></div>`:`<div class="pk empty" style="--t:${t};--k:${k}"></div>`; }
+    h+=`<div class="rf" style="--f:${f}">${pk}</div>`; }
+  $('#rkRotor').innerHTML=h; $('#rkEmpty').classList.toggle('hidden',n>0); rackLayout(); rackApply(); }
+function rackApply(){ $('#rkRotor').style.transform=`translateZ(calc(var(--r) * -1)) rotateY(${RK.a}deg)`; const f=((Math.round(-RK.a/RK.step)%RK.N)+RK.N)%RK.N; RK.front=f;
+  // hide faces turned away and order the rest by depth in JS too, so the rack draws correctly even where backface-visibility / 3D depth sorting is flaky
+  $('#rkRotor').querySelectorAll('.rf').forEach((e,i)=>{ e.classList.toggle('front',i===f); const c=Math.cos((i*RK.step+RK.a)*Math.PI/180), vis=c>-0.02;
+    if(e._v!==vis){ e._v=vis; e.style.visibility=vis?'':'hidden'; } const z=Math.round(c*100)+100; if(e._z!==z){ e._z=z; e.style.zIndex=z; } }); }
+function rackSnap(){ cancelAnimationFrame(RK.raf); const tgt=Math.round(RK.a/RK.step)*RK.step;
+  if(reduced()){ RK.a=tgt; RK.v=0; rackApply(); return; } const a0=RK.a, t0=performance.now(), D=320;
+  const f=t=>{ const k=Math.min(1,(t-t0)/D), e=1-Math.pow(1-k,3); RK.a=a0+(tgt-a0)*e; rackApply(); if(k<1) RK.raf=requestAnimationFrame(f); else RK.raf=0; }; RK.raf=requestAnimationFrame(f); }
+function rackCoast(){ cancelAnimationFrame(RK.raf); let last=performance.now();
+  const f=t=>{ const dt=Math.min(40,t-last); last=t; RK.a+=RK.v*dt; RK.v*=Math.pow(.925,dt/16); rackApply(); if(Math.abs(RK.v)>.02) RK.raf=requestAnimationFrame(f); else { RK.raf=0; rackSnap(); } };
+  RK.raf=requestAnimationFrame(f); }
+function rackSpin(dir){ cancelAnimationFrame(RK.raf); RK.raf=0; const t=Math.round(RK.a/RK.step)*RK.step+dir*RK.step; if(reduced()){ RK.a=t; rackApply(); } else rackSnapTo(t); }
+function rackSnapTo(t){ cancelAnimationFrame(RK.raf); const a0=RK.a,t0=performance.now(),D=420; const f=x=>{ const k=Math.min(1,(x-t0)/D), e=1-Math.pow(1-k,3); RK.a=a0+(t-a0)*e; rackApply(); if(k<1) RK.raf=requestAnimationFrame(f); else RK.raf=0; }; RK.raf=requestAnimationFrame(f); }
+function openRack(ym){ if(!(ym>0)) return; RK.on=true; RK.ym=ym; $('#rack').classList.remove('hidden'); renderRack(); }
+function closeRack(){ RK.on=false; cancelAnimationFrame(RK.raf); RK.raf=0; const r=$('#rack'); if(r){ r.classList.add('hidden'); $('#rkRotor').innerHTML=''; } document.querySelectorAll('.rkpull').forEach(e=>e.remove()); }
+function rackPull(btn){ if(RK.pulling||(R&&R.comic)) return; const id=btn.dataset.rk, img=btn.querySelector('img'), r=img.getBoundingClientRect();
+  if(reduced()||!r.width){ RK.pulling=id; openReader(id); setTimeout(()=>RK.pulling=null,400); return; }
+  const cl=document.createElement('img'); cl.className='rkpull'; cl.src=img.src; Object.assign(cl.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'}); document.body.appendChild(cl);
+  btn.classList.add('pulled'); const W=innerWidth,H=innerHeight, s=Math.min(W*.7/r.width,H*.7/r.height), dx=W/2-(r.left+r.width/2), dy=H/2-(r.top+r.height/2);
+  cl.getBoundingClientRect(); cl.style.transform=`translate(${dx}px,${dy-r.height*.15}px) translateZ(0) scale(${s})`; RK.pulling=id;
+  setTimeout(()=>{ openReader(id); setTimeout(()=>{ cl.remove(); btn.classList.remove('pulled'); RK.pulling=null; },400); },380); }
+{ const st=$('#rkStage');
+  st.addEventListener('pointerdown',e=>{ if(e.button>0||e.target.closest('.rkspin')) return; cancelAnimationFrame(RK.raf); RK.raf=0; RK.v=0; RK.drag={x:e.clientX,y:e.clientY,a:RK.a,t:performance.now(),lx:e.clientX,moved:false,id:e.pointerId,tgt:e.target.closest('.pkc')}; try{ st.setPointerCapture(e.pointerId); }catch(_){} });
+  st.addEventListener('pointermove',e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x; if(Math.abs(dx)>8||Math.abs(e.clientY-d.y)>8) d.moved=true; if(!d.moved) return;
+    const now=performance.now(), deg=(st.clientWidth>0?180/Math.max(320,st.clientWidth*.9):.3); RK.a=d.a+dx*deg; const dt=Math.max(1,now-d.t); RK.v=Math.max(-1.1,Math.min(1.1,.7*RK.v+.3*((e.clientX-d.lx)*deg/dt))); d.t=now; d.lx=e.clientX; rackApply(); });
+  const up=e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; RK.drag=null;
+    if(!d.moved){ if(d.tgt&&d.tgt.closest('.rf')?.classList.contains('front')) rackPull(d.tgt); else if(d.tgt){ const f=+d.tgt.closest('.rf').style.getPropertyValue('--f'); RK.a=-f*RK.step+Math.round((RK.a+f*RK.step)/360)*360; reduced()?rackApply():rackSnapTo(RK.a); } return; }
+    if(performance.now()-d.t>90) RK.v=0; if(reduced()||Math.abs(RK.v)<.05) rackSnap(); else rackCoast(); };
+  st.addEventListener('pointerup',up); st.addEventListener('pointercancel',up);
+  $('#rkBack').addEventListener('click',closeRack);
+  $('#rkPrev').addEventListener('click',()=>{ RK.ym--; renderRack(); }); $('#rkNext').addEventListener('click',()=>{ RK.ym++; renderRack(); });
+  $('#rkLeft').addEventListener('click',()=>rackSpin(1)); $('#rkRight').addEventListener('click',()=>rackSpin(-1));
+  addEventListener('resize',()=>{ if(RK.on) rackLayout(); });
+  addEventListener('keydown',e=>{ if(!RK.on||(R&&R.comic)) return; if(e.key==='ArrowLeft') rackSpin(1); else if(e.key==='ArrowRight') rackSpin(-1); else if(e.key==='Escape') closeRack(); }); }
 
 /* ---------- multi-select (Library and series pages): Select -> tap covers -> Move to Series… / Remove from Series ---------- */
 const SEL={on:false,ids:new Set()};

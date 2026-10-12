@@ -1,5 +1,13 @@
 # Comic Shelf: change log
 
+## cr-v25 — 2026-10-12
+- **Spinner rack**: each year section of the Timeline has a 40px rack button. It opens a full-screen CSS‑3D wire spinner rack ("On the racks · Mar 1984") holding your issues dated within ±2 months of that month (the year's median issue month), widened step by step up to ±6 months when fewer than 6 issues fall inside; the window is shown under the title.
+- 4–8 sided rack (by issue count), 4 tiers × 2 wire pockets per side, top sign, pole and base; original drawn wirework only, covers are your own.
+- Drag/swipe spins with momentum and settles on a face; ‹ › spin buttons and arrow keys turn one face; tapping a side pocket turns it to the front. Prev/next month arrows move the window; empty months say so.
+- Tap a front cover: it pulls out of the pocket (animated) and opens in the reader; closing the reader returns to the rack. A second tap during the pull-out is ignored.
+- Reduced motion: no momentum, no pull-out animation, instant face changes.
+- Faces turned away are hidden and depth-ordered in JS (robust on WebKit); spin runs on one transform per frame.
+
 ## cr-v24 — 2026-10-12
 - **Timeline**: every issue arranged by original cover/release date, oldest first, with sticky year headers, decade jump chips (highlight follows scrolling) and an "Unknown date" section last. Tap an issue to open it; closing the reader returns to the Timeline. Compact **Timeline** entry on Home under the carousel, showing the year range.
 - **How dates are found** (first match wins): date you set by hand → embedded metadata (ComicInfo.xml attached to the PDF, XMP `prism:coverDate` / `prism:publicationDate`, Info Year/Month) → year in the file name/title (`(1983)`, `(Mar 1984)`, `(1983-04)`) → built-in offline table of well-known series (estimated from #1's cover date + monthly cadence, shown with ≈) → Unknown. PDF CreationDate/ModDate are ignored (they're scan/export dates).

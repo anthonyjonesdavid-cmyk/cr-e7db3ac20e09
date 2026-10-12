@@ -388,11 +388,55 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .act .actv{margin-left:auto;color:var(--mut);font-size:13px;font-weight:500}
 .dtrow{display:grid;grid-template-columns:1fr 120px;gap:10px}
 .dtrow select,.dtrow input{width:100%;height:42px;border-radius:10px;border:0;background:var(--el2);color:#fff;padding:0 12px;font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+
+/* ---------- spinner rack (v25) ---------- */
+.tlh .rkbtn{margin-left:auto;align-self:center;width:40px;height:40px;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;color:#d1d1d6;background:var(--el)}
+.tlh .rkbtn:active{background:var(--el2)}.tlh .rkbtn svg{width:20px;height:20px}
+.tlh{height:52px;align-items:center;padding-top:8px}
+#rack{position:absolute;inset:0;z-index:40;background:#000;display:flex;flex-direction:column}#rack.hidden{display:none}
+.rkbar{flex:none;background:#000;padding:var(--sat) var(--padr) 0 var(--padx);border-bottom:.5px solid var(--sep);position:relative;z-index:3}
+.rk-row{grid-template-columns:44px 1fr auto;height:56px}
+.rkt{text-align:center;min-width:0}.rkt h2{margin:0;font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rkt small{display:block;color:var(--mut);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rknav{display:flex;gap:2px}
+#rkStage{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;
+  background:radial-gradient(ellipse 60% 55% at 50% 45%,#1d1e21 0%,#0b0b0c 60%,#000 100%)}
+#rkScene{position:absolute;left:50%;top:50%;width:var(--fw);height:calc(var(--fh) + var(--sign) + var(--base));transform:translate(-50%,-50%);transform-style:preserve-3d}
+#rkRotor{position:absolute;left:0;top:var(--sign);width:var(--fw);height:var(--fh);transform-style:preserve-3d;will-change:transform}
+.rf{position:absolute;inset:0;transform:rotateY(calc(var(--f) * 360deg / var(--n,4))) translateZ(var(--r));backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:linear-gradient(90deg,#9a9da3 0 2px,transparent 2px calc(100% - 2px),#9a9da3 calc(100% - 2px));}
+.rf::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent calc(50% - 1px),#7d8086 calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px));opacity:.55}
+.pk{position:absolute;left:calc(var(--gap) + var(--k) * (var(--pw) + var(--gap)));top:calc(var(--gap) + var(--t) * (var(--ph) + var(--gap)));width:var(--pw);height:var(--ph)}
+.pk::after{content:"";position:absolute;left:-3px;right:-3px;bottom:-2px;height:30%;pointer-events:none;border:2px solid #b4b7bc;border-top:0;border-radius:0 0 3px 3px;
+  background:repeating-linear-gradient(0deg,transparent 0 7px,rgba(190,193,198,.75) 7px 9px);box-shadow:0 3px 4px rgba(0,0,0,.6)}
+.pk::before{content:"";position:absolute;left:-3px;right:-3px;top:38%;height:2px;background:#a6a9ae;pointer-events:none;opacity:.8}
+.pkc{position:absolute;left:0;top:0;width:100%;height:100%;padding:0;border:0;background:none;display:block;transition:opacity .2s}
+.pkc img{width:100%;height:100%;object-fit:cover;display:block;border-radius:1px;box-shadow:0 2px 8px rgba(0,0,0,.7);background:#222;pointer-events:none}
+.pkc::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.07),transparent 30%,rgba(0,0,0,.28))}
+.pkc.pulled{opacity:0}
+.rf:not(.front) .pkc img{filter:brightness(.62)}
+.pk.empty{background:linear-gradient(#161618,#0e0e0f)}
+.rksign{position:absolute;left:8%;right:8%;top:0;height:calc(var(--sign) - 6px);border:2px solid #b4b7bc;border-radius:4px;background:#111;display:flex;align-items:center;justify-content:center;transform:translateZ(4px)}
+.rksign span{font-size:clamp(10px,calc(var(--sign) * .38),18px);letter-spacing:.32em;font-weight:800;color:#d1d1d6}
+.rkpole{position:absolute;left:calc(50% - 4px);width:8px;top:calc(var(--sign) + var(--fh) - 2px);bottom:10px;transform:translateZ(calc(var(--r) * -1));background:linear-gradient(90deg,#55585d,#d4d6da 45%,#5e6166);border-radius:4px}
+.rkbase{position:absolute;left:10%;right:10%;bottom:0;height:calc(var(--base) - 8px);border-radius:50%;background:radial-gradient(ellipse at 50% 40%,#3a3c40,#151517 70%);box-shadow:0 10px 30px #000;transform:translateZ(calc(var(--r) * -1)) rotateX(80deg)}
+.rkempty{position:absolute;left:0;right:0;top:44%;text-align:center;color:var(--mut);font-size:14px;line-height:1.5;z-index:2}.rkempty.hidden{display:none}
+.rkspin{position:absolute;top:50%;margin-top:-20px;z-index:2;background:#000c;border:.5px solid #333}.rkspin:active{background:#222}
+#rkLeft{left:calc(var(--padx) + 4px)}#rkRight{right:calc(var(--padr) + 4px)}
+.rkpull{position:fixed;z-index:200;object-fit:cover;border-radius:2px;box-shadow:0 20px 60px rgba(0,0,0,.8);transition:transform .38s cubic-bezier(.2,.8,.2,1);transform-origin:50% 50%;pointer-events:none}
+@media (prefers-reduced-motion: reduce){ .pkc,.rkpull{transition:none} }
 </style>
 </head>
 <body>
 <!-- ================= SHELF ================= -->
 <section id="shelf" class="screen">
+  <section id="rack" class="hidden" aria-label="Spinner rack"><header class="rkbar"><div class="tb-row rk-row">
+    <button class="icbtn" id="rkBack" aria-label="Back to Timeline"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="rkt"><h2 id="rkTitle">On the racks</h2><small id="rkSub"></small></div>
+    <div class="rknav"><button class="icbtn" id="rkPrev" aria-label="Previous month"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn" id="rkNext" aria-label="Next month"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></div></header>
+    <div id="rkStage"><div id="rkScene"><div class="rksign"><span>ON THE RACKS</span></div><div class="rkpole"></div><div id="rkRotor"></div><div class="rkbase"></div></div>
+      <p id="rkEmpty" class="rkempty hidden">Nothing on the racks this month.<br>Use the arrows to look at nearby months.</p>
+      <button class="icbtn rkspin" id="rkLeft" aria-label="Spin left"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn rkspin" id="rkRight" aria-label="Spin right"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></section>
   <section id="timeline" class="hidden" aria-label="Timeline"><header class="tlbar"><div class="tb-row tl-row">
       <button class="icbtn" id="tlBack" aria-label="Back to Home"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Timeline</h2><span id="tlCount" class="tlcount"></span></div>
       <div class="tldec" id="tlDec" aria-label="Jump to decade"></div></header><div class="scrollv" id="tlScroll"></div></section>
@@ -439,7 +483,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=24',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=25',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -730,6 +774,7 @@ const IC={
   list:'<svg class="i" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3"/></svg>',
   clock:'<svg class="i" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M7 9v6M12 7v10M17 9v6"/></svg>',
   cal:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  rack:'<svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg>',
   grid:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 10h18M12 10v11"/></svg>',
 };
 function cover(c){ if(!c.cover) return ''; let u=coverURL.get(c.id); if(!u){ u=URL.createObjectURL(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); coverURL.set(c.id,u); } return u; }
@@ -788,7 +833,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
 // app launch / restore from the back-forward cache: back to Home (no series page, no search), at the top
-function launchHome(){ closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
+function launchHome(){ closeRack(); closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
@@ -1002,6 +1047,7 @@ shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefau
   const a=e.target.closest('[data-act]'); if(!a) return; const k=a.dataset.act;
   if(SEL.on&&a.classList.contains('lc')){ e.preventDefault(); e.stopPropagation(); toggleSel(a.dataset.id); return; }
   if(k==='timeline'){ openTimeline(); return; }
+  if(k==='rack'){ openRack(+a.dataset.ym); return; }
   if(k==='open') openReader(a.dataset.id,a.dataset.q?{queue:a.dataset.q}:{queue:null}); else if(k==='qedit') editQueue(a.dataset.q); else if(k==='qmenu') queueMenu(a,a.dataset.q); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
   else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope') unscope();
   else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
@@ -1186,7 +1232,7 @@ function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,ye
   const card=(c,d)=>`<button class="tc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}${d?', '+esc(fmtDate(d)):''}">${coverBox(c)}<span class="tt">${esc(c.title)}</span><span class="td${d&&d.src==='lookup'?' est':''}">${d?esc(d.m?MONTHS[d.m-1].slice(0,3):'—')+(d.src==='lookup'?' ≈':''):'Set date'}</span></button>`;
   const decades=[...new Set(years.map(y=>Math.floor(y/10)*10))];
   $('#tlDec').innerHTML=decades.map(d=>`<button class="chip" data-dec="${d}">${d}s</button>`).join('')+(unk.length?'<button class="chip" data-dec="unk">Unknown</button>':'');
-  el.innerHTML=years.map(y=>`<section class="tly" data-y="${y}" data-dec="${Math.floor(y/10)*10}"><h3 class="tlh">${y}<small>${by.get(y).length} issue${by.get(y).length===1?'':'s'}</small></h3><div class="tlg">${by.get(y).map(x=>card(x.c,x.d)).join('')}</div></section>`).join('')
+  el.innerHTML=years.map(y=>`<section class="tly" data-y="${y}" data-dec="${Math.floor(y/10)*10}"><h3 class="tlh">${y}<small>${by.get(y).length} issue${by.get(y).length===1?'':'s'}</small><button class="rkbtn" data-act="rack" data-ym="${rackCenter(by.get(y))}" aria-label="Spinner rack, ${y}">${IC.rack}</button></h3><div class="tlg">${by.get(y).map(x=>card(x.c,x.d)).join('')}</div></section>`).join('')
     +(unk.length?`<section class="tly" data-dec="unk" id="tlUnk"><h3 class="tlh">Unknown date<small>${unk.length} · long-press to set</small></h3><div class="tlg">${unk.map(c=>card(c,null)).join('')}</div></section>`:'')
     +(!comics.length?'<p class="qempty">No comics yet.</p>':'');
   $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
@@ -1197,6 +1243,65 @@ function closeTimeline(){ TL.on=false; $('#timeline').classList.add('hidden'); }
 $('#tlBack').addEventListener('click',closeTimeline);
 $('#tlScroll').addEventListener('scroll',()=>requestAnimationFrame(tlSpy),{passive:true});
 $('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tly[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:s.offsetTop,behavior:'smooth'}); });
+
+/* ---------- spinner rack (v25): the issues that were "on the racks" around a month ---------- */
+const ymOf=d=>d.y*12+((d.m||6)-1);            // year-only dates count as June
+const ymLabel=i=>`${MONTHS[i%12].slice(0,3)} ${Math.floor(i/12)}`;
+function rackCenter(list){ const v=list.map(x=>ymOf(x.d)).sort((a,b)=>a-b); return v[Math.floor((v.length-1)/2)]; }
+const RK={on:false,ym:0,win:2,items:[],N:4,T:4,C:2,a:0,v:0,raf:0,drag:null,step:90};
+const rmq=matchMedia('(prefers-reduced-motion: reduce)'); const reduced=()=>rmq.matches;
+function rackItems(ym){ const all=comics.map(c=>({c,d:dateOf(c)})).filter(x=>x.d).map(x=>({...x,i:ymOf(x.d)}));
+  let w=2, L=[]; for(;w<=6;w++){ L=all.filter(x=>Math.abs(x.i-ym)<=w); if(L.length>=6) break; } w=Math.min(w,6);
+  L.sort((a,b)=>a.i-b.i||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)); return {w,L}; }
+function rackLayout(){ const st=$('#rkStage'), W=st.clientWidth, H=st.clientHeight, T=RK.T;
+  const sign=Math.max(26,H*.05), base=Math.max(30,H*.06), gap=Math.max(6,W*.008);
+  let ph=(H*.9-sign-base)/T-gap, pw=ph/1.54; const fw0=RK.C*pw+(RK.C+1)*gap, maxF=Math.min(W*.62,560); if(fw0>maxF){ const k=maxF/fw0; pw*=k; ph*=k; }
+  const fw=RK.C*pw+(RK.C+1)*gap, r=fw/2/Math.tan(Math.PI/RK.N);
+  const sc=$('#rkScene'); sc.style.setProperty('--n',RK.N); Object.entries({'--pw':pw+'px','--ph':ph+'px','--gap':gap+'px','--fw':fw+'px','--r':r+'px','--sign':sign+'px','--base':base+'px','--fh':(T*(ph+gap)+gap)+'px'}).forEach(([k,v])=>sc.style.setProperty(k,v));
+  st.style.perspective=Math.max(900,r*5)+'px'; }
+function renderRack(){ const {w,L}=rackItems(RK.ym); RK.win=w; RK.items=L.map(x=>x.c); const per=RK.T*RK.C, n=L.length;
+  RK.N=Math.min(8,Math.max(4,Math.ceil(n/per))); RK.step=360/RK.N; RK.a=0; RK.v=0;
+  $('#rkTitle').textContent=`On the racks · ${ymLabel(RK.ym)}`;
+  const sh=i=>innerWidth<560?`${MONTHS[i%12].slice(0,3)} ’${String(Math.floor(i/12)).slice(2)}`:ymLabel(i);
+  $('#rkSub').textContent=n?`${n} issue${n===1?'':'s'} · ${sh(RK.ym-w)} – ${sh(RK.ym+w)}${w>2&&innerWidth>=560?' (widened)':''}`:'Nothing dated near this month';
+  const shown=L.slice(0,RK.N*per); let h='';
+  for(let f=0;f<RK.N;f++){ let pk=''; for(let t=0;t<RK.T;t++) for(let k=0;k<RK.C;k++){ const x=shown[f*per+t*RK.C+k];   // fill face by face so the front face is full
+      pk+=x?`<div class="pk" style="--t:${t};--k:${k}"><button class="pkc" data-rk="${x.c.id}" aria-label="${esc(x.c.title)}, ${esc(fmtDate(x.d))}"><img src="${cover(x.c)}" alt="" draggable="false"></button></div>`:`<div class="pk empty" style="--t:${t};--k:${k}"></div>`; }
+    h+=`<div class="rf" style="--f:${f}">${pk}</div>`; }
+  $('#rkRotor').innerHTML=h; $('#rkEmpty').classList.toggle('hidden',n>0); rackLayout(); rackApply(); }
+function rackApply(){ $('#rkRotor').style.transform=`translateZ(calc(var(--r) * -1)) rotateY(${RK.a}deg)`; const f=((Math.round(-RK.a/RK.step)%RK.N)+RK.N)%RK.N; RK.front=f;
+  // hide faces turned away and order the rest by depth in JS too, so the rack draws correctly even where backface-visibility / 3D depth sorting is flaky
+  $('#rkRotor').querySelectorAll('.rf').forEach((e,i)=>{ e.classList.toggle('front',i===f); const c=Math.cos((i*RK.step+RK.a)*Math.PI/180), vis=c>-0.02;
+    if(e._v!==vis){ e._v=vis; e.style.visibility=vis?'':'hidden'; } const z=Math.round(c*100)+100; if(e._z!==z){ e._z=z; e.style.zIndex=z; } }); }
+function rackSnap(){ cancelAnimationFrame(RK.raf); const tgt=Math.round(RK.a/RK.step)*RK.step;
+  if(reduced()){ RK.a=tgt; RK.v=0; rackApply(); return; } const a0=RK.a, t0=performance.now(), D=320;
+  const f=t=>{ const k=Math.min(1,(t-t0)/D), e=1-Math.pow(1-k,3); RK.a=a0+(tgt-a0)*e; rackApply(); if(k<1) RK.raf=requestAnimationFrame(f); else RK.raf=0; }; RK.raf=requestAnimationFrame(f); }
+function rackCoast(){ cancelAnimationFrame(RK.raf); let last=performance.now();
+  const f=t=>{ const dt=Math.min(40,t-last); last=t; RK.a+=RK.v*dt; RK.v*=Math.pow(.925,dt/16); rackApply(); if(Math.abs(RK.v)>.02) RK.raf=requestAnimationFrame(f); else { RK.raf=0; rackSnap(); } };
+  RK.raf=requestAnimationFrame(f); }
+function rackSpin(dir){ cancelAnimationFrame(RK.raf); RK.raf=0; const t=Math.round(RK.a/RK.step)*RK.step+dir*RK.step; if(reduced()){ RK.a=t; rackApply(); } else rackSnapTo(t); }
+function rackSnapTo(t){ cancelAnimationFrame(RK.raf); const a0=RK.a,t0=performance.now(),D=420; const f=x=>{ const k=Math.min(1,(x-t0)/D), e=1-Math.pow(1-k,3); RK.a=a0+(t-a0)*e; rackApply(); if(k<1) RK.raf=requestAnimationFrame(f); else RK.raf=0; }; RK.raf=requestAnimationFrame(f); }
+function openRack(ym){ if(!(ym>0)) return; RK.on=true; RK.ym=ym; $('#rack').classList.remove('hidden'); renderRack(); }
+function closeRack(){ RK.on=false; cancelAnimationFrame(RK.raf); RK.raf=0; const r=$('#rack'); if(r){ r.classList.add('hidden'); $('#rkRotor').innerHTML=''; } document.querySelectorAll('.rkpull').forEach(e=>e.remove()); }
+function rackPull(btn){ if(RK.pulling||(R&&R.comic)) return; const id=btn.dataset.rk, img=btn.querySelector('img'), r=img.getBoundingClientRect();
+  if(reduced()||!r.width){ RK.pulling=id; openReader(id); setTimeout(()=>RK.pulling=null,400); return; }
+  const cl=document.createElement('img'); cl.className='rkpull'; cl.src=img.src; Object.assign(cl.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'}); document.body.appendChild(cl);
+  btn.classList.add('pulled'); const W=innerWidth,H=innerHeight, s=Math.min(W*.7/r.width,H*.7/r.height), dx=W/2-(r.left+r.width/2), dy=H/2-(r.top+r.height/2);
+  cl.getBoundingClientRect(); cl.style.transform=`translate(${dx}px,${dy-r.height*.15}px) translateZ(0) scale(${s})`; RK.pulling=id;
+  setTimeout(()=>{ openReader(id); setTimeout(()=>{ cl.remove(); btn.classList.remove('pulled'); RK.pulling=null; },400); },380); }
+{ const st=$('#rkStage');
+  st.addEventListener('pointerdown',e=>{ if(e.button>0||e.target.closest('.rkspin')) return; cancelAnimationFrame(RK.raf); RK.raf=0; RK.v=0; RK.drag={x:e.clientX,y:e.clientY,a:RK.a,t:performance.now(),lx:e.clientX,moved:false,id:e.pointerId,tgt:e.target.closest('.pkc')}; try{ st.setPointerCapture(e.pointerId); }catch(_){} });
+  st.addEventListener('pointermove',e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x; if(Math.abs(dx)>8||Math.abs(e.clientY-d.y)>8) d.moved=true; if(!d.moved) return;
+    const now=performance.now(), deg=(st.clientWidth>0?180/Math.max(320,st.clientWidth*.9):.3); RK.a=d.a+dx*deg; const dt=Math.max(1,now-d.t); RK.v=Math.max(-1.1,Math.min(1.1,.7*RK.v+.3*((e.clientX-d.lx)*deg/dt))); d.t=now; d.lx=e.clientX; rackApply(); });
+  const up=e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; RK.drag=null;
+    if(!d.moved){ if(d.tgt&&d.tgt.closest('.rf')?.classList.contains('front')) rackPull(d.tgt); else if(d.tgt){ const f=+d.tgt.closest('.rf').style.getPropertyValue('--f'); RK.a=-f*RK.step+Math.round((RK.a+f*RK.step)/360)*360; reduced()?rackApply():rackSnapTo(RK.a); } return; }
+    if(performance.now()-d.t>90) RK.v=0; if(reduced()||Math.abs(RK.v)<.05) rackSnap(); else rackCoast(); };
+  st.addEventListener('pointerup',up); st.addEventListener('pointercancel',up);
+  $('#rkBack').addEventListener('click',closeRack);
+  $('#rkPrev').addEventListener('click',()=>{ RK.ym--; renderRack(); }); $('#rkNext').addEventListener('click',()=>{ RK.ym++; renderRack(); });
+  $('#rkLeft').addEventListener('click',()=>rackSpin(1)); $('#rkRight').addEventListener('click',()=>rackSpin(-1));
+  addEventListener('resize',()=>{ if(RK.on) rackLayout(); });
+  addEventListener('keydown',e=>{ if(!RK.on||(R&&R.comic)) return; if(e.key==='ArrowLeft') rackSpin(1); else if(e.key==='ArrowRight') rackSpin(-1); else if(e.key==='Escape') closeRack(); }); }
 
 /* ---------- multi-select (Library and series pages): Select -> tap covers -> Move to Series… / Remove from Series ---------- */
 const SEL={on:false,ids:new Set()};
@@ -2002,7 +2107,7 @@ function panelsAfterRender(){ if(P.internal||!P.on) return; const want=P.key; P.
 pexit.addEventListener('click',()=>exitPanels(true));
 addEventListener('resize',()=>{ if(P.on) placeMask(false); });
 /* ================= boot ================= */
-window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,dates:{of:dateOf,fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},dates:{of:dateOf,fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);
