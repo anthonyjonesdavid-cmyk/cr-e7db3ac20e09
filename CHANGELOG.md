@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v28 — 2026-10-13
+- **"This week in…" row on Home** (first row under the carousel, same row style): your issues released this week in past years, newest year first; each tile shows its year (and day when known). Tap to read.
+- Uses Timeline release dates in this order: set by you > looked up online > embedded metadata > file name. "≈" estimates are never used.
+- Most dates are month-level: when no exact-day match falls within ±3 days of today, the row falls back to this calendar month and is titled "On sale this month in past years". Hidden when nothing matches.
+- Computed when Home is drawn (at open / after changes); no background task.
+- Exact days are now kept from ComicInfo `<Day>` and full ISO XMP dates (a "-01"/Day 1 placeholder stays month-level).
+
 ## cr-v27 — 2026-10-13
 - **Timeline is a tab**: top control is now Home | Library | Timeline. The Timeline tab shows the compact grid inside the normal app chrome, with decade chips, issue count and the spinner-rack button in a solid sub-bar; year labels still open that year's rack. The app still opens on Home.
 - Removed the Timeline bar under the Home carousel; Home rows sit directly under the carousel again.

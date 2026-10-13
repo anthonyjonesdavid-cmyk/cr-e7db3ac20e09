@@ -40,5 +40,6 @@ python3 test/e2e.py chromium --big           # or: webkit; screenshots -> shots/
 python3 test/e2e_v21.py webkit               # panel view, sharp zoom tiles, reading lists, multi-select (fixtures: test/gen_panels.py)
 python3 test/e2e_v24.py webkit               # Timeline / release dates, 4 sizes standalone (fixtures: test/gen_dates.py)
 python3 test/e2e_v26.py webkit               # spinner rack v2, compact Timeline, online date lookup (mocked + one live check), 4 sizes
+python3 test/e2e_v28.py webkit               # 'This week in…' Home row (week / month fallback, date priority), 4 sizes (fixtures: test/gen_dates.py)
 ```
 See CHANGELOG.md for the history.

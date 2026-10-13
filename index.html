@@ -443,6 +443,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   #selBtn{padding:0;width:40px}#selBtn .lbl{display:none}#selBtn .ic{display:block}
   #shelf.selecting #selBtn{width:auto;padding:0 10px}#shelf.selecting #selBtn .lbl{display:inline}#shelf.selecting #selBtn .ic{display:none}
 }
+
+/* v28 This week in… */
+.otw .row-h{cursor:default}.rc .s .yr{color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -499,7 +502,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=27',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=28',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -660,8 +663,10 @@ function dateFromName(n){ const s=String(n||'').replace(/_/g,' ');
   m=s.match(/(?:^|[\s-])((?:19|20)\d\d)-(0[1-9]|1[0-2])(?:[\s-]|$)/); if(m&&okY(+m[1])) return {y:+m[1],m:+m[2],src:'name'};
   return null; }
 function comicInfoDate(xml){ const g=k=>{ const m=String(xml).match(new RegExp('<'+k+'>\\s*(\\d+)\\s*</'+k+'>','i')); return m?+m[1]:0; };
-  const y=g('Year'), m=g('Month'); return okY(y)?{y,m:m>=1&&m<=12?m:0,src:'meta'}:null; }
-function isoDate(v,src){ const m=String(v||'').match(/((?:19|20)\d\d)(?:-(\d\d))?/); return m&&okY(+m[1])?{y:+m[1],m:m[2]&&+m[2]<=12?+m[2]:0,src}:null; }
+  const y=g('Year'), m=g('Month'), d=g('Day'); return okY(y)?withDay({y,m:m>=1&&m<=12?m:0,src:'meta'},d):null; }
+// exact day only when it is real: "-01" / Day 1 is the usual month-level placeholder, so it is not treated as a day
+function withDay(o,d){ if(o.m&&d>1&&d<=31) o.d=d; return o; }
+function isoDate(v,src){ const m=String(v||'').match(/((?:19|20)\d\d)(?:-(\d\d)(?:-(\d\d))?)?/); return m&&okY(+m[1])?withDay({y:+m[1],m:m[2]&&+m[2]<=12?+m[2]:0,src},+m[3]||0):null; }
 async function pdfDate(doc){
   try{ const at=await doc.getAttachments(); if(at) for(const k in at){ const a=at[k]; if(/comicinfo\.xml$/i.test(a.filename||k)){ const d=comicInfoDate(new TextDecoder().decode(a.content)); if(d) return d; } } }catch(e){}
   try{ const md=await doc.getMetadata(); const x=md&&md.metadata;
@@ -991,9 +996,24 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${rows}</div>`;
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${onThisWeekHTML()}${rows}</div>`;
   CF.mount($('#cf'),cf);
 }
+
+/* ---------- "This week in…": issues released this week (or, failing that, this month) in past years; computed when Home renders ---------- */
+const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook
+// trusted dates only, in this order: set by you > looked up online > embedded metadata > file name. ≈ estimates are excluded.
+function weekDate(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.onlineDate&&c.onlineDate.y) return c.onlineDate; if(c.metaDate&&c.metaDate.y) return c.metaDate;
+  return dateFromName(c.fileName)||dateFromName(c.title)||null; }
+function onThisWeek(now=nowD()){ const Y=now.getFullYear(), M=now.getMonth()+1, t0=new Date(Y,M-1,now.getDate()).getTime();
+  const all=comics.map(c=>({c,d:weekDate(c)})).filter(x=>x.d&&x.d.y<Y&&x.d.m);
+  const wk=all.filter(x=>x.d.d&&Math.abs(new Date(Y,x.d.m-1,x.d.d).getTime()-t0)<=3.5*864e5);   // same week: within ±3 days of today's date
+  const by=(a,b)=>b.d.y-a.d.y||(a.d.d||0)-(b.d.d||0)||byIssue(a.c,b.c);
+  if(wk.length) return {kind:'week',title:'This week in past years',items:wk.sort(by)};
+  const mo=all.filter(x=>x.d.m===M); return mo.length?{kind:'month',title:'On sale this month in past years',items:mo.sort(by)}:null; }
+function onThisWeekHTML(){ const r=onThisWeek(); if(!r) return '';
+  return `<section class="row otw" data-kind="${r.kind}"><div class="row-top"><div class="row-h"><h2>${r.title}</h2><span class="n">${r.items.length}</span></div></div>
+  <div class="row-s">${r.items.slice(0,30).map(({c,d})=>`<button class="rc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}, ${esc(fmtDate(d))}">${coverBox(c)}<div class="t">${esc(c.title)}</div><div class="s"><b class="yr">${d.y}</b>${d.d?` · ${MONTHS[d.m-1].slice(0,3)} ${d.d}`:''}</div></button>`).join('')}</div></section>`; }
 
 /* ---------- 3D coverflow: touch-tracked, momentum, snaps to center ---------- */
 // one factory, two carousels: Home (CF) and the series page (SCF)
@@ -2206,7 +2226,7 @@ function panelsAfterRender(){ if(P.internal||!P.on) return; const want=P.key; P.
 pexit.addEventListener('click',()=>exitPanels(true));
 addEventListener('resize',()=>{ if(P.on) placeMask(false); });
 /* ================= boot ================= */
-window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},dates:{of:dateOf,fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},dates:{of:dateOf,week:onThisWeek,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);

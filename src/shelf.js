@@ -182,9 +182,24 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${rows}</div>`;
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${onThisWeekHTML()}${rows}</div>`;
   CF.mount($('#cf'),cf);
 }
+
+/* ---------- "This week in…": issues released this week (or, failing that, this month) in past years; computed when Home renders ---------- */
+const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook
+// trusted dates only, in this order: set by you > looked up online > embedded metadata > file name. ≈ estimates are excluded.
+function weekDate(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.onlineDate&&c.onlineDate.y) return c.onlineDate; if(c.metaDate&&c.metaDate.y) return c.metaDate;
+  return dateFromName(c.fileName)||dateFromName(c.title)||null; }
+function onThisWeek(now=nowD()){ const Y=now.getFullYear(), M=now.getMonth()+1, t0=new Date(Y,M-1,now.getDate()).getTime();
+  const all=comics.map(c=>({c,d:weekDate(c)})).filter(x=>x.d&&x.d.y<Y&&x.d.m);
+  const wk=all.filter(x=>x.d.d&&Math.abs(new Date(Y,x.d.m-1,x.d.d).getTime()-t0)<=3.5*864e5);   // same week: within ±3 days of today's date
+  const by=(a,b)=>b.d.y-a.d.y||(a.d.d||0)-(b.d.d||0)||byIssue(a.c,b.c);
+  if(wk.length) return {kind:'week',title:'This week in past years',items:wk.sort(by)};
+  const mo=all.filter(x=>x.d.m===M); return mo.length?{kind:'month',title:'On sale this month in past years',items:mo.sort(by)}:null; }
+function onThisWeekHTML(){ const r=onThisWeek(); if(!r) return '';
+  return `<section class="row otw" data-kind="${r.kind}"><div class="row-top"><div class="row-h"><h2>${r.title}</h2><span class="n">${r.items.length}</span></div></div>
+  <div class="row-s">${r.items.slice(0,30).map(({c,d})=>`<button class="rc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}, ${esc(fmtDate(d))}">${coverBox(c)}<div class="t">${esc(c.title)}</div><div class="s"><b class="yr">${d.y}</b>${d.d?` · ${MONTHS[d.m-1].slice(0,3)} ${d.d}`:''}</div></button>`).join('')}</div></section>`; }
 
 /* ---------- 3D coverflow: touch-tracked, momentum, snaps to center ---------- */
 // one factory, two carousels: Home (CF) and the series page (SCF)

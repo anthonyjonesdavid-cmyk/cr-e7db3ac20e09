@@ -144,8 +144,10 @@ function dateFromName(n){ const s=String(n||'').replace(/_/g,' ');
   m=s.match(/(?:^|[\s-])((?:19|20)\d\d)-(0[1-9]|1[0-2])(?:[\s-]|$)/); if(m&&okY(+m[1])) return {y:+m[1],m:+m[2],src:'name'};
   return null; }
 function comicInfoDate(xml){ const g=k=>{ const m=String(xml).match(new RegExp('<'+k+'>\\s*(\\d+)\\s*</'+k+'>','i')); return m?+m[1]:0; };
-  const y=g('Year'), m=g('Month'); return okY(y)?{y,m:m>=1&&m<=12?m:0,src:'meta'}:null; }
-function isoDate(v,src){ const m=String(v||'').match(/((?:19|20)\d\d)(?:-(\d\d))?/); return m&&okY(+m[1])?{y:+m[1],m:m[2]&&+m[2]<=12?+m[2]:0,src}:null; }
+  const y=g('Year'), m=g('Month'), d=g('Day'); return okY(y)?withDay({y,m:m>=1&&m<=12?m:0,src:'meta'},d):null; }
+// exact day only when it is real: "-01" / Day 1 is the usual month-level placeholder, so it is not treated as a day
+function withDay(o,d){ if(o.m&&d>1&&d<=31) o.d=d; return o; }
+function isoDate(v,src){ const m=String(v||'').match(/((?:19|20)\d\d)(?:-(\d\d)(?:-(\d\d))?)?/); return m&&okY(+m[1])?withDay({y:+m[1],m:m[2]&&+m[2]<=12?+m[2]:0,src},+m[3]||0):null; }
 async function pdfDate(doc){
   try{ const at=await doc.getAttachments(); if(at) for(const k in at){ const a=at[k]; if(/comicinfo\.xml$/i.test(a.filename||k)){ const d=comicInfoDate(new TextDecoder().decode(a.content)); if(d) return d; } } }catch(e){}
   try{ const md=await doc.getMetadata(); const x=md&&md.metadata;

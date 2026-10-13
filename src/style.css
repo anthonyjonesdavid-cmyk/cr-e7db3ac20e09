@@ -422,3 +422,6 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
   #selBtn{padding:0;width:40px}#selBtn .lbl{display:none}#selBtn .ic{display:block}
   #shelf.selecting #selBtn{width:auto;padding:0 10px}#shelf.selecting #selBtn .lbl{display:inline}#shelf.selecting #selBtn .ic{display:none}
 }
+
+/* v28 This week in… */
+.otw .row-h{cursor:default}.rc .s .yr{color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
