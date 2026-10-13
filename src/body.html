@@ -47,10 +47,11 @@
     <span id="pgText">1 / 1</span>
   </div></div>
   <button id="pExit" class="pexit hidden" aria-label="Exit panel view, show the full page"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Full Page<span></span></button>
+  <button id="rRotate" class="rrot hidden" aria-pressed="false" aria-label="Rotate spread to fill the screen"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Rotate</button>
   <div id="pages" class="hidden"><div class="ph"><button class="icbtn" id="pagesClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button><h3>All Pages</h3></div><div id="pgrid"></div></div>
 </section>
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=28',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=29',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>

@@ -425,3 +425,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 /* v28 This week in… */
 .otw .row-h{cursor:default}.rc .s .yr{color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
+/* v29 two-page spreads: in-view rotation */
+.view.rot{inset:auto;transform:rotate(90deg);transform-origin:50% 50%}
+.rrot{position:absolute;z-index:22;right:calc(12px + env(safe-area-inset-right));bottom:calc(var(--sab) + 14px);height:40px;min-width:40px;padding:0 13px 0 10px;border-radius:20px;background:#1c1c1e;border:.5px solid #3a3a3c;color:#f5f5f7;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,.55);transition:bottom .2s ease}
+.rrot svg.i{width:17px;height:17px}.rrot.on{background:#f5f5f7;color:#000}.rrot.hidden{display:none}
+#reader.ui .rrot{bottom:calc(var(--sab) + 60px)}

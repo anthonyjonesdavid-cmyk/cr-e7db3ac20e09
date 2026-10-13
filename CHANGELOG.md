@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v29 — 2026-10-13
+- **Two-page spreads**: wide pages (width/height > 1.2) are detected when a comic opens (page shapes read once, remembered).
+- **Landscape**: a spread is its own page, shown full screen; it never pairs with a neighbour (2-up pairing resumes after it). Page turns between a pair and a spread turn as one sheet.
+- **Portrait (iPad/iPhone)**: a spread is fitted to the full width, centred vertically on black — not shrunk into a page slot or split. Pinch zoom with sharp re-render.
+- **Rotate** button (40px, bottom-right, only on spreads in portrait): rotates the spread 90° inside the view to fill the portrait screen (web apps can't force device orientation); tap again to undo. Pinch zoom works rotated; turning the page or entering panel view returns it upright.
+- Panel view works on spreads.
+
 ## cr-v28 — 2026-10-13
 - **"This week in…" row on Home** (first row under the carousel, same row style): your issues released this week in past years, newest year first; each tile shows its year (and day when known). Tap to read.
 - Uses Timeline release dates in this order: set by you > looked up online > embedded metadata > file name. "≈" estimates are never used.
