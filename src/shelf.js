@@ -86,7 +86,7 @@ function launchHome(){ closeRack(); closeTimeline(); ui.series=null; ui.q=''; ui
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
 function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
-  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); scopeUI(); if(t==='home') CF.size(); else SCF.size(); }
+  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL) renderTimeline(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
 function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
@@ -182,7 +182,7 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  const tr=tlRange(); el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="hlinks"><button class="hlink" data-act="timeline" id="tlOpen">${IC.clock}<span>Timeline</span>${tr?`<small>${tr}</small>`:''}${IC.chev}</button></div><div class="rows">${rows}</div>`;
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${rows}</div>`;
   CF.mount($('#cf'),cf);
 }
 
@@ -519,9 +519,8 @@ function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,ye
   $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
 function tlFirstVisible(){ const el=$('#tlScroll'), top=el.getBoundingClientRect().top; for(const c of el.querySelectorAll('.tc')){ const r=c.getBoundingClientRect(); if(r.bottom>top+8) return c; } return null; }
 function tlSpy(){ const c=tlFirstVisible(), cur=c&&c.dataset.dec; $('#tlDec').querySelectorAll('.chip').forEach(b=>{ const on=b.dataset.dec===cur; if(b.classList.contains('on')!==on){ b.classList.toggle('on',on); if(on) b.scrollIntoView({inline:'nearest',block:'nearest'}); } }); }
-function openTimeline(){ TL.on=true; $('#timeline').classList.remove('hidden'); $('#tlScroll').scrollTop=0; renderTimeline(); }
-function closeTimeline(){ TL.on=false; $('#timeline').classList.add('hidden'); }
-$('#tlBack').addEventListener('click',closeTimeline);
+function openTimeline(){ setTab('timeline'); }
+function closeTimeline(){ if(TL.on) setTab('home'); }
 $('#tlScroll').addEventListener('scroll',()=>requestAnimationFrame(tlSpy),{passive:true});
 $('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tc[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:Math.max(0,s.offsetTop-8),behavior:reduced()?'auto':'smooth'}); });
 $('#tlRack').addEventListener('click',()=>{ const c=tlFirstVisible(); let ym=c&&+c.dataset.ym; if(!ym){ const d=comics.map(dateOf).filter(Boolean).map(ymOf).sort((a,b)=>a-b); ym=d[Math.floor((d.length-1)/2)]; } if(ym) openRack(ym); else toast('Set a release date on some issues first'); });
@@ -598,8 +597,8 @@ function rackPull(btn){ if(RK.pulling||(R&&R.comic)) return; const id=btn.datase
 const SEL={on:false,ids:new Set()};
 const visIds=()=>libList().map(c=>c.id);
 function enterSel(){ if(ui.tab!=='library'||!comics.length) return; SEL.on=true; SEL.ids.clear(); $('#shelf').classList.add('selecting'); $('#selBar').classList.remove('hidden');
-  const b=$('#selBtn'); b.textContent='Done'; b.setAttribute('aria-pressed','true'); cancelLP(); syncSel(); }
-function exitSel(){ SEL.on=false; SEL.ids.clear(); $('#shelf').classList.remove('selecting'); $('#selBar').classList.add('hidden'); const b=$('#selBtn'); b.textContent='Select'; b.setAttribute('aria-pressed','false');
+  const b=$('#selBtn'); b.querySelector('.lbl').textContent='Done'; b.setAttribute('aria-pressed','true'); cancelLP(); syncSel(); }
+function exitSel(){ SEL.on=false; SEL.ids.clear(); $('#shelf').classList.remove('selecting'); $('#selBar').classList.add('hidden'); const b=$('#selBtn'); b.querySelector('.lbl').textContent='Select'; b.setAttribute('aria-pressed','false');
   document.querySelectorAll('#libGrid .lc.on').forEach(x=>x.classList.remove('on')); }
 function toggleSel(id){ if(SEL.ids.has(id)) SEL.ids.delete(id); else SEL.ids.add(id); syncSel(); }
 function syncSel(){ const vis=visIds(); for(const id of [...SEL.ids]) if(!comics.some(c=>c.id===id)) SEL.ids.delete(id);

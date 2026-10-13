@@ -37,7 +37,7 @@ def drag(pg,dx,steps=6,hold=0):
     if hold: pg.wait_for_timeout(hold)
     pg.mouse.up()
 def bars(pg,lab,sat,which):
-    sel={'rack':('.rkbar','#rkTitle',['#rkBack','#rkPrev','#rkNext','#rkLeft','#rkRight']),'tl':('.tlbar','#timeline h2',['#tlBack','#tlRack','#tlDec .chip','.tyr','.tcb'])}[which]
+    sel={'rack':('.rkbar','#rkTitle',['#rkBack','#rkPrev','#rkNext','#rkLeft','#rkRight']),'tl':('.tlbar','#tabs',['#tabs button','#tlRack','#tlDec .chip','.tyr','.tcb'])}[which]
     g=pg.evaluate("""([bar,t,bs])=>({bg:getComputedStyle(document.querySelector(bar)).backgroundColor,t:document.querySelector(t).getBoundingClientRect().top,
       btn:bs.map(s=>Math.min(...[...document.querySelectorAll(s)].slice(0,8).map(b=>{const r=b.getBoundingClientRect(); return Math.min(r.width,r.height)})))})""",list(sel))
     ok(f'{lab}: {which} bar solid black, nothing under the status bar, tap targets >=40px',g['bg']=='rgb(0, 0, 0)' and g['t']>=sat and min(g['btn'])>=40,json.dumps(g))
@@ -45,7 +45,7 @@ def setup(pg):
     pg.goto(URL); pg.wait_for_selector('html[data-ready]')
     pg.set_input_files('#fileIn',FILES); pg.wait_for_function(f'document.querySelectorAll("#libGrid .lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=120000)
     for t,y,m in MAN: pg.evaluate(f"__cr.dates.set(__cr.comics.find(c=>c.title==='{t}'),{{y:{y},m:{m}}})")
-    pg.wait_for_timeout(300); pg.click('#tabs [data-tab=home]'); pg.click('#tlOpen'); pg.wait_for_timeout(300)
+    pg.wait_for_timeout(300); pg.click('#tabs [data-tab=home]'); pg.click('#tabs [data-tab=timeline]'); pg.wait_for_timeout(300)
 with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     for (w,h,lab,dpr,sat,sab,rm) in [(1024,1366,'ipad-portrait',2,24,20,'no-preference'),(1366,1024,'ipad-landscape',2,24,20,'no-preference'),(390,844,'iphone-390',3,47,34,'reduce'),(430,932,'iphone-430',3,59,34,'no-preference')]:
@@ -57,8 +57,7 @@ with sync_playwright() as p:
         g=pg.evaluate("(()=>{const cs=[...document.querySelectorAll('#tlGrid .tc')]; const r=cs.map(e=>e.getBoundingClientRect()); const rows=[...new Set(r.map(x=>Math.round(x.top)))]; return {n:cs.length,rows:rows.length,per:Math.round(document.querySelector('#tlGrid').clientWidth/r[0].width),gaps:rows.slice(1).map((t,k)=>Math.round(t-rows[k]-r[0].height)),labels:[...document.querySelectorAll('.tyr')].map(e=>e.textContent),sections:document.querySelectorAll('.tly,.tlh').length}})()")
         ok(f'{lab}: Timeline is one continuous compact grid, small inline year labels only',g['sections']==0 and g['rows']==-(-g['n']//max(1,g['per'])) and all(x<=14 for x in g['gaps']) and g['labels']==['1983','1984','1991','1992','Unknown'],json.dumps(g))
         bars(pg,lab,sat,'tl')
-        if full: pg.screenshot(path=f'{SH}/{ENG}-v26-timeline-{lab}.png')
-        else: pg.screenshot(path=f'{SH}/{ENG}-v26-timeline-{lab}.png')
+        pg.screenshot(path=f'{SH}/{ENG}-v27-timeline-{lab}.png'); pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(400); pg.screenshot(path=f'{SH}/{ENG}-v27-home-{lab}.png'); pg.click('#tabs [data-tab=timeline]'); pg.wait_for_timeout(300)
         pg.click('.tyr:has-text("1984")'); pg.wait_for_timeout(500); s=rs(pg)
         ok(f'{lab}: tap a year label opens its rack ("On the racks · Jan 1984")',s['on'] and s['title']=='On the racks · Jan 1984',s['title'])
         ok(f'{lab}: every pocket filled (6 wings × 8 tiers); small library repeats to fill',s['pockets']==48 and s['filled']==48 and s['repeats'] and 'repeats' in s['sub'] and pg.evaluate("(e=>e.scrollWidth<=e.clientWidth+1)(document.querySelector('#rkSub'))"),json.dumps(s))
@@ -100,7 +99,7 @@ with sync_playwright() as p:
             ok('plain / Vol 1 / matching year still get the ≈ estimate',e['plain']=={'y':1962,'m':1,'src':'lookup'} and e['vol1']==e['plain'] and e['year62']==e['plain'],json.dumps(e))
             # ---- online lookup (mocked wiki): Settings button
             pg.evaluate("__cr.dates.set(__cr.comics.find(c=>c.title==='Iron Tide 04'),null)")   # Iron Tide 04 becomes unknown: eligible, but not on the mock wiki
-            pg.click('#tlBack'); pg.click('#settingsBtn'); pg.wait_for_selector('#sLookup'); ok('Settings: "Look Up Release Dates…" button with the count',pg.is_visible('#sLookup') and '3 issues' in pg.text_content('.sgrp:has(#sLookup)'),pg.text_content('.sgrp:has(#sLookup)'))
+            pg.click('#tabs [data-tab=home]'); pg.click('#settingsBtn'); pg.wait_for_selector('#sLookup'); ok('Settings: "Look Up Release Dates…" button with the count',pg.is_visible('#sLookup') and '3 issues' in pg.text_content('.sgrp:has(#sLookup)'),pg.text_content('.sgrp:has(#sLookup)'))
             CALLS.clear(); pg.click('#sLookup'); pg.wait_for_function("document.querySelector('#lkDone')&&document.querySelector('#lkDone').textContent==='Done'",timeout=30000)
             rows=pg.eval_on_selector_all('#lkRes .lkr','e=>e.map(x=>x.textContent)')
             pg.screenshot(path=f'{SH}/{ENG}-v26-lookup-{lab}.png')

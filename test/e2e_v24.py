@@ -18,7 +18,7 @@ def importf(pg,files,total):
     pg.set_input_files('#fileIn',files); pg.wait_for_function(f'document.querySelectorAll("#libGrid .lc").length=={total} && !document.querySelector(".toast .tb")',timeout=120000); pg.wait_for_timeout(300)
 def chrome(pg,lab,sat):
     g=pg.evaluate("""(()=>{const q=s=>document.querySelector(s).getBoundingClientRect(), bar=document.querySelector('.tlbar');
-      return {bg:getComputedStyle(bar).backgroundColor, h2:q('#timeline h2').top, back:[q('#tlBack').width,q('#tlBack').height],
+      return {bg:getComputedStyle(bar).backgroundColor, h2:q('#tabs').top, back:[q('#tlRack').width,q('#tlRack').height],
         chips:[...document.querySelectorAll('#tlDec .chip')].map(b=>{const r=b.getBoundingClientRect(); return Math.min(r.width,r.height)}),
         cards:[...document.querySelectorAll('#tlScroll .tcb')].slice(0,6).map(b=>{const r=b.getBoundingClientRect(); return Math.min(r.width,r.height)}),
         hbg:getComputedStyle(document.querySelector('.tyr')).backgroundColor}})()""")
@@ -47,8 +47,12 @@ with sync_playwright() as p:
             for t,y in [('Iron Tide 01',1962),('Iron Tide 02',1968),('Iron Tide 03',1974),('Iron Tide 04',2003)]:
                 pg.evaluate(f"__cr.dates.set(__cr.comics.find(c=>c.title==='{t}'),{{y:{y},m:5}})")
         pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(200)
-        hb=pg.locator('#tlOpen').bounding_box(); ok(f'{lab}: Home has a compact Timeline entry (>=40px, shows the year range)',hb and hb['height']>=40 and hb['height']<=52 and ('1983' in pg.text_content('#tlOpen') or '1962' in pg.text_content('#tlOpen')),json.dumps(hb)+pg.text_content('#tlOpen'))
-        pg.click('#tlOpen'); pg.wait_for_timeout(300); st=pg.evaluate(TLS)
+        fit=pg.evaluate('''(()=>{const r=e=>e.getBoundingClientRect(); const out={}; for(const t of ['home','library']){ document.querySelector('#tabs [data-tab='+t+']').click();
+          const tabs=[...document.querySelectorAll('#tabs button')].map(r), row=document.querySelector('.topbar .tb-row'), vis=[...row.querySelectorAll('.icbtn,.txtbtn')].filter(b=>b.offsetParent&&getComputedStyle(b).visibility!=='hidden'&&!b.closest('#tabs')).map(r);
+          out[t]={h:Math.min(...tabs.map(x=>x.height)),inView:tabs.every(x=>x.left>=0&&x.right<=innerWidth),clash:vis.some(b=>tabs.some(x=>b.left<x.right-1&&b.right>x.left+1)),txt:[...document.querySelectorAll('#tabs button')].map(b=>b.scrollWidth<=b.clientWidth+1).every(Boolean),btn:vis.map(b=>Math.min(b.width,b.height))}; }
+          document.querySelector('#tabs [data-tab=home]').click(); out.bar=!!document.querySelector('#homeScroll .hlinks,#tlOpen'); return out})()''')
+        ok(f'{lab}: Home | Library | Timeline control: buttons >=40px tall, fits, no overlap, labels not clipped; no Timeline bar on Home',all(fit[t]['h']>=40 and fit[t]['inView'] and not fit[t]['clash'] and fit[t]['txt'] and min(fit[t]['btn'])>=40 for t in ['home','library']) and not fit['bar'],json.dumps(fit))
+        pg.click('#tabs [data-tab=timeline]'); pg.wait_for_timeout(300); st=pg.evaluate(TLS)
         if full:
             ok('Timeline: years ascending, Unknown last',st['secs']==['1962','1968','1974','1983','1984','1991','1992','2003','unk'],json.dumps(st))
             ok('decade chips',st['chips']==['1960s','1970s','1980s','1990s','2000s','Unknown'] and st['on']=='1960s',json.dumps(st))
@@ -63,7 +67,7 @@ with sync_playwright() as p:
             pg.click('.tcb:has-text("Deep Signal 01")'); pg.wait_for_selector('#reader:not(.hidden)'); pg.wait_for_timeout(500)
             ok('tap an issue opens it',pg.evaluate("__cr.R.comic&&__cr.R.comic.title")=='Deep Signal 01')
             pg.evaluate('__cr.toggleUI(true)'); pg.click('#rBack'); pg.wait_for_selector('#shelf:not(.hidden)'); pg.wait_for_timeout(300)
-            ok('closing the reader returns to the Timeline',pg.is_visible('#timeline'))
+            ok('closing the reader returns to the Timeline tab',pg.is_visible('#timeline') and pg.evaluate("document.querySelector('#tabs .on').dataset.tab")=='timeline')
             pg.locator('.tcb:has-text("Paper Moons 01")').click(button='right'); pg.wait_for_selector('#aDate'); ok('long-press sheet shows Release Date (Unknown)','Unknown' in pg.text_content('#aDate'))
             pg.click('#aDate'); pg.wait_for_selector('#dYear'); ok('Save disabled until a 4-digit year',pg.is_disabled('#dSave'))
             pg.select_option('#dMonth','4'); pg.fill('#dYear','1977'); pg.wait_for_timeout(100); pg.click('#dSave'); pg.wait_for_timeout(500)
@@ -71,13 +75,13 @@ with sync_playwright() as p:
             pg.screenshot(path=f'{SH}/{ENG}-v24-date-set-ipad-portrait.png')
             idb=pg.evaluate("new Promise(r=>{const q=indexedDB.open('comic-reader'); q.onsuccess=()=>{const d=q.result; const t=d.transaction('overrides').objectStore('overrides').getAll(); t.onsuccess=()=>r({v:d.version,n:t.result.filter(o=>o.k.includes('Paper_Moons_01')).map(o=>o.date)})}})")
             ok('manual date stored in IndexedDB (v3 overrides store)',idb['v']==3 and idb['n']==[{'y':1977,'m':4}],json.dumps(idb))
-            pg.click('#tlBack'); pg.click('#tabs [data-tab=library]'); pg.locator('.lc[data-title="Paper Moons 01"]').click(button='right'); pg.click('#aDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(400)
+            pg.click('#tabs [data-tab=home]'); pg.click('#tabs [data-tab=library]'); pg.locator('.lc[data-title="Paper Moons 01"]').click(button='right'); pg.click('#aDelete'); pg.click('#confirmOk'); pg.wait_for_timeout(400)
             n=pg.evaluate('__cr.comics.length'); importf(pg,[os.path.join(D,'Paper_Moons_01.pdf')],n+1)
             ok('manual date survives delete + re-import',pg.evaluate(DOF,'Paper Moons 01')=={'y':1977,'m':4,'src':'manual'})
             pg.reload(); pg.wait_for_selector('html[data-ready]'); ok('reload: launch lands on Home, timeline closed; date persisted',pg.is_visible('#homeScroll') and not pg.is_visible('#timeline') and pg.evaluate(DOF,'Paper Moons 01')['y']==1977)
             pg.click('#tabs [data-tab=library]'); pg.locator('.lc[data-title="Paper Moons 01"]').click(button='right'); pg.click('#aDate'); pg.wait_for_selector('#dClear'); pg.click('#dClear'); pg.wait_for_timeout(400)
             ok('"Automatic" clears the manual date (back to Unknown)',pg.evaluate(DOF,'Paper Moons 01') is None and not any('Paper_Moons_01' in k for k in pg.evaluate('[...__cr.dates.ov().keys()]')))
-            pg.click('#tabs [data-tab=home]'); pg.click('#tlOpen'); pg.wait_for_timeout(300); st=pg.evaluate(TLS)
+            pg.click('#tabs [data-tab=home]'); pg.click('#tabs [data-tab=timeline]'); pg.wait_for_timeout(300); st=pg.evaluate(TLS)
         ok(f'{lab}: no horizontal overflow',not st['overflow'],json.dumps(st))
         chrome(pg,lab,sat)
         pg.screenshot(path=f'{SH}/{ENG}-v24-timeline-{lab}.png')

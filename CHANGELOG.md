@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v27 — 2026-10-13
+- **Timeline is a tab**: top control is now Home | Library | Timeline. The Timeline tab shows the compact grid inside the normal app chrome, with decade chips, issue count and the spinner-rack button in a solid sub-bar; year labels still open that year's rack. The app still opens on Home.
+- Removed the Timeline bar under the Home carousel; Home rows sit directly under the carousel again.
+- Segmented control buttons are 40px tall. On iPhone (≤440px) the segments narrow and the Library "Select" button becomes a 40px icon so everything fits at 390pt with no overlap.
+
 ## cr-v26 — 2026-10-12
 - **Spinner rack rebuilt to look like a real one**: tall, narrow white wire rack on a chrome pole with a round white base and a plain "COMICS" sign; 6 wings × 8 tiers of angled wire pockets fanned around the pole, covers leaning back and overlapping down each wing, several wings visible at once; fills ~90% of the screen height. Spins around the pole (60° steps, momentum, reduced motion respected). Every pocket's transform is computed per frame, so it renders the same even where nested 3D is flattened.
 - **Always full**: all 48 pockets filled, nearest dates first (outward from the chosen month, then undated issues); issues repeat only when the whole library is smaller than the rack (shown as "repeats to fill").

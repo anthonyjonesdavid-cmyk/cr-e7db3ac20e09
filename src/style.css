@@ -19,7 +19,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .topbar{flex:none;background:var(--bar);padding:var(--sat) var(--padr) 0 var(--padx);border-bottom:.5px solid var(--sep);position:relative;z-index:5}
 .tb-row{height:50px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
 .segctl{justify-self:center;display:inline-flex;background:var(--el);border-radius:9px;padding:2px;gap:2px}
-.segctl button{min-width:96px;height:30px;border-radius:7px;font-size:14px;font-weight:600;color:var(--mut);transition:background .15s,color .15s}
+.segctl button{min-width:96px;height:40px;border-radius:7px;font-size:14px;font-weight:600;color:var(--mut);transition:background .15s,color .15s}
 .segctl button.on{background:var(--el3);color:#fff}
 .icbtn{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:20px;color:#fff}
 .icbtn:active{background:#ffffff1a}
@@ -349,8 +349,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .hlink:active{background:var(--el2)}.hlink svg{width:20px;height:20px}.hlink span{flex:none}
 .hlink small{flex:1;text-align:right;color:var(--mut);font-weight:500;font-size:13px;font-variant-numeric:tabular-nums}
 .hlink svg:last-child{width:16px;height:16px;color:var(--mut)}
-#timeline{position:absolute;inset:0;z-index:30;background:#000;display:flex;flex-direction:column}#timeline.hidden{display:none}
-.tlbar{flex:none;background:#000;padding:var(--sat) var(--padr) 0 var(--padx);border-bottom:.5px solid var(--sep)}
+#timeline{display:flex;flex-direction:column;background:#000}#timeline.hidden{display:none}
+.tlbar{flex:none;background:#000;padding:4px var(--padr) 0 var(--padx);border-bottom:.5px solid var(--sep);display:flex;align-items:center;gap:8px}
+.tlbar .tldec{flex:1;min-width:0}.tlbar .tlr{flex:none}
 .tl-row{grid-template-columns:44px 1fr auto}.tl-row h2{margin:0;text-align:center;font-size:17px;font-weight:700}
 .tlcount{color:var(--mut);font-size:13px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
 .tldec{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none}.tldec::-webkit-scrollbar{display:none}
@@ -410,3 +411,14 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .lkr{display:flex;gap:10px;align-items:center;min-height:40px;border-bottom:.5px solid #2c2c2e;font-size:13.5px;padding:4px 0}
 .lkr b{flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lkr span{color:var(--mut);white-space:nowrap}.lkr.ok span{color:#30d158}
 .lkr .btn{height:40px;padding:0 12px}
+
+/* ---------- v27: Timeline is a tab ---------- */
+.topbar .tb-row{height:52px}
+.segctl{padding:2px}
+#selBtn .ic{display:none;width:24px;height:24px}
+@media (max-width:440px){
+  .topbar .tb-row{grid-template-columns:auto 1fr auto;column-gap:6px}
+  .segctl button{min-width:72px;font-size:13.5px}
+  #selBtn{padding:0;width:40px}#selBtn .lbl{display:none}#selBtn .ic{display:block}
+  #shelf.selecting #selBtn{width:auto;padding:0 10px}#shelf.selecting #selBtn .lbl{display:inline}#shelf.selecting #selBtn .ic{display:none}
+}
