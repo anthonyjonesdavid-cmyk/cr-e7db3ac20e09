@@ -187,7 +187,7 @@ function renderHome(){
 }
 
 /* ---------- shelf of volumes (v30): one book spine per series/volume (Library grouping incl. Move to Series), on a dark wooden shelf ---------- */
-const SPINE_V=2;   // v33: + accent, art crop
+const SPINE_V=3;   // v33: + accent; v34: art panel dropped (resample frees the stored crop)
 const hashN=t=>{ let h=2166136261; for(const ch of String(t)) h=Math.imul(h^ch.charCodeAt(0),16777619); return h>>>0; };
 const hexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const relLum=([r,g,b])=>{ const f=v=>{ v/=255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4); }; return .2126*f(r)+.7152*f(g)+.0722*f(b); };
@@ -219,64 +219,49 @@ function volInfo(name,list){ const ds=list.map(dateOf).filter(Boolean).map(d=>d.
   const y0=ds.length?Math.min(...ds):0, y1=ds.length?Math.max(...ds):0;
   const yr=!y0?'':y0===y1?String(y0):Math.floor(y0/100)===Math.floor(y1/100)?`${y0}–${String(y1).slice(2)}`:`${y0}–${y1}`;
   return {vol:h.vol||0,yr}; }
-const spineW=n=>Math.round(clamp(40+Math.sqrt(Math.max(0,n-1))*7,40,76));   // modest: 40px (tap target) .. 76px
-/* v33: trade-paperback spines (dark body, art panel cropped from the volume's own first cover, bright accent title) */
-const SPINE_BODY_K=.9;   // body = spine colour mixed 90% toward black
+const spineW=n=>Math.round(clamp(50+Math.sqrt(Math.max(0,n-1))*9,50,90));   // v34: bigger books, 50px .. 90px by issue count
+/* v34 spines: nearly black body, thin accent rule at the top, big near-white title (tint of the cover accent) with a soft dark glow */
+const SPINE_BODY_K=.94;   // body = cover colour mixed 94% toward black
 const bodyOf=hex=>mixHex(hexRGB(hex),[0,0,0],SPINE_BODY_K);
-// accent: lift the colour toward white until it clears 4.5:1 on the body (aim 5:1 for margin)
-function liftAccent(hex,body){ const B=hexRGB(body); let c=hexRGB(hex), k=0, out=hex; while(contrast(hexRGB(out),B)<5&&k<1){ k+=.06; out=mixHex(c,[255,255,255],Math.min(1,k)); } return out; }
-const spineURL=new Map();
-const artURL=c=>{ if(!c.spineArt) return ''; let u=spineURL.get(c.id); if(!u){ u=URL.createObjectURL(c.spineArt instanceof Blob?c.spineArt:new Blob([c.spineArt],{type:'image/jpeg'})); spineURL.set(c.id,u); } return u; };
+// accent (rule colour): the cover accent lifted toward white until it clears 4.5:1 on the body
+function liftAccent(hex,body,min=5){ const B=hexRGB(body); let c=hexRGB(hex), k=0, out=hex; while(contrast(hexRGB(out),B)<min&&k<1){ k+=.06; out=mixHex(c,[255,255,255],Math.min(1,k)); } return out; }
+// title ink: ~85% white mix of the accent, lifted further if needed so it clears 7:1 on the body
+function titleInk(acc,body){ let k=.85, out=mixHex(hexRGB(acc),[255,255,255],k); while(contrast(hexRGB(out),hexRGB(body))<7.2&&k<1){ k+=.03; out=mixHex(hexRGB(acc),[255,255,255],Math.min(1,k)); } return out; }
+const META_MIN_W=60;
 // a sample belongs to one cover bitmap: covers can be regenerated (cover migration, re-import), and then the spine is resampled
 const spineKey=c=>c.cover?(c.coverV||0)+':'+(c.cover.byteLength||c.cover.size||0):'';
-function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spineKey(f); const body=done?f.spineB:'#111114', acc=done?f.spineAcc:'#e8e8ea';
-  return {body,acc,art:done?artURL(f):''}; }
+function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spineKey(f); const body=done?f.spineB:'#0b0b0d', acc=done?f.spineAcc:'#8a8a90';
+  return {body,acc,ink:titleInk(acc,body)}; }
 function volShelfHTML(groups){ if(!groups.size) return '';
   const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
-  const books=vols.map(({name,list})=>{ const f=list[0], {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%4, V=spineVars(f);
-    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · ');
-    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${spineW(list.length)}px;--sb:${V.body};--si:${V.acc};--so:rgba(0,0,0,.6);--sh:${hv}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
-      <span class="sp-art"${V.art?` style="background-image:url(${V.art})"`:''} aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}<span class="sp-n" aria-hidden="true">${list.length}</span></button>`; }).join('');
+  const books=vols.map(({name,list})=>{ const f=list[0], {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%4, V=spineVars(f), sw=spineW(list.length);
+    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=sw>=META_MIN_W?[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · '):'';
+    const tfs=Math.round(clamp((sw-(meta?20:12))*.62,16,36));   // title fills most of the spine width (one column, or title + small subtitle column)
+    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${sw}px;--sb:${V.body};--sa:${V.acc};--si:${V.ink};--sh:${hv}px;--tfs:${tfs}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
+      <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}<span class="sp-n" aria-hidden="true">${list.length}</span></button>`; }).join('');
   return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
 // long titles shrink to fit the spine (down to 11px) before ellipsis
-function fitSpines(){ document.querySelectorAll('#homeScroll .spine .sp-t').forEach(t=>{ t.style.fontSize=''; const need=t.scrollHeight, have=t.clientHeight; if(need<=have+1) return;
-  const fs=parseFloat(getComputedStyle(t).fontSize); t.style.fontSize=Math.max(11,Math.floor(fs*have/need*10)/10)+'px'; }); }
-// per volume, once (when Home first shows it), cached on the first issue's record in IndexedDB: dominant colour, accent, smart-cropped art panel
+function fitSpines(){ document.querySelectorAll('#homeScroll .spine .sp-t').forEach(t=>{ t.style.fontSize=''; const have=t.getBoundingClientRect().height; t.style.maxInlineSize='none'; const need=t.getBoundingClientRect().height; t.style.maxInlineSize=''; if(need<=have+1) return;
+  const fs=parseFloat(getComputedStyle(t).fontSize); t.style.fontSize=Math.max(11,Math.floor(fs*have/need*.97*10)/10)+'px'; }); }
+// per volume, once (when Home first shows it), cached on the first issue's record in IndexedDB: dominant + accent colour
 let spineBusy=false;
 async function sampleSpines(){ if(spineBusy) return; spineBusy=true;
   try{ for(const el of [...document.querySelectorAll('#homeScroll .spine')]){ const c=comics.find(x=>x.id===el.dataset.cid); if(!c||!c.cover||(c.spineV===SPINE_V&&c.spineK===spineKey(c))) continue;
       let r=null; try{ r=await spineSample(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); }catch(e){ console.warn('spine sample',e); }
-      c.spineC=r?r.dom:'#3a3a40'; c.spineB=bodyOf(c.spineC); c.spineAcc=liftAccent(r?r.acc:'#d0d0d0',c.spineB); c.spineArt=r?r.art:null; c.spineCrop=r?r.crop:null; c.spineV=SPINE_V; c.spineK=spineKey(c);
-      await dbPut(c).catch(()=>{}); const u=spineURL.get(c.id); if(u){ URL.revokeObjectURL(u); spineURL.delete(c.id); }
-      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sb',c.spineB); b.style.setProperty('--si',c.spineAcc); const a=artURL(c); if(a) b.querySelector('.sp-art').style.backgroundImage=`url(${a})`; }); } }
+      c.spineC=r?r.dom:'#3a3a40'; c.spineB=bodyOf(c.spineC); c.spineAcc=liftAccent(r&&r.acc||'#a0a0a8',c.spineB); delete c.spineArt; delete c.spineCrop; c.spineV=SPINE_V; c.spineK=spineKey(c);
+      await dbPut(c).catch(()=>{});
+      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sb',c.spineB); b.style.setProperty('--sa',c.spineAcc); b.style.setProperty('--si',titleInk(c.spineAcc,c.spineB)); }); } }
   finally{ spineBusy=false; } }
-async function dominantColor(blob){ return (await spineSample(blob,true)).dom; }
+async function dominantColor(blob){ return (await spineSample(blob)).dom; }
 function colorStats(d){ const bins=new Map(), acc=new Map();
   for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2], mx=Math.max(r,g,b), mn=Math.min(r,g,b), k=(r>>5)<<6|(g>>5)<<3|(b>>5);
     const w=1+(mx-mn)/64, e=bins.get(k)||[0,0,0,0]; e[0]+=w; e[1]+=r*w; e[2]+=g*w; e[3]+=b*w; bins.set(k,e);
     const sat=mx?(mx-mn)/mx:0, val=mx/255; if(sat>.4&&val>.45){ const q=acc.get(k)||[0,0,0,0], ww=sat*val; q[0]+=ww; q[1]+=r*ww; q[2]+=g*ww; q[3]+=b*ww; acc.set(k,q); } }
   const top=m=>{ let best=null; for(const e of m.values()) if(!best||e[0]>best[0]) best=e; return best&&'#'+[best[1],best[2],best[3]].map(v=>Math.round(v/best[0]).toString(16).padStart(2,'0')).join(''); };
   return {dom:top(bins),acc:top(acc)}; }
-// smart crop: edge/contrast density on a downscaled grey copy, upper-centre bias, slight penalty on the top band (cover logo); crop is 5:4 (spine panel)
-const CROP_AR=1.25;
-function smartCrop(g,W,H){ const e=new Float32Array(W*H); for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; e[i]=Math.abs(g[i+1]-g[i-1])+Math.abs(g[i+W]-g[i-W]); }
-  // lettering bands (cover logo, tagline, credits): rows where strong edges spread across most of the width -> mostly ignored
-  { let mx=0; for(const v of e) if(v>mx) mx=v; const T=mx*.35;
-    for(let y=0;y<H;y++){ let n=0,x0=W,x1=-1; for(let x=0;x<W;x++) if(e[y*W+x]>T){ n++; if(x<x0) x0=x; if(x>x1) x1=x; }
-      if(n>W*.18&&x1-x0>W*.45) for(let x=0;x<W;x++) e[y*W+x]*=.15; } }
-  const I=new Float64Array((W+1)*(H+1)); for(let y=0;y<H;y++){ let row=0; for(let x=0;x<W;x++){ row+=e[y*W+x]; I[(y+1)*(W+1)+x+1]=I[y*(W+1)+x+1]+row; } }
-  const sum=(x,y,w,h)=>I[(y+h)*(W+1)+x+w]-I[y*(W+1)+x+w]-I[(y+h)*(W+1)+x]+I[y*(W+1)+x];
-  let best=null; for(const f of [.55,.7]){ const w=Math.round(W*f), h=Math.round(w/CROP_AR); if(h>H) continue;
-    for(let y=0;y+h<=H;y+=2) for(let x=0;x+w<=W;x+=2){ const cx=(x+w/2)/W, cy=(y+h/2)/H; let sc=sum(x,y,w,h)/(w*h)*(1-.4*Math.abs(cx-.5)/.5)*(1-.9*Math.abs(cy-.42))*(y/H<.12?.45:y/H<.24?.6:1)*(f===.7?1.06:1);   // the top band is usually the cover logo/title: art, not lettering
-      if(!best||sc>best.sc) best={sc,x,y,w,h}; } }
-  return best?{x:best.x/W,y:best.y/H,w:best.w/W,h:best.h/H}:{x:.2,y:.15,w:.6,h:.48}; }
-async function spineSample(blob,colorsOnly){ const bm=await createImageBitmap(blob), W=48, H=Math.max(24,Math.round(48*bm.height/bm.width));
-  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,W,H); const d=x.getImageData(0,0,W,H).data;
-  const st=colorStats(d); if(colorsOnly){ bm.close&&bm.close(); return st; }
-  const g=new Float32Array(W*H); for(let i=0;i<W*H;i++) g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
-  const crop=smartCrop(g,W,H), out=document.createElement('canvas'); out.width=190; out.height=152;
-  out.getContext('2d').drawImage(bm,crop.x*bm.width,crop.y*bm.height,crop.w*bm.width,crop.h*bm.height,0,0,190,152); bm.close&&bm.close();
-  const ab=await new Promise(r=>out.toBlob(r,'image/jpeg',.82)), art=ab?await ab.arrayBuffer():null; /* bytes, not a Blob: WebKit IndexedDB can't always store Blobs (same as covers) */ freeCanvas(cv); freeCanvas(out); return {...st,acc:st.acc||st.dom,crop,art}; }
+async function spineSample(blob){ const bm=await createImageBitmap(blob), W=48, H=Math.max(24,Math.round(48*bm.height/bm.width));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,W,H); bm.close&&bm.close();
+  const st=colorStats(x.getImageData(0,0,W,H).data); freeCanvas(cv); return {...st,acc:st.acc||st.dom}; }
 function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>seeAll('series',el.dataset.series);
   if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },200); }
 

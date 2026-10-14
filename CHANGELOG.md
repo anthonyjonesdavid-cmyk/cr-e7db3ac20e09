@@ -1,5 +1,14 @@
 # Comic Shelf: change log
 
+## cr-v34 — 2026-10-14
+
+- Spines: cover-art panel removed (smart-crop no longer used for spines; stored crops dropped).
+- Bigger books: shelf ~220px tall on iPad / ~165px on iPhone; spine width 50–90px scaled by issue count; 5px gaps.
+- Titles: full names, large (fill most of spine width) with v31 per-series fonts; near-white accent tint (85% white mix) with soft dark glow on a near-black body; contrast ≥ 7:1; shrink-to-fit before truncation.
+- Thin accent rule near the top; small issue count at foot; volume/years line only on spines ≥ 60px (light grey).
+- Soft shelf lighting: subtle top-down gradient and faint shadow under books.
+- Tests: e2e_v30 updated for v34 (57 checks).
+
 ## cr-v33 — 2026-10-14
 - **Trade-paperback spines** (after David's reference photo): mostly dark spine body (the cover's colour, 90% toward black); the top ~28% is an art panel cropped from that volume's own first cover; big vertical title in the v31 per-series font in a bright accent colour from the cover (lifted toward white until it clears 5:1 on the body; ≥4.5:1 verified on a 4,913-colour sweep); smaller light subtitle line for volume/years; small issue count at the foot (no publisher logo).
 - **Smart crop**: edge/contrast density on a 48px-wide grey copy, upper-centre bias; lettering bands (logo, tagline, credits: strong edges across most of the width) and the top band are down-weighted, so the panel shows art rather than the cover title. 5:4 crop, stored as a small JPEG.
