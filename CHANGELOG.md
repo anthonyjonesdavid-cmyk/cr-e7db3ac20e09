@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v35 — 2026-10-14
+
+- Spines: issue count and volume/years line removed (both still in the accessible label).
+- Real-book look: subtly rounded spine edges, cylindrical shading (lighter centre, darker edges), thin raised accent bands near top and bottom. Glowing titles, v31 fonts and ≥7:1 contrast unchanged.
+- Selection: tapped book slides up and tips toward the viewer (translateY + rotateX + scale, deeper shadow) over 220ms, then the volume opens (≤250ms). Skipped under prefers-reduced-motion.
+- Tests: e2e_v30 updated for v35 (58 checks, incl. open-time ≤250ms and a mid-animation screenshot).
+
 ## cr-v34 — 2026-10-14
 
 - Spines: cover-art panel removed (smart-crop no longer used for spines; stored crops dropped).

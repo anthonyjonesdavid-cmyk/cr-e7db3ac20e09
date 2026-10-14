@@ -227,7 +227,6 @@ const bodyOf=hex=>mixHex(hexRGB(hex),[0,0,0],SPINE_BODY_K);
 function liftAccent(hex,body,min=5){ const B=hexRGB(body); let c=hexRGB(hex), k=0, out=hex; while(contrast(hexRGB(out),B)<min&&k<1){ k+=.06; out=mixHex(c,[255,255,255],Math.min(1,k)); } return out; }
 // title ink: ~85% white mix of the accent, lifted further if needed so it clears 7:1 on the body
 function titleInk(acc,body){ let k=.85, out=mixHex(hexRGB(acc),[255,255,255],k); while(contrast(hexRGB(out),hexRGB(body))<7.2&&k<1){ k+=.03; out=mixHex(hexRGB(acc),[255,255,255],Math.min(1,k)); } return out; }
-const META_MIN_W=60;
 // a sample belongs to one cover bitmap: covers can be regenerated (cover migration, re-import), and then the spine is resampled
 const spineKey=c=>c.cover?(c.coverV||0)+':'+(c.cover.byteLength||c.cover.size||0):'';
 function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spineKey(f); const body=done?f.spineB:'#0b0b0d', acc=done?f.spineAcc:'#8a8a90';
@@ -235,10 +234,9 @@ function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spi
 function volShelfHTML(groups){ if(!groups.size) return '';
   const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
   const books=vols.map(({name,list})=>{ const f=list[0], {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%4, V=spineVars(f), sw=spineW(list.length);
-    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=sw>=META_MIN_W?[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · '):'';
-    const tfs=Math.round(clamp((sw-(meta?20:12))*.62,16,36));   // title fills most of the spine width (one column, or title + small subtitle column)
+    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], tfs=Math.round(clamp((sw-12)*.62,16,36));   // v35: title only — fills most of the spine width
     return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${sw}px;--sb:${V.body};--sa:${V.acc};--si:${V.ink};--sh:${hv}px;--tfs:${tfs}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
-      <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}<span class="sp-n" aria-hidden="true">${list.length}</span></button>`; }).join('');
+      <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span><span class="sp-rule sp-rb" aria-hidden="true"></span></button>`; }).join('');
   return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
 // long titles shrink to fit the spine (down to 11px) before ellipsis
 function fitSpines(){ document.querySelectorAll('#homeScroll .spine .sp-t').forEach(t=>{ t.style.fontSize=''; const have=t.getBoundingClientRect().height; t.style.maxInlineSize='none'; const need=t.getBoundingClientRect().height; t.style.maxInlineSize=''; if(need<=have+1) return;
@@ -263,7 +261,8 @@ async function spineSample(blob){ const bm=await createImageBitmap(blob), W=48, 
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,W,H); bm.close&&bm.close();
   const st=colorStats(x.getImageData(0,0,W,H).data); freeCanvas(cv); return {...st,acc:st.acc||st.dom}; }
 function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>seeAll('series',el.dataset.series);
-  if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },200); }
+  if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },PULL_MS); }
+const PULL_MS=220;   // v35: book slides up and tips toward the viewer, then the volume opens (never > 250ms)
 
 /* ---------- "This week in…": issues released this week (or, failing that, this month) in past years; computed when Home renders ---------- */
 const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook

@@ -495,6 +495,15 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .spine .sp-m{color:#b8b8be;opacity:1;font-weight:600;font-size:10.5px;text-shadow:0 0 6px rgba(0,0,0,.7)}
 .spine .sp-n{position:absolute;left:0;right:0;bottom:6px;writing-mode:horizontal-tb;text-align:center;font-size:10px;font-weight:700;color:#8e8e96;font-variant-numeric:tabular-nums;line-height:1}
 @media (max-width:600px){.spine .sp-t{font-size:calc(var(--tfs) * var(--fs) * .9)}}
+
+/* v35 spines: real-book look (rounded edges, cylindrical shading, raised bands), no count / no vol-years; tip-out selection */
+.volshelf{perspective:900px}
+.spine{border-radius:6px/3px;background-image:linear-gradient(90deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.28) 9%,rgba(255,255,255,.07) 32%,rgba(255,255,255,.11) 50%,rgba(255,255,255,.07) 68%,rgba(0,0,0,.28) 91%,rgba(0,0,0,.62) 100%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0) 30%);
+  padding:26px 0 26px;transform-origin:50% 100%;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s ease;will-change:transform}
+.spine .sp-rule{left:8%;right:8%;top:12px;height:3px;border-radius:1.5px;opacity:.9;background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 45%,rgba(0,0,0,.35)),var(--sa);box-shadow:0 1px 1px rgba(0,0,0,.6),0 -1px 0 rgba(255,255,255,.06)}
+.spine .sp-rule.sp-rb{top:auto;bottom:12px}
+.spine.out{transform:translateY(-16px) rotateX(-10deg) scale(1.05);z-index:2;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 22px -6px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.3)}
+@media (prefers-reduced-motion:reduce){.spine{transition:none}.spine.out{transform:none}}
 </style>
 </head>
 <body>
@@ -552,7 +561,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=34',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=35',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -1094,7 +1103,6 @@ const bodyOf=hex=>mixHex(hexRGB(hex),[0,0,0],SPINE_BODY_K);
 function liftAccent(hex,body,min=5){ const B=hexRGB(body); let c=hexRGB(hex), k=0, out=hex; while(contrast(hexRGB(out),B)<min&&k<1){ k+=.06; out=mixHex(c,[255,255,255],Math.min(1,k)); } return out; }
 // title ink: ~85% white mix of the accent, lifted further if needed so it clears 7:1 on the body
 function titleInk(acc,body){ let k=.85, out=mixHex(hexRGB(acc),[255,255,255],k); while(contrast(hexRGB(out),hexRGB(body))<7.2&&k<1){ k+=.03; out=mixHex(hexRGB(acc),[255,255,255],Math.min(1,k)); } return out; }
-const META_MIN_W=60;
 // a sample belongs to one cover bitmap: covers can be regenerated (cover migration, re-import), and then the spine is resampled
 const spineKey=c=>c.cover?(c.coverV||0)+':'+(c.cover.byteLength||c.cover.size||0):'';
 function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spineKey(f); const body=done?f.spineB:'#0b0b0d', acc=done?f.spineAcc:'#8a8a90';
@@ -1102,10 +1110,9 @@ function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spi
 function volShelfHTML(groups){ if(!groups.size) return '';
   const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
   const books=vols.map(({name,list})=>{ const f=list[0], {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%4, V=spineVars(f), sw=spineW(list.length);
-    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=sw>=META_MIN_W?[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · '):'';
-    const tfs=Math.round(clamp((sw-(meta?20:12))*.62,16,36));   // title fills most of the spine width (one column, or title + small subtitle column)
+    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], tfs=Math.round(clamp((sw-12)*.62,16,36));   // v35: title only — fills most of the spine width
     return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${sw}px;--sb:${V.body};--sa:${V.acc};--si:${V.ink};--sh:${hv}px;--tfs:${tfs}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
-      <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}<span class="sp-n" aria-hidden="true">${list.length}</span></button>`; }).join('');
+      <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span><span class="sp-rule sp-rb" aria-hidden="true"></span></button>`; }).join('');
   return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
 // long titles shrink to fit the spine (down to 11px) before ellipsis
 function fitSpines(){ document.querySelectorAll('#homeScroll .spine .sp-t').forEach(t=>{ t.style.fontSize=''; const have=t.getBoundingClientRect().height; t.style.maxInlineSize='none'; const need=t.getBoundingClientRect().height; t.style.maxInlineSize=''; if(need<=have+1) return;
@@ -1130,7 +1137,8 @@ async function spineSample(blob){ const bm=await createImageBitmap(blob), W=48, 
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,W,H); bm.close&&bm.close();
   const st=colorStats(x.getImageData(0,0,W,H).data); freeCanvas(cv); return {...st,acc:st.acc||st.dom}; }
 function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>seeAll('series',el.dataset.series);
-  if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },200); }
+  if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },PULL_MS); }
+const PULL_MS=220;   // v35: book slides up and tips toward the viewer, then the volume opens (never > 250ms)
 
 /* ---------- "This week in…": issues released this week (or, failing that, this month) in past years; computed when Home renders ---------- */
 const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook

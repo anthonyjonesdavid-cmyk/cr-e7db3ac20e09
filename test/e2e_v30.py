@@ -9,7 +9,7 @@ res=[]; errors=[]
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS' if cond else 'FAIL'),f'[{ENG}]',name,str(extra)[:300] if not cond else '',flush=True)
 SP="""(()=>{const s=document.querySelector('#homeScroll .volshelf'); if(!s) return null; const sc=s.querySelector('.vs-s'), r=e=>e.getBoundingClientRect(), cf=r(document.querySelector('#homeScroll .hero'));
-  const sp=[...s.querySelectorAll('.spine')].map(b=>{const q=r(b), cs=getComputedStyle(b); return {n:b.dataset.series,w:q.width,h:q.height,bg:cs.backgroundColor,ink:cs.color,wm:getComputedStyle(b.querySelector('.sp-t')).writingMode,ff:getComputedStyle(b.querySelector('.sp-t')).fontFamily,font:b.dataset.font,tw:b.querySelector('.sp-t').getBoundingClientRect().width,fs:parseFloat(getComputedStyle(b.querySelector('.sp-t')).fontSize),t:b.querySelector('.sp-t').textContent,m:(b.querySelector('.sp-m')||{}).textContent||'',cid:b.dataset.cid}});
+  const sp=[...s.querySelectorAll('.spine')].map(b=>{const q=r(b), cs=getComputedStyle(b); return {n:b.dataset.series,w:q.width,h:q.height,bg:cs.backgroundColor,ink:cs.color,wm:getComputedStyle(b.querySelector('.sp-t')).writingMode,ff:getComputedStyle(b.querySelector('.sp-t')).fontFamily,font:b.dataset.font,tw:b.querySelector('.sp-t').getBoundingClientRect().width,fs:parseFloat(getComputedStyle(b.querySelector('.sp-t')).fontSize),t:b.querySelector('.sp-t').textContent,m:(b.querySelector('.sp-m')||{}).textContent||'',nc:!!b.querySelector('.sp-n'),al:b.getAttribute('aria-label'),cid:b.dataset.cid}});
   const ks=[...s.querySelectorAll('.spine')].map(r), gaps=ks.slice(1).map((q,k)=>+(q.left-ks[k].right).toFixed(1)); const nx=s.nextElementSibling; return {sp,gaps,h:r(s).height,gapTop:r(s).top-cf.bottom,next:nx&&(nx.classList.contains('otw')?'otw':nx.classList.contains('row')?'row':nx.className),over:sc.scrollWidth>sc.clientWidth+1,first:s===document.querySelector('#homeScroll .rows').firstElementChild,ox:document.documentElement.scrollWidth>innerWidth}})()"""
 RGB="(s=>s.match(/\\d+/g).slice(0,3).map(Number))"
 def wait_cols(pg): pg.wait_for_function("__cr.comics.filter(c=>c.series).every(c=>true) && [...document.querySelectorAll('#homeScroll .spine')].every(b=>{const c=__cr.comics.find(x=>x.id===b.dataset.cid); return c&&c.spineV})",timeout=30000); pg.wait_for_timeout(200)
@@ -37,7 +37,7 @@ with sync_playwright() as p:
         if lab=='ipad-landscape':
             byn={x['n']:x for x in s['sp']}
             ok('thickness scales with issue count (5 issues wider than 2), 50-90px',byn['Iron Tide']['w']>byn['Twin Moon']['w'] and max(x['w'] for x in s['sp'])<=90 and min(x['w'] for x in s['sp'])>=50,json.dumps({k:v['w'] for k,v in byn.items()}))
-            ok('v34: volume/years line only on spines >=60px (year range from Timeline dates)',all((x['m']=='')==(x['w']<60) or (x['w']>=60 and x['m']=='') for x in s['sp']) and all(x['m']=='' for x in s['sp'] if x['w']<60) and pg.evaluate("__cr.vols.info('Comet Run',__cr.comics.filter(c=>c.series==='Comet Run')).yr")=='1983–84' and byn['Comet Run']['w']<60,json.dumps([(x['n'],x['w'],x['m']) for x in s['sp']]))
+            ok('v35: no issue count and no volume/years line on any spine (years still computed for the label)',all(x['m']=='' and not x['nc'] for x in s['sp']) and pg.evaluate("__cr.vols.info('Comet Run',__cr.comics.filter(c=>c.series==='Comet Run')).yr")=='1983–84' and byn['Comet Run']['w']<60,json.dumps([(x['n'],x['w'],x['m']) for x in s['sp']]))
             sweep=pg.evaluate("""(()=>{let worst=99,at=''; for(let r=0;r<256;r+=15)for(let g=0;g<256;g+=15)for(let b=0;b<256;b+=15){ const h='#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''), k=__cr.vols.inks(h), c=__cr.vols.contrast(__cr.vols.hexRGB(h),__cr.vols.hexRGB(k.ink)); if(c<worst){worst=c;at=h} } return {worst,at}})()""")
             ok('v31: ink passes WCAG 4.5:1 on every spine colour (4,913-colour sweep incl. all mid-tones)',sweep['worst']>=4.5,json.dumps(sweep))
             mid=pg.evaluate("['#777777','#7f7f7f','#808080','#8a6d5a','#5f7f9f','#b05a5a','#6a8f3f'].map(h=>{const k=__cr.vols.inks(h); return [h,k.ink,+__cr.vols.contrast(__cr.vols.hexRGB(h),__cr.vols.hexRGB(k.ink)).toFixed(2)]})")
@@ -59,13 +59,14 @@ with sync_playwright() as p:
             samp=pg.evaluate("""(async()=>{const c=__cr.comics.find(x=>x.title==='Iron Tide 01'); const b=document.querySelector('.spine[data-series="Iron Tide"]'); const again=await __cr.vols.dominant(c.cover instanceof Blob?c.cover:new Blob([c.cover]));
               const t=b.querySelector('.sp-t'), ru=b.querySelector('.sp-rule'), rr=ru.getBoundingClientRect(), br=b.getBoundingClientRect(), tr=t.getBoundingClientRect();
               return {c:c.spineC,again,body:c.spineB,acc:c.spineAcc,bodyExp:__cr.vols.bodyOf(c.spineC),inkExp:__cr.vols.titleInk(c.spineAcc,c.spineB),bg:getComputedStyle(b).backgroundColor,ink:getComputedStyle(t).color,ts:getComputedStyle(t).textShadow,
-                rule:getComputedStyle(ru).backgroundColor,ruleTop:rr.top-br.top,ruleH:rr.height,art:!!b.querySelector('.sp-art'),stored:!!c.spineArt||!!c.spineCrop,fill:tr.width/br.width,meta:getComputedStyle(b.querySelector('.sp-m')||b).color,n:b.querySelector('.sp-n').textContent}})()""")
+                rule:getComputedStyle(ru).backgroundColor,ruleTop:rr.top-br.top,ruleH:rr.height,art:!!b.querySelector('.sp-art'),stored:!!c.spineArt||!!c.spineCrop,fill:tr.width/br.width,rb:(()=>{const q=b.querySelector('.sp-rule.sp-rb'); if(!q) return null; const z=q.getBoundingClientRect(); return {bot:br.bottom-z.bottom,h:z.height,c:getComputedStyle(q).backgroundColor}})(),rad:getComputedStyle(b).borderTopLeftRadius,bgi:getComputedStyle(b).backgroundImage}})()""")
             hx=lambda h:[int(h[i:i+2],16) for i in (1,3,5)]
             ok('v34: nearly black body from the cover colour; title = near-white tint of the cover accent with a soft dark glow',samp['c']==samp['again'] and samp['body']==samp['bodyExp'] and pg.evaluate(f"{RGB}('{samp['bg']}')")==hx(samp['body']) and pg.evaluate(f"{RGB}('{samp['ink']}')")==hx(samp['inkExp']) and sum(hx(samp['body']))<70 and min(hx(samp['inkExp']))>=190 and '8px' in samp['ts'],json.dumps(samp))
-            ok('v34: no cover-art panel (nothing cropped or stored); thin accent rule at the top; issue count at the foot',not samp['art'] and not samp['stored'] and pg.evaluate(f"{RGB}('{samp['rule']}')")==hx(samp['acc']) and samp['ruleTop']<=14 and samp['ruleH']<=3 and samp['n']=='5',json.dumps(samp))
+            ok('v34: no cover-art panel (nothing cropped or stored); raised accent bands near top and bottom',not samp['art'] and not samp['stored'] and pg.evaluate(f"{RGB}('{samp['rule']}')")==hx(samp['acc']) and samp['ruleTop']<=16 and samp['ruleH']<=4 and samp['rb'] and samp['rb']['bot']<=16 and samp['rb']['h']<=4 and pg.evaluate(f"{RGB}('{samp['rb']['c']}')")==hx(samp['acc']),json.dumps(samp))
             ok('v34: big titles fill most of the spine width',samp['fill']>=.38,json.dumps(samp))
-            mc=[pg.evaluate(f"__cr.vols.contrast({RGB}('{x}'),{RGB}('{samp['bg']}'))") for x in (samp['meta'],)]
-            ok('v34: subtitle (Vol/years) light grey, readable on the dark body',min(mc)>=4.5,json.dumps(mc))
+            stops=samp['bgi'].split('linear-gradient')[1] if 'linear-gradient' in samp['bgi'] else ''
+            al=[float(a) for a in __import__('re').findall(r'rgba\(\s*\d+,\s*\d+,\s*\d+,\s*([\d.]+)\)',stops)]
+            ok('v35: real-book look: rounded spine edges + cylindrical shading (dark edges, light centre)',samp['rad'].startswith('6px') and stops.count('rgba(0, 0, 0')>=4 and stops.count('rgba(255, 255, 255')>=2 and al and al[0]>=.5 and al[-1]>=.5,json.dumps([samp['rad'],stops]))
             sw2=pg.evaluate("""(()=>{let worst=99,at=''; for(let r=0;r<256;r+=15)for(let g=0;g<256;g+=15)for(let b=0;b<256;b+=15){ const h='#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''), body=__cr.vols.bodyOf(h), a=__cr.vols.lift(h,body), t=__cr.vols.titleInk(a,body), c=__cr.vols.contrast(__cr.vols.hexRGB(t),__cr.vols.hexRGB(body)); if(c<worst){worst=c;at=h} } return {worst,at}})()""")
             ok('v34: title passes 7:1 on the body for every cover colour (4,913-colour sweep)',sw2['worst']>=7,json.dumps(sw2))
             hs=[x['h'] for x in s['sp']]; ok('v34: trade-like uniform heights (within 4px)',max(hs)-min(hs)<=4,json.dumps(hs))
@@ -76,12 +77,17 @@ with sync_playwright() as p:
             ok('after reload colours come from the cache (no resampling, applied on first paint)',n==0,n)
             pg.evaluate("__cr.series.move(['Ember Road'],'Ember Road Vol 2')"); pg.wait_for_timeout(400); s=pg.evaluate(SP)
             e=[x for x in s['sp'] if x['n']=='Ember Road Vol 2']
-            ok('Move to Series choice regroups the shelf; volume number shown',e and 'Vol 2' in e[0]['m'] and e[0]['t']=='Ember Road' and not any(x['n']=='Ember Road' for x in s['sp']),json.dumps(e))
-            pg.screenshot(path=f'{SH}/{ENG}-v34-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v34-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
-            t=pg.evaluate("""(async()=>{const b=document.querySelector('.spine[data-series="Nightfall"]'); b.click(); await new Promise(r=>setTimeout(r,90)); const mid=getComputedStyle(b).transform; return {mid,cls:b.classList.contains('out')}})()""")
+            ok('Move to Series choice regroups the shelf; volume number shown',e and 'volume 2' in e[0]['al'] and e[0]['m']=='' and e[0]['t']=='Ember Road' and not any(x['n']=='Ember Road' for x in s['sp']),json.dumps(e))
+            pg.screenshot(path=f'{SH}/{ENG}-v35-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v35-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
+            pg.evaluate("""(()=>{window.__pt={}; const b=document.querySelector('.spine[data-series="Nightfall"]'); const L=document.querySelector('#library'); const t0=performance.now(); new MutationObserver((m,o)=>{ if(!L.classList.contains('hidden')){ __pt.open=performance.now()-t0; o.disconnect(); } }).observe(L,{attributes:true}); b.click(); setTimeout(()=>{__pt.mid=getComputedStyle(b).transform; __pt.cls=b.classList.contains('out'); __pt.dur=getComputedStyle(b).transitionDuration},110)})()""")
+            pg.wait_for_timeout(450); t=pg.evaluate("__pt")
+            ok('v35: tap = slide up + tip toward the viewer (3D: rotateX + scale) with ~220ms transition, volume opens within 250ms',t.get('cls') and t.get('mid','').startswith('matrix3d') and t.get('open',999)<=265 and t.get('open',0)>=180 and '0.22s' in t.get('dur',''),json.dumps(t))
             pg.wait_for_timeout(400); lib=pg.evaluate("({vis:!document.querySelector('#library').classList.contains('hidden'),tab:document.querySelector('#tabs .on').dataset.tab,titles:[...document.querySelectorAll('#libGrid .lc')].map(e=>e.dataset.title)})")
             ok('tap a spine: it slides out, then the series issue view opens',t['cls'] and t['mid']!='none' and lib['vis'] and lib['titles'] and all(x.startswith('Nightfall') for x in lib['titles']),json.dumps([t,lib]))
-            pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300)
+            pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(400)
+            pg.evaluate("document.querySelector('.spine[data-series=\"Iron Tide\"]').click()"); pg.wait_for_timeout(100)
+            pg.screenshot(path=f'{SH}/{ENG}-v35-spine-tipout-mid-{lab}.png',clip={'x':0,'y':bb['y']-30,'width':min(w,700),'height':bb['height']+40})
+            pg.wait_for_timeout(400); pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300)
             pg.emulate_media(reduced_motion='reduce'); pg.wait_for_timeout(100)
             t=pg.evaluate("""(()=>{const b=document.querySelector('.spine[data-series="Iron Tide"]'); b.click(); return {out:b.classList.contains('out'),lib:!document.querySelector('#library').classList.contains('hidden')}})()""")
             ok('reduced motion: no slide, opens immediately',not t['out'] and t['lib'],json.dumps(t)); pg.emulate_media(reduced_motion='no-preference'); pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300)
@@ -93,7 +99,7 @@ with sync_playwright() as p:
         g=pg.evaluate("(()=>({tb:getComputedStyle(document.querySelector('.topbar')).backgroundColor,top:document.querySelector('#tabs').getBoundingClientRect().top}))()")
         ok(f'{lab}: solid top bar, nothing under the status bar',g['tb']=='rgb(0, 0, 0)' and g['top']>=sat,json.dumps(g))
         if lab!='ipad-landscape':
-            pg.screenshot(path=f'{SH}/{ENG}-v34-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v34-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
+            pg.screenshot(path=f'{SH}/{ENG}-v35-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v35-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
         ctx.close()
     b.close()
 ok('no page errors',not errors,'; '.join(errors[:3]))

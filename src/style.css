@@ -474,3 +474,12 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .spine .sp-m{color:#b8b8be;opacity:1;font-weight:600;font-size:10.5px;text-shadow:0 0 6px rgba(0,0,0,.7)}
 .spine .sp-n{position:absolute;left:0;right:0;bottom:6px;writing-mode:horizontal-tb;text-align:center;font-size:10px;font-weight:700;color:#8e8e96;font-variant-numeric:tabular-nums;line-height:1}
 @media (max-width:600px){.spine .sp-t{font-size:calc(var(--tfs) * var(--fs) * .9)}}
+
+/* v35 spines: real-book look (rounded edges, cylindrical shading, raised bands), no count / no vol-years; tip-out selection */
+.volshelf{perspective:900px}
+.spine{border-radius:6px/3px;background-image:linear-gradient(90deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.28) 9%,rgba(255,255,255,.07) 32%,rgba(255,255,255,.11) 50%,rgba(255,255,255,.07) 68%,rgba(0,0,0,.28) 91%,rgba(0,0,0,.62) 100%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0) 30%);
+  padding:26px 0 26px;transform-origin:50% 100%;transition:transform .22s cubic-bezier(.2,.8,.2,1),box-shadow .22s ease;will-change:transform}
+.spine .sp-rule{left:8%;right:8%;top:12px;height:3px;border-radius:1.5px;opacity:.9;background:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 45%,rgba(0,0,0,.35)),var(--sa);box-shadow:0 1px 1px rgba(0,0,0,.6),0 -1px 0 rgba(255,255,255,.06)}
+.spine .sp-rule.sp-rb{top:auto;bottom:12px}
+.spine.out{transform:translateY(-16px) rotateX(-10deg) scale(1.05);z-index:2;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 22px -6px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.3)}
+@media (prefers-reduced-motion:reduce){.spine{transition:none}.spine.out{transform:none}}
