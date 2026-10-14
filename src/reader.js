@@ -35,6 +35,12 @@ function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key)
   return enqueue(key,'page',i,prio,async()=>{ if(window.__crSlow) await new Promise(r=>setTimeout(r,window.__crSlow)); const page=await doc.getPage(i+1); const vp=page.getViewport({scale:1}); noteAspect(i,vp.width/vp.height);
     const c=await renderToCanvas(page,w,h,DPR,BASE_MAX_PX); page.cleanup(); return cachePut(key,{canvas:c,px:c.width*c.height}); }); }
 
+/* ---- v32 diagnostics: pixel size of the largest image embedded in a page (scan resolution), vs the page's size on screen ---- */
+async function pageSourceRes(i){ const doc=R.doc; if(!doc) return null; const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), ops=await pg.getOperatorList(); let best=null;
+  const P=pdfjsLib.OPS; for(let k=0;k<ops.fnArray.length;k++){ const f=ops.fnArray[k]; if(f!==P.paintImageXObject&&f!==P.paintInlineImageXObject&&f!==P.paintImageMaskXObject) continue; const a=ops.argsArray[k];
+    let w=a[1],h=a[2]; if(!(w>0)){ const o=typeof a[0]==='string'?await new Promise(r=>{ try{ pg.objs.get(a[0],r); }catch(e){ r(null); } }):a[0]; w=o&&o.width; h=o&&o.height; }
+    if(w>0&&(!best||w*h>best.w*best.h)) best={w,h}; }
+  pg.cleanup(); return best?{...best,ptW:vp.width,ptH:vp.height}:null; }
 /* ---- views: single pages, or spreads with the cover alone ---- */
 // half mode (fold comics in portrait): each wide sheet becomes two views, its halves in reading order (RTL: right half first);
 // the wide cover sheet shows only its cover half (from the cover-crop detection); narrow sheets stay whole. R.vh[k] = 'L' | 'R' | null
@@ -96,7 +102,11 @@ function fillPage(d,i,w,h,align,prio,half){ Object.assign(d.dataset,{p:i,w,h,a:a
   const e=cacheGet(keyFor(i,fw,h)); if(e){ show(e); return; }
   const any=cacheAny(i); if(any){ show(any); d.dataset.interim='1'; }
   else { d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i+1; d.prepend(ph); }
-  requestPage(i,fw,h,prio).then(ent=>{ if(d.isConnected&&d.dataset.p==String(i)&&!d.dataset.hi){ show(ent); delete d.dataset.interim; } }).catch(()=>{}); }
+  // v32: an interim (a cached render made for another size/orientation) is only a placeholder: the exact-size render is always requested,
+  // and re-requested if its job was dropped, so a visible page can never stay on a lower-resolution bitmap
+  const want=(n)=>requestPage(i,fw,h,prio).then(ent=>{ if(d.isConnected&&d.dataset.p==String(i)&&!d.dataset.hi){ show(ent); delete d.dataset.interim; } })
+    .catch(()=>{ if(n<3&&d.isConnected&&d.dataset.p==String(i)&&R.viewEl&&R.viewEl.contains(d)) setTimeout(()=>{ if(d.isConnected) want(n+1); },60); });
+  want(0); }
 function pageEl(i,r,align,cls,half){ const d=document.createElement('div'); d.className=cls||'pg'; d.style.width=r.w+'px'; d.style.height=r.h+'px';
   if(i==null) d.classList.add('blank'); else fillPage(d,i,r.w,r.h,align,0,half); return d; }
 

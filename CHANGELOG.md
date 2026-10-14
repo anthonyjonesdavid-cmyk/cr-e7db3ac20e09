@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v32 — 2026-10-14
+- **Sharper pages on iPad**: the per-page bitmap cap on iOS was 4.2 MP. That forced full-screen spreads (2732×2048 on iPad landscape) to 88% resolution and portrait pages on large iPads to ~93%, below screen × devicePixelRatio. Raised to 7 MP (well under the iOS 16.7 MP per-canvas limit); the total cache budget is still bounded (36 MP on iOS).
+- Placeholders (a cached render from another size/orientation) are always upgraded: the exact-size render is re-requested if its job was dropped.
+- Diagnostics: `__cr.srcRes(page)` reports the pixel size of the scan embedded in a page.
+- Investigated Excalibur 006 pp.18–19: the soft left page is the file itself. Pages 11–18 embed their art as 329×499 images (≈50 ppi), the rest at 988×1500 (150 ppi). The reader renders both at full screen resolution; nothing in the app can recover the missing detail (a better scan is needed).
+- New test e2e_v32.py: with an iPad/iPhone user agent (iOS caps on), every visible page's canvas backing ≥ CSS size × DPR after opening, turns, fast turns while renders are slow, jumps, the Rotate button and device rotation — both pages in 2-up included.
+
 ## cr-v31 — 2026-10-14
 - **Spine typography**: each series gets a display face that evokes its genre (never a copy of a logo), from 8 bundled open-licensed fonts (fonts/README.md): Bangers (Spider-Man-style comic), Bungee + italic skew (X-Men blocky), Luckiest Guy (Fantastic Four heavy retro), Cinzel Decorative (Batman / Hellboy / Sandman gothic serif), Creepster (horror), Orbitron (sci-fi geometric), Black Ops One (military/war), Permanent Marker (indie). Unknown series get a deterministic varied fallback. Letter-spacing per face; Latin subsets (~150 KB total), cached by the service worker.
 - **Full names on spines**: ASM → Amazing Spider-Man, UXM → Uncanny X-Men, FF → Fantastic Four, TMNT, JLA, GotG, TEC and more (small alias map; Library names unchanged).

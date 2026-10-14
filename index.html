@@ -541,7 +541,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=31',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=32',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -568,9 +568,12 @@ const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Mat
 const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':(b/1073741824).toFixed(2)+' GB';
 const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const DPR=Math.min(window.devicePixelRatio||1, 2);
-const BASE_MAX_PX = IS_IOS? 4.2e6 : 6e6;   // per page bitmap
+// per page bitmap. v32: was 4.2e6 on iOS, which downscaled full-screen spreads (2732x2048 = 5.6MP on iPad landscape) and
+// portrait pages on large iPads (~2048x2732) below viewport x devicePixelRatio. 7e6 covers every iPad screen at 2x and stays far under
+// the iOS 16.7MP per-canvas limit; total memory stays bounded by CACHE_BUDGET.
+const BASE_MAX_PX = IS_IOS? 7e6 : 9e6;
 const HI_MAX_PX   = IS_IOS? 12e6 : 16e6;   // zoomed re-render (iOS canvas limit is 16.7 MP)
-const CACHE_BUDGET= IS_IOS? 30e6 : 70e6;   // total pixels kept in the bitmap LRU (~4 bytes each)
+const CACHE_BUDGET= IS_IOS? 36e6 : 70e6;   // total pixels kept in the bitmap LRU (~4 bytes each)
 const CHUNK=4*1024*1024;                    // PDFs are stored in 4 MB chunks and read by range
 const store={get:(k,d)=>{try{const v=localStorage.getItem('cr.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set:(k,v)=>{try{localStorage.setItem('cr.'+k,JSON.stringify(v))}catch(e){}}};
 function titleFromName(n){ return n.replace(/\.pdf$/i,'').replace(/_+/g,' ').replace(/\s+/g,' ').trim()||'Untitled'; }
@@ -1837,6 +1840,12 @@ function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key)
   return enqueue(key,'page',i,prio,async()=>{ if(window.__crSlow) await new Promise(r=>setTimeout(r,window.__crSlow)); const page=await doc.getPage(i+1); const vp=page.getViewport({scale:1}); noteAspect(i,vp.width/vp.height);
     const c=await renderToCanvas(page,w,h,DPR,BASE_MAX_PX); page.cleanup(); return cachePut(key,{canvas:c,px:c.width*c.height}); }); }
 
+/* ---- v32 diagnostics: pixel size of the largest image embedded in a page (scan resolution), vs the page's size on screen ---- */
+async function pageSourceRes(i){ const doc=R.doc; if(!doc) return null; const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), ops=await pg.getOperatorList(); let best=null;
+  const P=pdfjsLib.OPS; for(let k=0;k<ops.fnArray.length;k++){ const f=ops.fnArray[k]; if(f!==P.paintImageXObject&&f!==P.paintInlineImageXObject&&f!==P.paintImageMaskXObject) continue; const a=ops.argsArray[k];
+    let w=a[1],h=a[2]; if(!(w>0)){ const o=typeof a[0]==='string'?await new Promise(r=>{ try{ pg.objs.get(a[0],r); }catch(e){ r(null); } }):a[0]; w=o&&o.width; h=o&&o.height; }
+    if(w>0&&(!best||w*h>best.w*best.h)) best={w,h}; }
+  pg.cleanup(); return best?{...best,ptW:vp.width,ptH:vp.height}:null; }
 /* ---- views: single pages, or spreads with the cover alone ---- */
 // half mode (fold comics in portrait): each wide sheet becomes two views, its halves in reading order (RTL: right half first);
 // the wide cover sheet shows only its cover half (from the cover-crop detection); narrow sheets stay whole. R.vh[k] = 'L' | 'R' | null
@@ -1898,7 +1907,11 @@ function fillPage(d,i,w,h,align,prio,half){ Object.assign(d.dataset,{p:i,w,h,a:a
   const e=cacheGet(keyFor(i,fw,h)); if(e){ show(e); return; }
   const any=cacheAny(i); if(any){ show(any); d.dataset.interim='1'; }
   else { d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i+1; d.prepend(ph); }
-  requestPage(i,fw,h,prio).then(ent=>{ if(d.isConnected&&d.dataset.p==String(i)&&!d.dataset.hi){ show(ent); delete d.dataset.interim; } }).catch(()=>{}); }
+  // v32: an interim (a cached render made for another size/orientation) is only a placeholder: the exact-size render is always requested,
+  // and re-requested if its job was dropped, so a visible page can never stay on a lower-resolution bitmap
+  const want=(n)=>requestPage(i,fw,h,prio).then(ent=>{ if(d.isConnected&&d.dataset.p==String(i)&&!d.dataset.hi){ show(ent); delete d.dataset.interim; } })
+    .catch(()=>{ if(n<3&&d.isConnected&&d.dataset.p==String(i)&&R.viewEl&&R.viewEl.contains(d)) setTimeout(()=>{ if(d.isConnected) want(n+1); },60); });
+  want(0); }
 function pageEl(i,r,align,cls,half){ const d=document.createElement('div'); d.className=cls||'pg'; d.style.width=r.w+'px'; d.style.height=r.h+'px';
   if(i==null) d.classList.add('blank'); else fillPage(d,i,r.w,r.h,align,0,half); return d; }
 
@@ -2347,7 +2360,7 @@ function panelsAfterRender(){ if(P.internal||!P.on) return; const want=P.key; P.
 pexit.addEventListener('click',()=>exitPanels(true));
 addEventListener('resize',()=>{ if(P.on) placeMask(false); });
 /* ================= boot ================= */
-window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},dates:{of:dateOf,week:onThisWeek,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},dates:{of:dateOf,week:onThisWeek,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);

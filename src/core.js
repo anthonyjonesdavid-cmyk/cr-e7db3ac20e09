@@ -10,9 +10,12 @@ const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Mat
 const fmtBytes=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':(b/1073741824).toFixed(2)+' GB';
 const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const DPR=Math.min(window.devicePixelRatio||1, 2);
-const BASE_MAX_PX = IS_IOS? 4.2e6 : 6e6;   // per page bitmap
+// per page bitmap. v32: was 4.2e6 on iOS, which downscaled full-screen spreads (2732x2048 = 5.6MP on iPad landscape) and
+// portrait pages on large iPads (~2048x2732) below viewport x devicePixelRatio. 7e6 covers every iPad screen at 2x and stays far under
+// the iOS 16.7MP per-canvas limit; total memory stays bounded by CACHE_BUDGET.
+const BASE_MAX_PX = IS_IOS? 7e6 : 9e6;
 const HI_MAX_PX   = IS_IOS? 12e6 : 16e6;   // zoomed re-render (iOS canvas limit is 16.7 MP)
-const CACHE_BUDGET= IS_IOS? 30e6 : 70e6;   // total pixels kept in the bitmap LRU (~4 bytes each)
+const CACHE_BUDGET= IS_IOS? 36e6 : 70e6;   // total pixels kept in the bitmap LRU (~4 bytes each)
 const CHUNK=4*1024*1024;                    // PDFs are stored in 4 MB chunks and read by range
 const store={get:(k,d)=>{try{const v=localStorage.getItem('cr.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set:(k,v)=>{try{localStorage.setItem('cr.'+k,JSON.stringify(v))}catch(e){}}};
 function titleFromName(n){ return n.replace(/\.pdf$/i,'').replace(/_+/g,' ').replace(/\s+/g,' ').trim()||'Untitled'; }
