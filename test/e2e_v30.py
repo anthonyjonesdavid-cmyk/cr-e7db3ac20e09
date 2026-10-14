@@ -55,17 +55,30 @@ with sync_playwright() as p:
             ok('v31: "ASM" series shows "Amazing Spider-Man" on its spine, Library name unchanged, comic-style face',a and a[0]['t']=='Amazing Spider-Man' and a[0]['font']=='bangers' and libn,json.dumps(a))
             pg.evaluate("__cr.series.move(['ASM'],'Twin Moon')"); pg.wait_for_timeout(400)
             samp=pg.evaluate("""(async()=>{const c=__cr.comics.find(x=>x.title==='Iron Tide 01'); const b=document.querySelector('.spine[data-series="Iron Tide"]'); const again=await __cr.vols.dominant(c.cover instanceof Blob?c.cover:new Blob([c.cover]));
-              return {c:c.spineC,v:c.spineV,again,bg:getComputedStyle(b).backgroundColor}})()""")
-            ok('spine colour = dominant colour of the first cover, applied to the spine',samp['c']==samp['again'] and pg.evaluate(f"{RGB}('{samp['bg']}')")==[int(samp['c'][i:i+2],16) for i in (1,3,5)],json.dumps(samp))
-            idb=pg.evaluate("new Promise(r=>{const q=indexedDB.open('comic-reader'); q.onsuccess=()=>{const t=q.result.transaction('comics').objectStore('comics').getAll(); t.onsuccess=()=>r(t.result.filter(c=>c.spineC).map(c=>c.title))}})")
-            ok('sampled colours cached in IndexedDB (first issue of each volume)',len(idb)==len(groups),json.dumps(idb))
+              const a=b.querySelector('.sp-art'), ar=a.getBoundingClientRect(), br=b.getBoundingClientRect();
+              return {c:c.spineC,again,body:c.spineB,acc:c.spineAcc,bodyExp:__cr.vols.bodyOf(c.spineC),bg:getComputedStyle(b).backgroundColor,ink:getComputedStyle(b.querySelector('.sp-t')).color,meta:getComputedStyle(b.querySelector('.sp-m')||b).color,
+                art:getComputedStyle(a).backgroundImage.slice(0,9),artFrac:ar.height/br.height,artW:ar.width-br.width,crop:c.spineCrop,blob:!!c.spineArt&&(c.spineArt.byteLength||c.spineArt.size)>500,n:b.querySelector('.sp-n').textContent}})()""")
+            hx=lambda h:[int(h[i:i+2],16) for i in (1,3,5)]
+            ok('v33: dark spine body derived from the cover colour; accent title colour from the cover',samp['c']==samp['again'] and samp['body']==samp['bodyExp'] and pg.evaluate(f"{RGB}('{samp['bg']}')")==hx(samp['body']) and pg.evaluate(f"{RGB}('{samp['ink']}')")==hx(samp['acc']) and sum(hx(samp['body']))<120,json.dumps(samp))
+            ok('v33: art panel = smart crop of the volume\'s own first cover, top ~28%, full spine width; issue count at the foot',samp['art']=='url("blob' and .25<=samp['artFrac']<=.31 and abs(samp['artW'])<1 and samp['blob'] and samp['n']=='5' and 0<=samp['crop']['x'] and samp['crop']['x']+samp['crop']['w']<=1.001 and samp['crop']['y']+samp['crop']['h']<=1.001,json.dumps(samp))
+            mc=[pg.evaluate(f"__cr.vols.contrast({RGB}('{x}'),{RGB}('{samp['bg']}'))") for x in (samp['meta'],)]
+            ok('v33: subtitle (Vol/years) readable on the dark body',min(mc)>=4.5,json.dumps(mc))
+            sw2=pg.evaluate("""(()=>{let worst=99,at=''; for(let r=0;r<256;r+=15)for(let g=0;g<256;g+=15)for(let b=0;b<256;b+=15){ const h='#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''), body=__cr.vols.bodyOf(h), a=__cr.vols.lift(h,body), c=__cr.vols.contrast(__cr.vols.hexRGB(a),__cr.vols.hexRGB(body)); if(c<worst){worst=c;at=h} } return {worst,at}})()""")
+            ok('v33: accent passes 4.5:1 on the dark body for every cover colour (4,913-colour sweep)',sw2['worst']>=4.5,json.dumps(sw2))
+            sc=pg.evaluate("""(()=>{const W=48,H=72,g=new Float32Array(W*H).fill(128); for(let y=40;y<58;y++)for(let x=4;x<22;x++) g[y*W+x]=((x+y)%2)*255; const a=__cr.vols.smartCrop(g,W,H);
+              for(let y=18;y<34;y++)for(let x=16;x<34;x++) g[y*W+x]=((x*3+y)%2)*255; const b=__cr.vols.smartCrop(g,W,H); return {a,b}})()""")
+            inside=lambda c,x0,y0,x1,y1:c['x']*48<=x0+2 and (c['x']+c['w'])*48>=x1-2 and c['y']*72<=y0+2 and (c['y']+c['h'])*72>=y1-2
+            ok('v33: smart crop finds the detailed region, prefers upper-centre detail',inside(sc['a'],4,40,22,58) and inside(sc['b'],16,18,34,34),json.dumps(sc))
+            hs=[x['h'] for x in s['sp']]; ok('v33: trade-like uniform heights (within 4px)',max(hs)-min(hs)<=4,json.dumps(hs))
+            idb=pg.evaluate("new Promise(r=>{const q=indexedDB.open('comic-reader'); q.onsuccess=()=>{const t=q.result.transaction('comics').objectStore('comics').getAll(); t.onsuccess=()=>r(t.result.filter(c=>c.spineC&&c.spineAcc&&c.spineArt).map(c=>c.title))}})")
+            ok('colours, accent and art crop cached in IndexedDB (first issue of each volume)',len(idb)==len(groups),json.dumps(idb))
             pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(600)
-            n=pg.evaluate("[...document.querySelectorAll('.spine')].filter(b=>!b.style.getPropertyValue('--sc').startsWith('#')).length")
+            n=pg.evaluate("[...document.querySelectorAll('.spine')].filter(b=>!b.style.getPropertyValue('--sb').startsWith('#')||b.style.getPropertyValue('--sb')==='#111114'||!b.querySelector('.sp-art').style.backgroundImage).length")
             ok('after reload colours come from the cache (no resampling, applied on first paint)',n==0,n)
             pg.evaluate("__cr.series.move(['Ember Road'],'Ember Road Vol 2')"); pg.wait_for_timeout(400); s=pg.evaluate(SP)
             e=[x for x in s['sp'] if x['n']=='Ember Road Vol 2']
             ok('Move to Series choice regroups the shelf; volume number shown',e and 'Vol 2' in e[0]['m'] and e[0]['t']=='Ember Road' and not any(x['n']=='Ember Road' for x in s['sp']),json.dumps(e))
-            pg.screenshot(path=f'{SH}/{ENG}-v31-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v31-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
+            pg.screenshot(path=f'{SH}/{ENG}-v33-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v33-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
             t=pg.evaluate("""(async()=>{const b=document.querySelector('.spine[data-series="Nightfall"]'); b.click(); await new Promise(r=>setTimeout(r,90)); const mid=getComputedStyle(b).transform; return {mid,cls:b.classList.contains('out')}})()""")
             pg.wait_for_timeout(400); lib=pg.evaluate("({vis:!document.querySelector('#library').classList.contains('hidden'),tab:document.querySelector('#tabs .on').dataset.tab,titles:[...document.querySelectorAll('#libGrid .lc')].map(e=>e.dataset.title)})")
             ok('tap a spine: it slides out, then the series issue view opens',t['cls'] and t['mid']!='none' and lib['vis'] and lib['titles'] and all(x.startswith('Nightfall') for x in lib['titles']),json.dumps([t,lib]))
@@ -81,7 +94,7 @@ with sync_playwright() as p:
         g=pg.evaluate("(()=>({tb:getComputedStyle(document.querySelector('.topbar')).backgroundColor,top:document.querySelector('#tabs').getBoundingClientRect().top}))()")
         ok(f'{lab}: solid top bar, nothing under the status bar',g['tb']=='rgb(0, 0, 0)' and g['top']>=sat,json.dumps(g))
         if lab!='ipad-landscape':
-            pg.screenshot(path=f'{SH}/{ENG}-v31-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v31-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
+            pg.screenshot(path=f'{SH}/{ENG}-v33-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v33-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
         ctx.close()
     b.close()
 ok('no page errors',not errors,'; '.join(errors[:3]))

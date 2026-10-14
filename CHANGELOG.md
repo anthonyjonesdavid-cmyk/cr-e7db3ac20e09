@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v33 — 2026-10-14
+- **Trade-paperback spines** (after David's reference photo): mostly dark spine body (the cover's colour, 90% toward black); the top ~28% is an art panel cropped from that volume's own first cover; big vertical title in the v31 per-series font in a bright accent colour from the cover (lifted toward white until it clears 5:1 on the body; ≥4.5:1 verified on a 4,913-colour sweep); smaller light subtitle line for volume/years; small issue count at the foot (no publisher logo).
+- **Smart crop**: edge/contrast density on a 48px-wide grey copy, upper-centre bias; lettering bands (logo, tagline, credits: strong edges across most of the width) and the top band are down-weighted, so the panel shows art rather than the cover title. 5:4 crop, stored as a small JPEG.
+- Sampled once per volume and cached in IndexedDB with the colours (resampled only if that cover image is regenerated).
+- Taller, more uniform spines (170px iPad / 130px iPhone, heights within 4px); widths still 40–76px; long titles shrink to fit (min 11px) before ellipsis.
+
 ## cr-v32 — 2026-10-14
 - **Sharper pages on iPad**: the per-page bitmap cap on iOS was 4.2 MP. That forced full-screen spreads (2732×2048 on iPad landscape) to 88% resolution and portrait pages on large iPads to ~93%, below screen × devicePixelRatio. Raised to 7 MP (well under the iOS 16.7 MP per-canvas limit); the total cache budget is still bounded (36 MP on iOS).
 - Placeholders (a cached render from another size/orientation) are always upgraded: the exact-size render is re-requested if its job was dropped.

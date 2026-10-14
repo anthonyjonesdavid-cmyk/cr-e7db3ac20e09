@@ -182,12 +182,12 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${onThisWeekHTML()}${rows}</div>`; sampleSpines();
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${onThisWeekHTML()}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
   CF.mount($('#cf'),cf);
 }
 
 /* ---------- shelf of volumes (v30): one book spine per series/volume (Library grouping incl. Move to Series), on a dark wooden shelf ---------- */
-const SPINE_V=1;
+const SPINE_V=2;   // v33: + accent, art crop
 const hashN=t=>{ let h=2166136261; for(const ch of String(t)) h=Math.imul(h^ch.charCodeAt(0),16777619); return h>>>0; };
 const hexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const relLum=([r,g,b])=>{ const f=v=>{ v/=255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4); }; return .2126*f(r)+.7152*f(g)+.0722*f(b); };
@@ -220,28 +220,63 @@ function volInfo(name,list){ const ds=list.map(dateOf).filter(Boolean).map(d=>d.
   const yr=!y0?'':y0===y1?String(y0):Math.floor(y0/100)===Math.floor(y1/100)?`${y0}–${String(y1).slice(2)}`:`${y0}–${y1}`;
   return {vol:h.vol||0,yr}; }
 const spineW=n=>Math.round(clamp(40+Math.sqrt(Math.max(0,n-1))*7,40,76));   // modest: 40px (tap target) .. 76px
+/* v33: trade-paperback spines (dark body, art panel cropped from the volume's own first cover, bright accent title) */
+const SPINE_BODY_K=.9;   // body = spine colour mixed 90% toward black
+const bodyOf=hex=>mixHex(hexRGB(hex),[0,0,0],SPINE_BODY_K);
+// accent: lift the colour toward white until it clears 4.5:1 on the body (aim 5:1 for margin)
+function liftAccent(hex,body){ const B=hexRGB(body); let c=hexRGB(hex), k=0, out=hex; while(contrast(hexRGB(out),B)<5&&k<1){ k+=.06; out=mixHex(c,[255,255,255],Math.min(1,k)); } return out; }
+const spineURL=new Map();
+const artURL=c=>{ if(!c.spineArt) return ''; let u=spineURL.get(c.id); if(!u){ u=URL.createObjectURL(c.spineArt instanceof Blob?c.spineArt:new Blob([c.spineArt],{type:'image/jpeg'})); spineURL.set(c.id,u); } return u; };
+// a sample belongs to one cover bitmap: covers can be regenerated (cover migration, re-import), and then the spine is resampled
+const spineKey=c=>c.cover?(c.coverV||0)+':'+(c.cover.byteLength||c.cover.size||0):'';
+function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spineKey(f); const body=done?f.spineB:'#111114', acc=done?f.spineAcc:'#e8e8ea';
+  return {body,acc,art:done?artURL(f):''}; }
 function volShelfHTML(groups){ if(!groups.size) return '';
   const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
-  const books=vols.map(({name,list})=>{ const f=list[0], col=f.spineC&&f.spineV===SPINE_V?f.spineC:`hsl(${hashN(name)%360} 28% 26%)`, {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%14;
-    const ik=f.spineC&&f.spineV===SPINE_V?spineInks(f.spineC):{ink:'#ffffff',stroke:'rgba(0,0,0,.55)'}, ink=ik.ink, disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · ');
-    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${spineW(list.length)}px;--sc:${col};--si:${ink};--so:${ik.stroke};--sh:${hv}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
-      <span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}</button>`; }).join('');
+  const books=vols.map(({name,list})=>{ const f=list[0], {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%4, V=spineVars(f);
+    const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · ');
+    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${spineW(list.length)}px;--sb:${V.body};--si:${V.acc};--so:rgba(0,0,0,.6);--sh:${hv}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
+      <span class="sp-art"${V.art?` style="background-image:url(${V.art})"`:''} aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}<span class="sp-n" aria-hidden="true">${list.length}</span></button>`; }).join('');
   return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
-// dominant colour of each volume's first cover: sampled once (when Home first shows it), cached on the comic record in IndexedDB
+// long titles shrink to fit the spine (down to 11px) before ellipsis
+function fitSpines(){ document.querySelectorAll('#homeScroll .spine .sp-t').forEach(t=>{ t.style.fontSize=''; const need=t.scrollHeight, have=t.clientHeight; if(need<=have+1) return;
+  const fs=parseFloat(getComputedStyle(t).fontSize); t.style.fontSize=Math.max(11,Math.floor(fs*have/need*10)/10)+'px'; }); }
+// per volume, once (when Home first shows it), cached on the first issue's record in IndexedDB: dominant colour, accent, smart-cropped art panel
 let spineBusy=false;
 async function sampleSpines(){ if(spineBusy) return; spineBusy=true;
-  try{ for(const el of [...document.querySelectorAll('#homeScroll .spine')]){ const c=comics.find(x=>x.id===el.dataset.cid); if(!c||!c.cover||c.spineV===SPINE_V) continue;
-      let hex=null; try{ hex=await dominantColor(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); }catch(e){}
-      c.spineC=hex||'#3a3a40'; c.spineV=SPINE_V; await dbPut(c).catch(()=>{});
-      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sc',c.spineC); const k=spineInks(c.spineC); b.style.setProperty('--si',k.ink); b.style.setProperty('--so',k.stroke); }); } }
+  try{ for(const el of [...document.querySelectorAll('#homeScroll .spine')]){ const c=comics.find(x=>x.id===el.dataset.cid); if(!c||!c.cover||(c.spineV===SPINE_V&&c.spineK===spineKey(c))) continue;
+      let r=null; try{ r=await spineSample(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); }catch(e){ console.warn('spine sample',e); }
+      c.spineC=r?r.dom:'#3a3a40'; c.spineB=bodyOf(c.spineC); c.spineAcc=liftAccent(r?r.acc:'#d0d0d0',c.spineB); c.spineArt=r?r.art:null; c.spineCrop=r?r.crop:null; c.spineV=SPINE_V; c.spineK=spineKey(c);
+      await dbPut(c).catch(()=>{}); const u=spineURL.get(c.id); if(u){ URL.revokeObjectURL(u); spineURL.delete(c.id); }
+      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sb',c.spineB); b.style.setProperty('--si',c.spineAcc); const a=artURL(c); if(a) b.querySelector('.sp-art').style.backgroundImage=`url(${a})`; }); } }
   finally{ spineBusy=false; } }
-async function dominantColor(blob){ const bm=await createImageBitmap(blob), cv=document.createElement('canvas'); cv.width=24; cv.height=36;
-  const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,24,36); bm.close&&bm.close(); const d=x.getImageData(0,0,24,36).data, bins=new Map();
+async function dominantColor(blob){ return (await spineSample(blob,true)).dom; }
+function colorStats(d){ const bins=new Map(), acc=new Map();
   for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2], mx=Math.max(r,g,b), mn=Math.min(r,g,b), k=(r>>5)<<6|(g>>5)<<3|(b>>5);
-    const w=1+(mx-mn)/64;   // favour colourful pixels a little over grey paper / black ink
-    const e=bins.get(k)||[0,0,0,0]; e[0]+=w; e[1]+=r*w; e[2]+=g*w; e[3]+=b*w; bins.set(k,e); }
-  let best=null; for(const e of bins.values()) if(!best||e[0]>best[0]) best=e;
-  return '#'+[best[1],best[2],best[3]].map(v=>Math.round(v/best[0]).toString(16).padStart(2,'0')).join(''); }
+    const w=1+(mx-mn)/64, e=bins.get(k)||[0,0,0,0]; e[0]+=w; e[1]+=r*w; e[2]+=g*w; e[3]+=b*w; bins.set(k,e);
+    const sat=mx?(mx-mn)/mx:0, val=mx/255; if(sat>.4&&val>.45){ const q=acc.get(k)||[0,0,0,0], ww=sat*val; q[0]+=ww; q[1]+=r*ww; q[2]+=g*ww; q[3]+=b*ww; acc.set(k,q); } }
+  const top=m=>{ let best=null; for(const e of m.values()) if(!best||e[0]>best[0]) best=e; return best&&'#'+[best[1],best[2],best[3]].map(v=>Math.round(v/best[0]).toString(16).padStart(2,'0')).join(''); };
+  return {dom:top(bins),acc:top(acc)}; }
+// smart crop: edge/contrast density on a downscaled grey copy, upper-centre bias, slight penalty on the top band (cover logo); crop is 5:4 (spine panel)
+const CROP_AR=1.25;
+function smartCrop(g,W,H){ const e=new Float32Array(W*H); for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; e[i]=Math.abs(g[i+1]-g[i-1])+Math.abs(g[i+W]-g[i-W]); }
+  // lettering bands (cover logo, tagline, credits): rows where strong edges spread across most of the width -> mostly ignored
+  { let mx=0; for(const v of e) if(v>mx) mx=v; const T=mx*.35;
+    for(let y=0;y<H;y++){ let n=0,x0=W,x1=-1; for(let x=0;x<W;x++) if(e[y*W+x]>T){ n++; if(x<x0) x0=x; if(x>x1) x1=x; }
+      if(n>W*.18&&x1-x0>W*.45) for(let x=0;x<W;x++) e[y*W+x]*=.15; } }
+  const I=new Float64Array((W+1)*(H+1)); for(let y=0;y<H;y++){ let row=0; for(let x=0;x<W;x++){ row+=e[y*W+x]; I[(y+1)*(W+1)+x+1]=I[y*(W+1)+x+1]+row; } }
+  const sum=(x,y,w,h)=>I[(y+h)*(W+1)+x+w]-I[y*(W+1)+x+w]-I[(y+h)*(W+1)+x]+I[y*(W+1)+x];
+  let best=null; for(const f of [.55,.7]){ const w=Math.round(W*f), h=Math.round(w/CROP_AR); if(h>H) continue;
+    for(let y=0;y+h<=H;y+=2) for(let x=0;x+w<=W;x+=2){ const cx=(x+w/2)/W, cy=(y+h/2)/H; let sc=sum(x,y,w,h)/(w*h)*(1-.4*Math.abs(cx-.5)/.5)*(1-.9*Math.abs(cy-.42))*(y/H<.12?.45:y/H<.24?.6:1)*(f===.7?1.06:1);   // the top band is usually the cover logo/title: art, not lettering
+      if(!best||sc>best.sc) best={sc,x,y,w,h}; } }
+  return best?{x:best.x/W,y:best.y/H,w:best.w/W,h:best.h/H}:{x:.2,y:.15,w:.6,h:.48}; }
+async function spineSample(blob,colorsOnly){ const bm=await createImageBitmap(blob), W=48, H=Math.max(24,Math.round(48*bm.height/bm.width));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,W,H); const d=x.getImageData(0,0,W,H).data;
+  const st=colorStats(d); if(colorsOnly){ bm.close&&bm.close(); return st; }
+  const g=new Float32Array(W*H); for(let i=0;i<W*H;i++) g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+  const crop=smartCrop(g,W,H), out=document.createElement('canvas'); out.width=190; out.height=152;
+  out.getContext('2d').drawImage(bm,crop.x*bm.width,crop.y*bm.height,crop.w*bm.width,crop.h*bm.height,0,0,190,152); bm.close&&bm.close();
+  const ab=await new Promise(r=>out.toBlob(r,'image/jpeg',.82)), art=ab?await ab.arrayBuffer():null; /* bytes, not a Blob: WebKit IndexedDB can't always store Blobs (same as covers) */ freeCanvas(cv); freeCanvas(out); return {...st,acc:st.acc||st.dom,crop,art}; }
 function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>seeAll('series',el.dataset.series);
   if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },200); }
 

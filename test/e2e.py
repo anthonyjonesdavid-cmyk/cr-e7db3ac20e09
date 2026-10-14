@@ -702,7 +702,7 @@ with sync_playwright() as p:
     ok('renamed series keeps its position',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
     sheet(pg,'Nightfall 05','aEdit'); pg.wait_for_selector('#eSeries'); pg.fill('#eSeries','Abyss'); pg.click('#eSave'); pg.wait_for_timeout(400); tab(pg,'home'); pg.wait_for_timeout(200)
     ok('new series appends at the end (not alphabetically first)',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall','Abyss'],str(pg.evaluate(HEADS)))
-    pg.click('.row-more[data-series="Abyss"]'); pg.wait_for_selector('#smRename'); pg.click('#smRename'); pg.wait_for_selector('#srName'); pg.fill('#srName','Starlight Ronin'); pg.click('#srSave'); pg.wait_for_timeout(400)
+    pg.evaluate("document.querySelector('.row-more[data-series=\"Abyss\"]').scrollIntoView({block:'center'})"); pg.wait_for_timeout(200); pg.click('.row-more[data-series="Abyss"]'); pg.wait_for_selector('#smRename'); pg.click('#smRename'); pg.wait_for_selector('#srName'); pg.fill('#srName','Starlight Ronin'); pg.click('#srSave'); pg.wait_for_timeout(400)
     ok('merged series takes the topmost position of those merged',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
     pg.locator('#homeScroll .row-h[data-kind=added]').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
     ok('long-press on Recently Added heading offers Arrange',pg.locator('#smArrange').count()==1 and pg.locator('#smRename').count()==0); pg.evaluate("document.querySelector('.menu')?.remove()")
