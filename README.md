@@ -42,6 +42,6 @@ python3 test/e2e_v24.py webkit               # Timeline / release dates, 4 sizes
 python3 test/e2e_v26.py webkit               # spinner rack v2, compact Timeline, online date lookup (mocked + one live check), 4 sizes
 python3 test/e2e_v28.py webkit               # 'This week in…' Home row (week / month fallback, date priority), 4 sizes (fixtures: test/gen_dates.py)
 python3 test/e2e_v29.py webkit               # two-page spreads: landscape full screen, portrait fit + in-view Rotate, pinch, turns, panels; 4 sizes (fixtures: test/gen_spreads.py)
-python3 test/e2e_v30.py webkit               # shelf of volumes on Home (grouping, colours + contrast, IDB cache, tap/slide, reduced motion), 4 sizes
+python3 test/e2e_v30.py webkit               # shelf of volumes on Home + v31 spine fonts/full names/contrast sweep (grouping, colours + contrast, IDB cache, tap/slide, reduced motion), 4 sizes
 ```
 See CHANGELOG.md for the history.

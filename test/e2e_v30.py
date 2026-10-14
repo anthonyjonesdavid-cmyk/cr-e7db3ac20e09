@@ -1,4 +1,4 @@
-"""cr-v30 suite: shelf of volumes on Home.  python3 test/e2e_v30.py [webkit]  (server on 127.0.0.1:8823)
+"""cr-v30/v31 suite: shelf of volumes on Home (v31: spine typography, full names, contrast).  python3 test/e2e_v30.py [webkit]  (server on 127.0.0.1:8823)
 Fixtures: original abstract comics from test/gen_pdfs.py + test/gen_dates.py. Standalone insets via --sat/--sab."""
 import sys, os, json, glob
 from playwright.sync_api import sync_playwright
@@ -9,7 +9,7 @@ res=[]; errors=[]
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS' if cond else 'FAIL'),f'[{ENG}]',name,str(extra)[:300] if not cond else '',flush=True)
 SP="""(()=>{const s=document.querySelector('#homeScroll .volshelf'); if(!s) return null; const sc=s.querySelector('.vs-s'), r=e=>e.getBoundingClientRect(), cf=r(document.querySelector('#homeScroll .hero'));
-  const sp=[...s.querySelectorAll('.spine')].map(b=>{const q=r(b), cs=getComputedStyle(b); return {n:b.dataset.series,w:q.width,h:q.height,bg:cs.backgroundColor,ink:cs.color,wm:getComputedStyle(b.querySelector('.sp-t')).writingMode,t:b.querySelector('.sp-t').textContent,m:(b.querySelector('.sp-m')||{}).textContent||'',cid:b.dataset.cid}});
+  const sp=[...s.querySelectorAll('.spine')].map(b=>{const q=r(b), cs=getComputedStyle(b); return {n:b.dataset.series,w:q.width,h:q.height,bg:cs.backgroundColor,ink:cs.color,wm:getComputedStyle(b.querySelector('.sp-t')).writingMode,ff:getComputedStyle(b.querySelector('.sp-t')).fontFamily,font:b.dataset.font,tw:b.querySelector('.sp-t').getBoundingClientRect().width,fs:parseFloat(getComputedStyle(b.querySelector('.sp-t')).fontSize),t:b.querySelector('.sp-t').textContent,m:(b.querySelector('.sp-m')||{}).textContent||'',cid:b.dataset.cid}});
   const nx=s.nextElementSibling; return {sp,h:r(s).height,gapTop:r(s).top-cf.bottom,next:nx&&(nx.classList.contains('otw')?'otw':nx.classList.contains('row')?'row':nx.className),over:sc.scrollWidth>sc.clientWidth+1,first:s===document.querySelector('#homeScroll .rows').firstElementChild,ox:document.documentElement.scrollWidth>innerWidth}})()"""
 RGB="(s=>s.match(/\\d+/g).slice(0,3).map(Number))"
 def wait_cols(pg): pg.wait_for_function("__cr.comics.filter(c=>c.series).every(c=>true) && [...document.querySelectorAll('#homeScroll .spine')].every(b=>{const c=__cr.comics.find(x=>x.id===b.dataset.cid); return c&&c.spineV})",timeout=30000); pg.wait_for_timeout(200)
@@ -22,6 +22,9 @@ with sync_playwright() as p:
         pg.goto(URL); pg.wait_for_selector('html[data-ready]')
         pg.set_input_files('#fileIn',FILES); pg.wait_for_function(f'document.querySelectorAll("#libGrid .lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=180000)
         pg.click('#tabs [data-tab=home]'); wait_cols(pg); s=pg.evaluate(SP)
+        pg.evaluate("document.fonts.ready"); fl=pg.evaluate("(async()=>{await document.fonts.ready; const F=__cr.vols.FONTS; const used=[...new Set([...document.querySelectorAll('.spine')].map(b=>b.dataset.font))]; await Promise.all(used.map(k=>document.fonts.load('14px \"'+F[k].f+'\"','ABC'))); return used.map(k=>[k,document.fonts.check('14px \"'+F[k].f+'\"','ABC')])})()")
+        ok(f'{lab}: v31 bundled spine fonts load locally',fl and all(x[1] for x in fl),json.dumps(fl)); s=pg.evaluate(SP)
+        ok(f'{lab}: v31 each spine title uses its series font; text fits the spine width; legible size',all(pg.evaluate(f"__cr.vols.FONTS['{x['font']}'].f") in x['ff'] for x in s['sp']) and all(x['tw']<=x['w']+.5 for x in s['sp']) and min(x['fs'] for x in s['sp'])>=11,json.dumps([(x['n'],x['font'],x['ff'][:30],x['tw'],x['w'],x['fs']) for x in s['sp']]))
         groups=pg.evaluate("[...new Set(__cr.comics.map(c=>(c.series||'').trim()).filter(Boolean))].sort()")
         ok(f'{lab}: one spine per Library series/volume, directly under the carousel, above "This week in…"',s and sorted(x['n'] for x in s['sp'])==groups and s['first'] and s['next']=='otw',json.dumps([s and s['next'],groups,s and [x['n'] for x in s['sp']]]))
         ipad=w>=1000
@@ -33,6 +36,24 @@ with sync_playwright() as p:
             byn={x['n']:x for x in s['sp']}
             ok('thickness scales modestly with issue count (5 issues wider than 2, capped)',byn['Iron Tide']['w']>byn['Twin Moon']['w'] and max(x['w'] for x in s['sp'])<=76,json.dumps({k:v['w'] for k,v in byn.items()}))
             ok('year range from Timeline dates on the spine',any(x['n']=='Comet Run' and '1983–84' in x['m'] for x in s['sp']),json.dumps([(x['n'],x['m']) for x in s['sp']]))
+            sweep=pg.evaluate("""(()=>{let worst=99,at=''; for(let r=0;r<256;r+=15)for(let g=0;g<256;g+=15)for(let b=0;b<256;b+=15){ const h='#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join(''), k=__cr.vols.inks(h), c=__cr.vols.contrast(__cr.vols.hexRGB(h),__cr.vols.hexRGB(k.ink)); if(c<worst){worst=c;at=h} } return {worst,at}})()""")
+            ok('v31: ink passes WCAG 4.5:1 on every spine colour (4,913-colour sweep incl. all mid-tones)',sweep['worst']>=4.5,json.dumps(sweep))
+            mid=pg.evaluate("['#777777','#7f7f7f','#808080','#8a6d5a','#5f7f9f','#b05a5a','#6a8f3f'].map(h=>{const k=__cr.vols.inks(h); return [h,k.ink,+__cr.vols.contrast(__cr.vols.hexRGB(h),__cr.vols.hexRGB(k.ink)).toFixed(2)]})")
+            ok('v31: mid-tone spines get readable ink',all(x[2]>=4.5 for x in mid),json.dumps(mid))
+            nm=pg.evaluate("['ASM','UXM','FF','X Men','asm vol 2','TMNT','ASM Annual','Iron Tide'].map(__cr.vols.name)")
+            ok('v31: abbreviations expand to full names on spines',nm==['Amazing Spider-Man','Uncanny X-Men','Fantastic Four','X-Men','Amazing Spider-Man','Teenage Mutant Ninja Turtles','Amazing Spider-Man Annual','Iron Tide'],json.dumps(nm))
+            st=pg.evaluate("['Amazing Spider-Man','Uncanny X-Men','Batman','The Walking Dead','Star Wars','Fantastic Four','Hellboy','The Sandman'].map(__cr.vols.style)")
+            ok('v31: known series map to fitting styles (Spider-Man comic face, X-Men blocky italic, Batman/Hellboy/Sandman gothic serif, horror, sci-fi geometric, FF heavy retro)',st==['bangers','bungee','cinzel','creep','orb','lucky','cinzel','cinzel'],json.dumps(st))
+            fb=pg.evaluate("['Glass Harbor','Atlas Omnibus','Quiet Engines','Lantern Bay','Hollow Pines','Velvet Rook'].map(__cr.vols.style).concat([__cr.vols.style('Velvet Rook')])")
+            ok('v31: deterministic fallback style for unknown series',fb[-1]==fb[-2] and all(f in pg.evaluate("Object.keys(__cr.vols.FONTS)") for f in fb),json.dumps(fb))
+            ok('v31: spines use varied styles (>=4 faces on this shelf)',len(set(x['font'] for x in s['sp']))>=4,json.dumps([x['font'] for x in s['sp']]))
+            fr=pg.evaluate("Promise.all(['Bangers','Bungee','LuckiestGuy','BlackOpsOne','Creepster','CinzelDecorative','Orbitron','PermanentMarker'].map(f=>fetch('fonts/'+f+'.woff2').then(r=>[f,r.status,+r.headers.get('content-length')||0])))")
+            ok('v31: font files bundled and small (<40KB each, subset)',all(x[1]==200 for x in fr) and all(0<x[2]<40000 for x in fr),json.dumps(fr))
+            sw=pg.evaluate("fetch('sw.js').then(r=>r.text())"); ok('v31: service worker caches the fonts',all(f"fonts/{f}.woff2" in sw for f in ['Bangers','Bungee','LuckiestGuy','BlackOpsOne','Creepster','CinzelDecorative','Orbitron','PermanentMarker']))
+            pg.evaluate("__cr.series.move(['Twin Moon'],'ASM')"); pg.wait_for_timeout(400); s2=pg.evaluate(SP); a=[x for x in s2['sp'] if x['n']=='ASM']
+            libn=pg.evaluate("[...new Set(__cr.comics.map(c=>c.series))].includes('ASM')")
+            ok('v31: "ASM" series shows "Amazing Spider-Man" on its spine, Library name unchanged, comic-style face',a and a[0]['t']=='Amazing Spider-Man' and a[0]['font']=='bangers' and libn,json.dumps(a))
+            pg.evaluate("__cr.series.move(['ASM'],'Twin Moon')"); pg.wait_for_timeout(400)
             samp=pg.evaluate("""(async()=>{const c=__cr.comics.find(x=>x.title==='Iron Tide 01'); const b=document.querySelector('.spine[data-series="Iron Tide"]'); const again=await __cr.vols.dominant(c.cover instanceof Blob?c.cover:new Blob([c.cover]));
               return {c:c.spineC,v:c.spineV,again,bg:getComputedStyle(b).backgroundColor}})()""")
             ok('spine colour = dominant colour of the first cover, applied to the spine',samp['c']==samp['again'] and pg.evaluate(f"{RGB}('{samp['bg']}')")==[int(samp['c'][i:i+2],16) for i in (1,3,5)],json.dumps(samp))
@@ -44,7 +65,7 @@ with sync_playwright() as p:
             pg.evaluate("__cr.series.move(['Ember Road'],'Ember Road Vol 2')"); pg.wait_for_timeout(400); s=pg.evaluate(SP)
             e=[x for x in s['sp'] if x['n']=='Ember Road Vol 2']
             ok('Move to Series choice regroups the shelf; volume number shown',e and 'Vol 2' in e[0]['m'] and e[0]['t']=='Ember Road' and not any(x['n']=='Ember Road' for x in s['sp']),json.dumps(e))
-            pg.screenshot(path=f'{SH}/{ENG}-v30-home-{lab}.png')
+            pg.screenshot(path=f'{SH}/{ENG}-v31-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v31-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
             t=pg.evaluate("""(async()=>{const b=document.querySelector('.spine[data-series="Nightfall"]'); b.click(); await new Promise(r=>setTimeout(r,90)); const mid=getComputedStyle(b).transform; return {mid,cls:b.classList.contains('out')}})()""")
             pg.wait_for_timeout(400); lib=pg.evaluate("({vis:!document.querySelector('#library').classList.contains('hidden'),tab:document.querySelector('#tabs .on').dataset.tab,titles:[...document.querySelectorAll('#libGrid .lc')].map(e=>e.dataset.title)})")
             ok('tap a spine: it slides out, then the series issue view opens',t['cls'] and t['mid']!='none' and lib['vis'] and lib['titles'] and all(x.startswith('Nightfall') for x in lib['titles']),json.dumps([t,lib]))
@@ -59,7 +80,8 @@ with sync_playwright() as p:
             pg.evaluate("document.querySelector('.vs-s').scrollLeft=0")
         g=pg.evaluate("(()=>({tb:getComputedStyle(document.querySelector('.topbar')).backgroundColor,top:document.querySelector('#tabs').getBoundingClientRect().top}))()")
         ok(f'{lab}: solid top bar, nothing under the status bar',g['tb']=='rgb(0, 0, 0)' and g['top']>=sat,json.dumps(g))
-        if lab!='ipad-landscape': pg.screenshot(path=f'{SH}/{ENG}-v30-home-{lab}.png')
+        if lab!='ipad-landscape':
+            pg.screenshot(path=f'{SH}/{ENG}-v31-home-{lab}.png'); bb=pg.locator('.volshelf').bounding_box(); pg.screenshot(path=f'{SH}/{ENG}-v31-spines-closeup-{lab}.png',clip={'x':0,'y':bb['y'],'width':min(w,700),'height':bb['height']+10})
         ctx.close()
     b.close()
 ok('no page errors',not errors,'; '.join(errors[:3]))

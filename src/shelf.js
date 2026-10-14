@@ -193,7 +193,28 @@ const hexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const relLum=([r,g,b])=>{ const f=v=>{ v/=255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4); }; return .2126*f(r)+.7152*f(g)+.0722*f(b); };
 const contrast=(a,b)=>{ const x=relLum(a),y=relLum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
 // readable ink: white or near-black, whichever contrasts more (both clear WCAG 4.5:1 for one of them on any colour)
-const spineInk=hex=>{ const c=hexRGB(hex); return contrast(c,[255,255,255])>=contrast(c,[17,17,17])?'#ffffff':'#111111'; };
+// v31: a tinted light/dark ink (keeps some of the spine's hue) when it still clears 4.5:1 with margin, else pure white / near-black (one of those always clears 4.5:1);
+// plus a thin opposite-colour stroke/shadow behind the letters
+const mixHex=(c,t,k)=>'#'+c.map((v,i)=>Math.round(v+(t[i]-v)*k).toString(16).padStart(2,'0')).join('');
+function spineInks(hex){ const c=hexRGB(hex), W=[255,255,255], B=[0,0,0], light=contrast(c,W)>=contrast(c,B);
+  const tint=mixHex(c,light?W:B,light?.82:.8); const ink=contrast(c,hexRGB(tint))>=5?tint:light?'#ffffff':'#000000';
+  return {ink,stroke:light?'rgba(0,0,0,.55)':'rgba(255,255,255,.45)'}; }
+const spineInk=hex=>spineInks(hex).ink;
+/* spine typography: free open-licensed display faces (bundled in fonts/) chosen to evoke a series' genre/feel — never a copy of a logo */
+const SPINE_FONTS={bangers:{f:'Bangers',s:1.18,ls:'.06em'},bungee:{f:'Bungee',s:.9,ls:'.02em',sk:-7},lucky:{f:'Luckiest Guy',s:1,ls:'.04em'},ops:{f:'Black Ops One',s:1,ls:'.05em'},
+  creep:{f:'Creepster',s:1.15,ls:'.05em'},cinzel:{f:'Cinzel Decorative',s:.95,ls:'.06em',w:700},orb:{f:'Orbitron',s:.86,ls:'.05em',w:800,up:1},marker:{f:'Permanent Marker',s:1,ls:'.02em'}};
+const STYLE_RULES=[[/spider|venom|web[- ]?(head|slinger)|daredevil|deadpool/i,'bangers'],[/x-?men|x-?force|x-?factor|mutant|wolverine|excalibur|new mutants|avengers/i,'bungee'],
+  [/fantastic four|hulk|thor\b|captain|iron man|incredible|silver surfer/i,'lucky'],[/batman|detective|gotham|nightwing|hellboy|sandman|hellblazer|lucifer|swamp thing|preacher|dracula|conan/i,'cinzel'],
+  [/walking dead|zombie|creep|horror|vampire|tomb|hollow|haunt|crypt|ghost|night(fall|mare)/i,'creep'],[/star|space|galax|wars|trek|planet|cyber|robot|transform|moon|saga|alien|ronin|atlas/i,'orb'],
+  [/punisher|g\.?i\.?|war\b|soldier|sgt|tide|commando|black ops|nick fury/i,'ops'],[/transmet|y the last|scott pilgrim|street|punk|road|paper|ember/i,'marker']];
+const SPINE_FB=['bangers','bungee','lucky','ops','orb','marker','cinzel'];
+function spineStyle(name){ for(const [re,k] of STYLE_RULES) if(re.test(name)) return k; return SPINE_FB[hashN(name+'f')%SPINE_FB.length]; }
+// spine shows full names for common shorthand (Library names unchanged)
+const ALIASES={asm:'Amazing Spider-Man',tasm:'The Amazing Spider-Man',usm:'Ultimate Spider-Man',ssm:'Spectacular Spider-Man',psm:'Peter Parker, Spider-Man',uxm:'Uncanny X-Men',xm:'X-Men',xmen:'X-Men','x men':'X-Men',
+  ff:'Fantastic Four',tmnt:'Teenage Mutant Ninja Turtles',jla:'Justice League of America',jsa:'Justice Society of America',gotg:'Guardians of the Galaxy',tec:'Detective Comics',ih:'Incredible Hulk',dd:'Daredevil',ww:'Wonder Woman',bprd:'B.P.R.D.',twd:'The Walking Dead',gl:'Green Lantern'};
+function spineName(name){ const base=String(name).replace(/\s*\bvol(?:ume)?\.?\s*\d+\b/i,'').trim(); const k=base.toLowerCase().replace(/[.\s_-]+/g,' ').trim();
+  if(ALIASES[k]) return ALIASES[k]; if(ALIASES[k.replace(/ /g,'')]) return ALIASES[k.replace(/ /g,'')];
+  return base.replace(/^([A-Za-z]{2,4})(?=\s|:|$)/,(m)=>ALIASES[m.toLowerCase()]&&m===m.toUpperCase()?ALIASES[m.toLowerCase()]:m); }
 function volInfo(name,list){ const ds=list.map(dateOf).filter(Boolean).map(d=>d.y), h=volHints(name,...list.map(c=>c.fileName||c.title));
   const y0=ds.length?Math.min(...ds):0, y1=ds.length?Math.max(...ds):0;
   const yr=!y0?'':y0===y1?String(y0):Math.floor(y0/100)===Math.floor(y1/100)?`${y0}–${String(y1).slice(2)}`:`${y0}–${y1}`;
@@ -202,9 +223,9 @@ const spineW=n=>Math.round(clamp(40+Math.sqrt(Math.max(0,n-1))*7,40,76));   // m
 function volShelfHTML(groups){ if(!groups.size) return '';
   const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
   const books=vols.map(({name,list})=>{ const f=list[0], col=f.spineC&&f.spineV===SPINE_V?f.spineC:`hsl(${hashN(name)%360} 28% 26%)`, {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%14;
-    const ink=f.spineC&&f.spineV===SPINE_V?spineInk(f.spineC):'#ffffff', meta=[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · ');
-    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" style="--sw:${spineW(list.length)}px;--sc:${col};--si:${ink};--sh:${hv}px" aria-label="${esc(name)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
-      <span class="sp-t">${esc(name.replace(/\s*\bvol(?:ume)?\.?\s*\d+\b/i,''))}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}</button>`; }).join('');
+    const ik=f.spineC&&f.spineV===SPINE_V?spineInks(f.spineC):{ink:'#ffffff',stroke:'rgba(0,0,0,.55)'}, ink=ik.ink, disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], meta=[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · ');
+    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${spineW(list.length)}px;--sc:${col};--si:${ink};--so:${ik.stroke};--sh:${hv}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
+      <span class="sp-t">${esc(disp)}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}</button>`; }).join('');
   return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
 // dominant colour of each volume's first cover: sampled once (when Home first shows it), cached on the comic record in IndexedDB
 let spineBusy=false;
@@ -212,7 +233,7 @@ async function sampleSpines(){ if(spineBusy) return; spineBusy=true;
   try{ for(const el of [...document.querySelectorAll('#homeScroll .spine')]){ const c=comics.find(x=>x.id===el.dataset.cid); if(!c||!c.cover||c.spineV===SPINE_V) continue;
       let hex=null; try{ hex=await dominantColor(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); }catch(e){}
       c.spineC=hex||'#3a3a40'; c.spineV=SPINE_V; await dbPut(c).catch(()=>{});
-      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sc',c.spineC); b.style.setProperty('--si',spineInk(c.spineC)); }); } }
+      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sc',c.spineC); const k=spineInks(c.spineC); b.style.setProperty('--si',k.ink); b.style.setProperty('--so',k.stroke); }); } }
   finally{ spineBusy=false; } }
 async function dominantColor(blob){ const bm=await createImageBitmap(blob), cv=document.createElement('canvas'); cv.width=24; cv.height=36;
   const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,24,36); bm.close&&bm.close(); const d=x.getImageData(0,0,24,36).data, bins=new Map();

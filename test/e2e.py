@@ -116,7 +116,7 @@ with sync_playwright() as p:
     pg.on('console',lambda m: errors.append(f'console.{m.type}: {m.text}') if m.type=='error' and not GRE.match((m.location or {}).get('url','') or '') and not GRE.search(m.text) else None)
     pg.goto(URL); pg.wait_for_selector('html[data-ready]')
     ok('robots meta present',pg.evaluate("document.querySelector('meta[name=robots]').content")=='noindex, nofollow')
-    ok('no comic display font / halftone left',pg.evaluate("!document.documentElement.outerHTML.includes('Bangers')"))
+    ok('UI chrome uses the UI font (v31 display fonts only on Home shelf spines)',pg.evaluate("[...document.querySelectorAll('body,h2,h3,#tabs button,.topbar,.rbar')].every(e=>!/Bangers|Bungee|Luckiest|Black Ops|Creepster|Cinzel|Orbitron|Permanent/.test(getComputedStyle(e).fontFamily)) && !/halftone/i.test(document.documentElement.outerHTML)"))
     shot(pg,'01-empty-home')
     ok('empty state offers From Google Drive + From Files',pg.locator('#homeScroll [data-act=drive]').count()==1 and pg.locator('#homeScroll [data-act=import]').count()==1)
     t0=time.time(); pg.set_input_files('#fileIn',[f'{T}/{f}' for f in FILES])

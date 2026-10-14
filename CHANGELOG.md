@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v31 — 2026-10-14
+- **Spine typography**: each series gets a display face that evokes its genre (never a copy of a logo), from 8 bundled open-licensed fonts (fonts/README.md): Bangers (Spider-Man-style comic), Bungee + italic skew (X-Men blocky), Luckiest Guy (Fantastic Four heavy retro), Cinzel Decorative (Batman / Hellboy / Sandman gothic serif), Creepster (horror), Orbitron (sci-fi geometric), Black Ops One (military/war), Permanent Marker (indie). Unknown series get a deterministic varied fallback. Letter-spacing per face; Latin subsets (~150 KB total), cached by the service worker.
+- **Full names on spines**: ASM → Amazing Spider-Man, UXM → Uncanny X-Men, FF → Fantastic Four, TMNT, JLA, GotG, TEC and more (small alias map; Library names unchanged).
+- **Contrast**: ink is a tint of the spine colour when it clears 5:1, else white or black (which always clears 4.5:1), plus a thin opposite-colour stroke/shadow. Tested on every spine and on a 4,913-colour sweep including mid-tones.
+
 ## cr-v30 — 2026-10-14
 - **Shelf of volumes on Home**, directly under the carousel (above "This week in…"): one book spine per series/volume exactly as grouped in Library (Move to Series choices included), standing on a minimal dark wooden shelf.
 - Spine colour = dominant colour of the volume's first cover; text ink (white or near-black) picked for ≥4.5:1 contrast. Vertical title plus a second line with volume number and year range from Timeline dates (e.g. "Vol 2 · 1991–92").

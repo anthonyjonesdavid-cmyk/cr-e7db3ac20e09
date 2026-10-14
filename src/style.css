@@ -450,3 +450,16 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 @media (max-width:600px){.spine .sp-t{font-size:12px}.spine .sp-m{font-size:10px}}
 @media (prefers-reduced-motion:reduce){.spine{transition:none}.spine.out{transform:none}}
 .volshelf+.row{margin-top:12px}
+/* v31 spine typography: bundled open-licensed fonts (fonts/LICENSE-*.txt), Latin subset */
+@font-face{font-family:'Bangers';src:url(fonts/Bangers.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Bungee';src:url(fonts/Bungee.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Luckiest Guy';src:url(fonts/LuckiestGuy.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Black Ops One';src:url(fonts/BlackOpsOne.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Creepster';src:url(fonts/Creepster.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Cinzel Decorative';src:url(fonts/CinzelDecorative.woff2) format('woff2');font-weight:700;font-display:swap}
+@font-face{font-family:'Orbitron';src:url(fonts/Orbitron.woff2) format('woff2');font-weight:400 900;font-display:swap}
+@font-face{font-family:'Permanent Marker';src:url(fonts/PermanentMarker.woff2) format('woff2');font-weight:400;font-display:swap}
+.spine .sp-t{font-family:var(--ff),var(--ui);font-weight:var(--fw);font-size:calc(14px * var(--fs));letter-spacing:var(--ls);text-transform:var(--tt);transform:skewY(var(--sk));
+  text-shadow:0 0 1px var(--so),1px 0 0 var(--so),0 1px 1px var(--so);line-height:1.15}
+.spine .sp-m{text-shadow:0 0 1px var(--so)}
+@media (max-width:600px){.spine .sp-t{font-size:calc(13px * var(--fs))}}
