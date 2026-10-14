@@ -451,6 +451,26 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .rrot{position:absolute;z-index:22;right:calc(12px + env(safe-area-inset-right));bottom:calc(var(--sab) + 14px);height:40px;min-width:40px;padding:0 13px 0 10px;border-radius:20px;background:#1c1c1e;border:.5px solid #3a3a3c;color:#f5f5f7;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,.55);transition:bottom .2s ease}
 .rrot svg.i{width:17px;height:17px}.rrot.on{background:#f5f5f7;color:#000}.rrot.hidden{display:none}
 #reader.ui .rrot{bottom:calc(var(--sab) + 60px)}
+/* v30 shelf of volumes */
+.volshelf{--bh:150px;margin:6px 0 0;position:relative;background:linear-gradient(#0d0b0a,#16110d)}
+@media (max-width:600px){.volshelf{--bh:116px}}
+.vs-s{display:flex;align-items:flex-end;gap:3px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;padding:12px var(--padr) 0 var(--padx);
+  border-bottom:14px solid #3b2618;box-shadow:inset 0 -1px 0 #5a3b26;background:linear-gradient(transparent calc(100% - 1px),#000) ;
+  border-image:repeating-linear-gradient(90deg,#3e2819 0 37px,#352214 37px 61px,#43301f 61px 83px) 14}
+.vs-s::-webkit-scrollbar{display:none}
+.volshelf::after{content:'';position:absolute;left:0;right:0;bottom:-8px;height:8px;background:linear-gradient(#000a,#0000);pointer-events:none}
+.spine{flex:none;width:var(--sw);min-width:40px;height:calc(var(--bh) - var(--sh));position:relative;writing-mode:vertical-rl;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:1px;
+  padding:11px 0 9px;border-radius:3px 3px 1px 1px;color:var(--si);background:var(--sc);text-align:start;
+  background-image:linear-gradient(90deg,rgba(0,0,0,.38),rgba(255,255,255,.10) 22%,rgba(255,255,255,0) 45%,rgba(0,0,0,.18) 80%,rgba(0,0,0,.42));
+  box-shadow:inset 0 9px 0 -7px rgba(255,255,255,.18),inset 0 -9px 0 -7px rgba(0,0,0,.35),0 -1px 0 rgba(0,0,0,.6);transition:transform .2s cubic-bezier(.2,.8,.2,1);-webkit-tap-highlight-color:transparent}
+.spine.out{transform:translateY(-14px)}
+/* vertical text: title and Vol/years are two vertical lines (columns) running the full spine height */
+.spine .sp-t,.spine .sp-m{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-inline-size:100%;line-height:1.25}
+.spine .sp-t{font-size:13px;font-weight:700;letter-spacing:.02em}
+.spine .sp-m{font-size:10.5px;font-weight:600;opacity:.85;font-variant-numeric:tabular-nums}
+@media (max-width:600px){.spine .sp-t{font-size:12px}.spine .sp-m{font-size:10px}}
+@media (prefers-reduced-motion:reduce){.spine{transition:none}.spine.out{transform:none}}
+.volshelf+.row{margin-top:12px}
 </style>
 </head>
 <body>
@@ -508,7 +528,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=29',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=30',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -1002,9 +1022,47 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${onThisWeekHTML()}${rows}</div>`;
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${onThisWeekHTML()}${rows}</div>`; sampleSpines();
   CF.mount($('#cf'),cf);
 }
+
+/* ---------- shelf of volumes (v30): one book spine per series/volume (Library grouping incl. Move to Series), on a dark wooden shelf ---------- */
+const SPINE_V=1;
+const hashN=t=>{ let h=2166136261; for(const ch of String(t)) h=Math.imul(h^ch.charCodeAt(0),16777619); return h>>>0; };
+const hexRGB=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const relLum=([r,g,b])=>{ const f=v=>{ v/=255; return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4); }; return .2126*f(r)+.7152*f(g)+.0722*f(b); };
+const contrast=(a,b)=>{ const x=relLum(a),y=relLum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+// readable ink: white or near-black, whichever contrasts more (both clear WCAG 4.5:1 for one of them on any colour)
+const spineInk=hex=>{ const c=hexRGB(hex); return contrast(c,[255,255,255])>=contrast(c,[17,17,17])?'#ffffff':'#111111'; };
+function volInfo(name,list){ const ds=list.map(dateOf).filter(Boolean).map(d=>d.y), h=volHints(name,...list.map(c=>c.fileName||c.title));
+  const y0=ds.length?Math.min(...ds):0, y1=ds.length?Math.max(...ds):0;
+  const yr=!y0?'':y0===y1?String(y0):Math.floor(y0/100)===Math.floor(y1/100)?`${y0}–${String(y1).slice(2)}`:`${y0}–${y1}`;
+  return {vol:h.vol||0,yr}; }
+const spineW=n=>Math.round(clamp(40+Math.sqrt(Math.max(0,n-1))*7,40,76));   // modest: 40px (tap target) .. 76px
+function volShelfHTML(groups){ if(!groups.size) return '';
+  const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
+  const books=vols.map(({name,list})=>{ const f=list[0], col=f.spineC&&f.spineV===SPINE_V?f.spineC:`hsl(${hashN(name)%360} 28% 26%)`, {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%14;
+    const ink=f.spineC&&f.spineV===SPINE_V?spineInk(f.spineC):'#ffffff', meta=[vol?`Vol ${vol}`:'',yr].filter(Boolean).join(' · ');
+    return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" style="--sw:${spineW(list.length)}px;--sc:${col};--si:${ink};--sh:${hv}px" aria-label="${esc(name)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
+      <span class="sp-t">${esc(name.replace(/\s*\bvol(?:ume)?\.?\s*\d+\b/i,''))}</span>${meta?`<span class="sp-m">${esc(meta)}</span>`:''}</button>`; }).join('');
+  return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
+// dominant colour of each volume's first cover: sampled once (when Home first shows it), cached on the comic record in IndexedDB
+let spineBusy=false;
+async function sampleSpines(){ if(spineBusy) return; spineBusy=true;
+  try{ for(const el of [...document.querySelectorAll('#homeScroll .spine')]){ const c=comics.find(x=>x.id===el.dataset.cid); if(!c||!c.cover||c.spineV===SPINE_V) continue;
+      let hex=null; try{ hex=await dominantColor(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); }catch(e){}
+      c.spineC=hex||'#3a3a40'; c.spineV=SPINE_V; await dbPut(c).catch(()=>{});
+      document.querySelectorAll(`#homeScroll .spine[data-cid="${c.id}"]`).forEach(b=>{ b.style.setProperty('--sc',c.spineC); b.style.setProperty('--si',spineInk(c.spineC)); }); } }
+  finally{ spineBusy=false; } }
+async function dominantColor(blob){ const bm=await createImageBitmap(blob), cv=document.createElement('canvas'); cv.width=24; cv.height=36;
+  const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,24,36); bm.close&&bm.close(); const d=x.getImageData(0,0,24,36).data, bins=new Map();
+  for(let i=0;i<d.length;i+=4){ const r=d[i],g=d[i+1],b=d[i+2], mx=Math.max(r,g,b), mn=Math.min(r,g,b), k=(r>>5)<<6|(g>>5)<<3|(b>>5);
+    const w=1+(mx-mn)/64;   // favour colourful pixels a little over grey paper / black ink
+    const e=bins.get(k)||[0,0,0,0]; e[0]+=w; e[1]+=r*w; e[2]+=g*w; e[3]+=b*w; bins.set(k,e); }
+  let best=null; for(const e of bins.values()) if(!best||e[0]>best[0]) best=e;
+  return '#'+[best[1],best[2],best[3]].map(v=>Math.round(v/best[0]).toString(16).padStart(2,'0')).join(''); }
+function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>seeAll('series',el.dataset.series);
+  if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },200); }
 
 /* ---------- "This week in…": issues released this week (or, failing that, this month) in past years; computed when Home renders ---------- */
 const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook
@@ -1132,6 +1190,7 @@ shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefau
   if(SEL.on&&a.classList.contains('lc')){ e.preventDefault(); e.stopPropagation(); toggleSel(a.dataset.id); return; }
   if(k==='timeline'){ openTimeline(); return; }
   if(k==='rack'){ openRack(+a.dataset.ym); return; }
+  if(k==='spine'){ pullSpine(a); return; }
   if(k==='open') openReader(a.dataset.id,a.dataset.q?{queue:a.dataset.q}:{queue:null}); else if(k==='qedit') editQueue(a.dataset.q); else if(k==='qmenu') queueMenu(a,a.dataset.q); else if(k==='see') seeAll(a.dataset.kind,a.dataset.series);
   else if(k==='filter'){ ui.filter=a.dataset.f; renderLibrary(); $('#libScroll').scrollTop=0; } else if(k==='unscope') unscope();
   else if(k==='smenu') seriesMenu(a,a.dataset.kind==='series'?a.dataset.series:''); else if(k==='srename') renameSeries(a.dataset.series); else if(k==='smerge') mergeSeries([a.dataset.series]);
@@ -2254,7 +2313,7 @@ function panelsAfterRender(){ if(P.internal||!P.on) return; const want=P.key; P.
 pexit.addEventListener('click',()=>exitPanels(true));
 addEventListener('resize',()=>{ if(P.on) placeMask(false); });
 /* ================= boot ================= */
-window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},dates:{of:dateOf,week:onThisWeek,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{ink:spineInk,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},dates:{of:dateOf,week:onThisWeek,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);

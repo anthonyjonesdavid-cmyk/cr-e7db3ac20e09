@@ -1,5 +1,13 @@
 # Comic Shelf: change log
 
+## cr-v30 — 2026-10-14
+- **Shelf of volumes on Home**, directly under the carousel (above "This week in…"): one book spine per series/volume exactly as grouped in Library (Move to Series choices included), standing on a minimal dark wooden shelf.
+- Spine colour = dominant colour of the volume's first cover; text ink (white or near-black) picked for ≥4.5:1 contrast. Vertical title plus a second line with volume number and year range from Timeline dates (e.g. "Vol 2 · 1991–92").
+- Thickness grows modestly with issue count (40px minimum tap target, 76px cap); slight height variation for a real-shelf look.
+- Native horizontal scroll with momentum when the shelf overflows.
+- Tap a spine: it slides out (200ms; instant with Reduce Motion) and opens that series' issues.
+- Compact: ~176px on iPad, ~142px on iPhone. Colours are sampled once per volume and cached in IndexedDB (on the comic record); no other background work.
+
 ## cr-v29 — 2026-10-13
 - **Two-page spreads**: wide pages (width/height > 1.2) are detected when a comic opens (page shapes read once, remembered).
 - **Landscape**: a spread is its own page, shown full screen; it never pairs with a neighbour (2-up pairing resumes after it). Page turns between a pair and a spread turn as one sheet.

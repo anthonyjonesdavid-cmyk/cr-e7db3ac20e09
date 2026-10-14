@@ -11,7 +11,7 @@ def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS' if cond else 'FAIL'),f'[{ENG}]',name,str(extra)[:220] if not cond else '',flush=True)
 ROW="""(()=>{const s=document.querySelector('#homeScroll .otw'); if(!s) return null; const r=e=>e.getBoundingClientRect();
   return {kind:s.dataset.kind,title:s.querySelector('h2').textContent,tiles:[...s.querySelectorAll('.rc')].map(b=>b.querySelector('.t').textContent+'|'+b.querySelector('.yr').textContent),
-    first:s===document.querySelector('#homeScroll .rows').firstElementChild, tap:Math.min(...[...s.querySelectorAll('.rc')].map(b=>Math.min(r(b).width,r(b).height))),
+    first:s===document.querySelector('#homeScroll .rows').firstElementChild||(s.previousElementSibling&&s.previousElementSibling.classList.contains('volshelf')&&s.previousElementSibling===document.querySelector('#homeScroll .rows').firstElementChild), tap:Math.min(...[...s.querySelectorAll('.rc')].map(b=>Math.min(r(b).width,r(b).height))),
     h:r(s.querySelector('.row-h')).height, sameH:r(s.querySelector('.rc .cvr')).height===r(document.querySelector('#homeScroll .row:not(.otw) .rc .cvr')||s.querySelector('.rc .cvr')).height}})()"""
 SETN="(([t,k,v])=>{const c=__cr.comics.find(x=>x.title===t); if(v===null) delete c[k]; else c[k]=v; __cr.dates.render()})"
 def now(pg,iso): pg.evaluate(f"window.__crNow=new Date('{iso}T12:00:00').getTime(); sessionStorage.crNow=window.__crNow; __cr.dates.render()"); pg.wait_for_timeout(150)
@@ -50,7 +50,7 @@ with sync_playwright() as p:
         else:
             pg.evaluate("__cr.dates.set(__cr.comics.find(c=>c.title==='Paper Moons 01'),{y:1980,m:6})"); now(pg,'2026-06-10')
         r=pg.evaluate(ROW)
-        ok(f'{lab}: row is first under the carousel, same row style, tiles >=40px',r and r['first'] and r['sameH'] and r['tap']>=40 and r['h']>=34,json.dumps(r))
+        ok(f'{lab}: row is first under the carousel (after the v30 shelf of volumes), same row style, tiles >=40px',r and r['first'] and r['sameH'] and r['tap']>=40 and r['h']>=34,json.dumps(r))
         g=pg.evaluate("(()=>({tb:getComputedStyle(document.querySelector('.topbar')).backgroundColor,top:document.querySelector('#tabs').getBoundingClientRect().top,ov:document.documentElement.scrollWidth>innerWidth}))()")
         ok(f'{lab}: solid top bar, tabs clear of status bar, no overflow',g['tb']=='rgb(0, 0, 0)' and g['top']>=sat and not g['ov'],json.dumps(g))
         pg.evaluate("document.querySelector('#homeScroll .otw').scrollIntoView({block:'center'})"); pg.wait_for_timeout(200)
