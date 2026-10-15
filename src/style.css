@@ -497,3 +497,13 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* v37: sign = one flat layer (SVG board+text background), lifted 2px off the pole's plane so the two never z-fight */
 .rksign{background:#f5f2e8 center/100% 100% no-repeat;transform:translateZ(2px);transform-style:flat;backface-visibility:hidden}
 .rkpole{transform:translateZ(-1px)}
+
+/* v38: Recent tab (4th segment) — compact newest-first grid */
+#recScroll{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rgrid{grid-template-columns:repeat(4,1fr);gap:8px 5px}
+@media (min-width:600px){.rgrid{grid-template-columns:repeat(7,1fr);gap:10px 6px}}
+@media (min-width:1000px){.rgrid{grid-template-columns:repeat(9,1fr)}}
+.segctl button .rs{display:none}
+.segctl button{min-width:84px;padding:0 10px}
+@media (max-width:700px){.segctl button .rl{display:none}.segctl button .rs{display:inline}}
+@media (max-width:440px){.segctl button{min-width:0;padding:0 8px;font-size:13px}}

@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v38 — 2026-10-15
+
+- Home: removed the "This week in… / On sale this month in past years" row and the "Recently Added" row (Arrange Categories now lists series and reading lists only).
+- New 4th switcher segment: Home | Library | Timeline | Recently Added ("Recent" on narrow screens). Compact newest-first grid of every comic; tap opens the issue; scroll position kept across tab switches and reader round-trips. Re-renders only when the list changes.
+- Home cover carousel is now circular: covers wrap around, so the first cover has the last ones to its left and flicks past either end keep cycling; momentum and snapping unchanged. With very few comics the list repeats so both sides stay full. Fixed DOM slots (±window) instead of one node per item.
+- Tests: new e2e_v38 (replaces the v28 This-week suite): removed rows, 4-segment switcher fit (≥40px, no clipping/clash, below status bar), Recent order/open/scroll memory, 980-issue render time, carousel filled on both sides at load at 4 sizes, wrap past start, 2-comic repeat. e2e / v21 / v30 updated for the removed rows.
+
 ## cr-v37 — 2026-10-15
 
 - Fix: rack header sign flickered while spinning (red "FOR ALL AGES" z-fighting with the white board). The sign is now one flat layer: board and lettering baked into a single SVG background, no child text layers, `transform-style: flat`, lifted 2px off the pole's plane (pole pushed back 1px).

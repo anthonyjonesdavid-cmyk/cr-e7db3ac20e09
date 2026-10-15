@@ -84,9 +84,13 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
 // app launch / restore from the back-forward cache: back to Home (no series page, no search), at the top
 function launchHome(){ closeRack(); closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
-function renderShelf(){ renderHome(); renderLibrary(); setTab(ui.tab); if(TL.on) renderTimeline(); }
+// v38: Recently Added tab — every comic, newest first, compact grid; re-rendered only when the list changed (keeps scroll position)
+function renderRecent(){ const g=$('#recGrid'); if(!g) return; const L=comics.slice().sort((a,b)=>b.added-a.added), sig=L.map(c=>c.id+'.'+(c.coverV||'')+(c.cover?1:0)).join(',');
+  if(g.dataset.sig===sig) return; g.dataset.sig=sig;
+  g.innerHTML=L.length?L.map(c=>`<button class="lc" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}">${coverBox(c)}</button>`).join(''):`<div class="lempty" style="grid-column:1/-1">No comics yet.</div>`; }
+function renderShelf(){ renderHome(); renderLibrary(); if(ui.tab==='recent') renderRecent(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
-  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL) renderTimeline(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
+  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL) renderTimeline(); $('#recent').classList.toggle('hidden',t!=='recent'); if(t==='recent') renderRecent(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
 function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
@@ -148,7 +152,7 @@ async function editQueue(qid){ const q=queues.find(x=>x.id===qid); if(!q) return
 const alpha=(a,b)=>a.localeCompare(b,undefined,{numeric:true});
 const rowPrefs=()=>{ const p=store.get('rowOrder',null)||{}; return {order:Array.isArray(p.order)?p.order:[],hidden:Array.isArray(p.hidden)?p.hidden:[],saved:!!p.order}; };
 const setRowPrefs=(order,hidden)=>store.set('rowOrder',{order,hidden});
-const defaultKeys=()=>['added',...queues.slice().sort((a,b)=>a.created-b.created).map(q=>'q:'+q.id),...seriesCounts().map(([s])=>'s:'+s).sort((a,b)=>alpha(a,b))];
+const defaultKeys=()=>[...queues.slice().sort((a,b)=>a.created-b.created).map(q=>'q:'+q.id),...seriesCounts().map(([s])=>'s:'+s).sort((a,b)=>alpha(a,b))];
 // saved order (only rows that still exist), then any rows not in it: new series appended alphabetically
 function rowKeys(){ const cur=defaultKeys(), have=new Set(cur), p=rowPrefs(); if(!p.saved) return cur;
   const out=p.order.filter(k=>have.has(k)), inn=new Set(out), nq=cur.filter(k=>!inn.has(k)&&k.startsWith('q:')), rest=cur.filter(k=>!inn.has(k)&&!k.startsWith('q:'));
@@ -182,7 +186,7 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${onThisWeekHTML()}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
   CF.mount($('#cf'),cf);
 }
 
@@ -264,69 +268,72 @@ function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>se
   if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },PULL_MS); }
 const PULL_MS=220;   // v35: book slides up and tips toward the viewer, then the volume opens (never > 250ms)
 
-/* ---------- "This week in…": issues released this week (or, failing that, this month) in past years; computed when Home renders ---------- */
+/* ---------- trusted-date helper (v38: the "This week in…" Home row was removed) ---------- */
 const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook
 // trusted dates only, in this order: set by you > looked up online > embedded metadata > file name. ≈ estimates are excluded.
 function weekDate(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.onlineDate&&c.onlineDate.y) return c.onlineDate; if(c.metaDate&&c.metaDate.y) return c.metaDate;
   return dateFromName(c.fileName)||dateFromName(c.title)||null; }
-function onThisWeek(now=nowD()){ const Y=now.getFullYear(), M=now.getMonth()+1, t0=new Date(Y,M-1,now.getDate()).getTime();
-  const all=comics.map(c=>({c,d:weekDate(c)})).filter(x=>x.d&&x.d.y<Y&&x.d.m);
-  const wk=all.filter(x=>x.d.d&&Math.abs(new Date(Y,x.d.m-1,x.d.d).getTime()-t0)<=3.5*864e5);   // same week: within ±3 days of today's date
-  const by=(a,b)=>b.d.y-a.d.y||(a.d.d||0)-(b.d.d||0)||byIssue(a.c,b.c);
-  if(wk.length) return {kind:'week',title:'This week in past years',items:wk.sort(by)};
-  const mo=all.filter(x=>x.d.m===M); return mo.length?{kind:'month',title:'On sale this month in past years',items:mo.sort(by)}:null; }
-function onThisWeekHTML(){ const r=onThisWeek(); if(!r) return '';
-  return `<section class="row otw" data-kind="${r.kind}"><div class="row-top"><div class="row-h"><h2>${r.title}</h2><span class="n">${r.items.length}</span></div></div>
-  <div class="row-s">${r.items.slice(0,30).map(({c,d})=>`<button class="rc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}, ${esc(fmtDate(d))}">${coverBox(c)}<div class="t">${esc(c.title)}</div><div class="s"><b class="yr">${d.y}</b>${d.d?` · ${MONTHS[d.m-1].slice(0,3)} ${d.d}`:''}</div></button>`).join('')}</div></section>`; }
 
 /* ---------- 3D coverflow: touch-tracked, momentum, snaps to center ---------- */
 // one factory, two carousels: Home (CF) and the series page (SCF)
+const CF_SLOTS=CF_WIN*2+1;   // one DOM slot per visible stack (±CF_WIN); same comic can sit on both sides when the list wraps
+const cfMod=(i,n)=>((i%n)+n)%n;
 const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
-  mount(el,items){ this.el=el; this.items=items; this.pos=0; this.shown=-1; this.vis=new Set(); this.size(); this.bind(); },
+  // v38: circular coverflow — wraps so both sides of the centre stay filled; with few comics the list is tiled across the slots
+  mount(el,items){ this.stop(); const re=this.el!==el; this.el=el; this.items=items; this.pos=0; this.shown=-1;
+    el.innerHTML=Array.from({length:CF_SLOTS},(_,k)=>`<div class="cf-item" data-slot="${k-CF_WIN}" style="display:none"><img alt="" decoding="async" draggable="false"><div class="dim"></div></div>`).join('');
+    if(re) this.bind(); this.size(); },
   size(){ if(!this.el||!this.el.isConnected) return; const vw=innerWidth, vh=innerHeight;
     this.cw=Math.round(vw<600? Math.min(vw*.46,vh*.3) : Math.min(290,vw*.3,vh*.33)); this.sp=this.cw*.8;
     // side-stack spacing: solve so the 7th neighbour's centre lands on the screen edge (after perspective shrink), so stacks run off both edges
     { const cw=this.cw, T=7, P=1100, z=cw*.55+(T-1)*cw*.2, need=(vw/2)*(P+z)/P; this.gap=clamp((need-cw*.8)/(T-1),cw*.12,cw*.5);
-      // window = neighbours up to the first one that sits fully past the screen edge (capped at CF_WIN): stacks always bleed off, no wasted layers
       this.win=CF_WIN; for(let k=2;k<=CF_WIN;k++){ const f=P/(P+cw*.55+(k-1)*cw*.2); if((cw*.8+(k-1)*this.gap-cw*.32)*f>vw/2){ this.win=k; break; } } }
     this.el.style.setProperty('--cw',this.cw+'px'); this.layout(); },
-  // virtualized: only covers within ±CF_WIN of centre are displayed/transformed (enough to bleed past both edges); covers load lazily (±CF_WIN+2 prefetch)
-  layout(){ if(!this.el) return; const kids=this.el.children, cw=this.cw, gap=this.gap||cw*.3, n=kids.length, W=this.win||CF_WIN;
-    const lo=Math.max(0,Math.floor(this.pos)-W), hi=Math.min(n-1,Math.ceil(this.pos)+W), vis=this.vis||(this.vis=new Set());
-    for(const k of [...vis]) if(k<lo||k>hi){ kids[k].style.display='none'; vis.delete(k); }
-    for(let k=Math.max(0,lo-2);k<=Math.min(n-1,hi+2);k++){ const im=kids[k].firstChild; if(!im.src){ const u=cover(this.items[k]); if(u) im.src=u; } }
-    for(let k=lo;k<=hi;k++){ const it=kids[k], o=k-this.pos, ao=Math.abs(o);
-      if(!vis.has(k)){ it.style.display=''; vis.add(k); }
-      const s=Math.sign(o), a=Math.min(ao,1), x=s*(a*cw*.8+Math.max(0,ao-1)*gap);
+  layout(){ if(!this.el) return; const n=this.items.length, cw=this.cw, gap=this.gap||cw*.3, W=this.win||CF_WIN, kids=this.el.children;
+    if(!n){ for(const it of kids) it.style.display='none'; return; }
+    const base=Math.round(this.pos);
+    for(let s=-CF_WIN;s<=CF_WIN;s++){ const it=kids[s+CF_WIN], k=base+s, o=k-this.pos, ao=Math.abs(o), on=Math.abs(s)<=W;
+      if(!on){ it.style.display='none'; continue; }
+      const idx=cfMod(k,n), c=this.items[idx], im=it.firstChild;
+      it.style.display=''; it.dataset.i=''+idx; it.dataset.id=c.id;
+      if(im.dataset.cid!==c.id){ im.dataset.cid=c.id; im.alt=c.title||''; const u=cover(c); if(u) im.src=u; else im.removeAttribute('src'); }
+      const sg=Math.sign(o)||0, a=Math.min(ao,1), x=sg*(a*cw*.8+Math.max(0,ao-1)*gap);
       const z=-a*cw*.55-Math.max(0,ao-1)*cw*.2, rot=-clamp(o,-1,1)*52, sc=1-a*.1;
       it.style.transform=`translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
-      it.style.zIndex=1000-Math.round(ao*100); it.lastChild.style.opacity=Math.min(.55,a*.3+Math.max(0,ao-1)*.04).toFixed(3);   // light dimming so the centre stands out; far covers fade only slightly
-      it.classList.toggle('lite',ao>2.5); }   // covers stay sharp (no blur); far stacks drop reflection/shadow (keeps compositing cheap)
+      it.style.zIndex=1000-Math.round(ao*100); it.lastChild.style.opacity=Math.min(.55,a*.3+Math.max(0,ao-1)*.04).toFixed(3);
+      it.classList.toggle('lite',ao>2.5); }
     this.info(); },
-  info(){ const i=clamp(Math.round(this.pos),0,this.items.length-1); if(i===this.shown) return; this.shown=i; const c=this.items[i]; if(!c||!this.el) return;
-    // no caption under the carousel: the centre cover itself is the control (tap opens); keep it labelled for VoiceOver
-    [...this.el.children].forEach((it,k)=>{ it.setAttribute('role','button'); it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1-skipList(c).filter(p=>p<(c.page||0)).length} of ${c.pages-skipList(c).length}`:''}`:this.items[k].title); }); },
+  info(){ const n=this.items.length; if(!n||!this.el) return; const i=cfMod(Math.round(this.pos),n); if(i===this.shown) return; this.shown=i; const c=this.items[i];
+    [...this.el.children].forEach(it=>{ if(it.style.display==='none') return; const k=+it.dataset.i;
+      it.setAttribute('role','button');
+      it.setAttribute('aria-label',k===i?`${c.lastRead&&!isDone(c)?'Continue reading':'Open'} ${c.title}${c.lastRead?`, page ${(c.page||0)+1-skipList(c).filter(p=>p<(c.page||0)).length} of ${c.pages-skipList(c).length}`:''}`:this.items[k].title); }); },
   stop(){ cancelAnimationFrame(this.raf); this.raf=0; },
-  moving(v){ if(this.el) this.el.classList.toggle('moving',v); },   // shadows are dropped while moving (cheaper compositing)
-  to(target,dur){ this.stop(); this.moving(true); const from=this.pos, t0=performance.now(); target=clamp(target,0,this.items.length-1);
-    const step=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3); this.pos=from+(target-from)*e; this.layout(); if(k<1) this.raf=requestAnimationFrame(step); else { this.raf=0; this.pos=target; this.layout(); this.moving(false); } };
+  moving(v){ if(this.el) this.el.classList.toggle('moving',v); },
+  to(target,dur){ this.stop(); this.moving(true); const from=this.pos, t0=performance.now();
+    const step=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3); this.pos=from+(target-from)*e; this.layout(); if(k<1) this.raf=requestAnimationFrame(step); else { this.raf=0; this.pos=target; this.layout(); this.moving(false); this.norm(); } };
     this.raf=requestAnimationFrame(step); },
-  bind(){ const el=this.el; let d=null;
-    el.addEventListener('pointerdown',e=>{ if(e.button>0) return; this.stop(); d={id:e.pointerId,x0:e.clientX,y0:e.clientY,p0:this.pos,drag:false,s:[[e.timeStamp,e.clientX]],t0:e.timeStamp}; });
-    el.addEventListener('pointermove',e=>{ if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x0, dy=e.clientY-d.y0;
-      if(!d.drag){ if(Math.abs(dx)>7&&Math.abs(dx)>Math.abs(dy)){ d.drag=true; this.moving(true); cancelLP(); try{el.setPointerCapture(e.pointerId)}catch(_){} } else if(Math.abs(dy)>10){ d=null; return; } else return; }
+  norm(){ const n=this.items.length; if(n){ this.pos=cfMod(Math.round(this.pos),n); this.shown=-1; this.layout(); } },
+  bind(){ let d=null;
+    const el=()=>this.el;
+    // pointer/wheel on document via delegation won't work easily; bind once to the cf root (same node across remounts — only children are replaced)
+    const root=this.el;
+    root.addEventListener('pointerdown',e=>{ if(e.button>0||!this.el) return; this.stop(); d={id:e.pointerId,x0:e.clientX,y0:e.clientY,p0:this.pos,drag:false,s:[[e.timeStamp,e.clientX]],t0:e.timeStamp}; });
+    root.addEventListener('pointermove',e=>{ if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x0, dy=e.clientY-d.y0;
+      if(!d.drag){ if(Math.abs(dx)>7&&Math.abs(dx)>Math.abs(dy)){ d.drag=true; this.moving(true); cancelLP(); try{root.setPointerCapture(e.pointerId)}catch(_){} } else if(Math.abs(dy)>10){ d=null; return; } else return; }
       d.s.push([e.timeStamp,e.clientX]); if(d.s.length>8) d.s.shift();
-      let p=d.p0-dx/this.sp; const n=this.items.length-1; if(p<0) p*=.35; else if(p>n) p=n+(p-n)*.35; this.pos=p; this.layout(); });
+      this.pos=d.p0-dx/this.sp; this.layout(); });
     const end=(e,cancel)=>{ if(!d||e.pointerId!==d.id) return; const g=d; d=null;
-      if(g.drag){ const s=g.s.filter(q=>g.s[g.s.length-1][0]-q[0]<=100), a=s[0], b=s[s.length-1]; /* velocity over the last ~100ms of the gesture */ const v=(b[0]-a[0])>0&&(e.timeStamp-b[0])<90? (b[1]-a[1])/(b[0]-a[0]) : 0;   // px/ms
-        const proj=v*300*(1+Math.min(2.5,Math.abs(v))*.45); const target=Math.round(this.pos-proj/this.sp); const dist=Math.abs(clamp(target,0,this.items.length-1)-this.pos); this.to(target,clamp(300+dist*75,300,1400)); return; }
+      if(g.drag){ const s=g.s.filter(q=>g.s[g.s.length-1][0]-q[0]<=100), a=s[0], b=s[s.length-1]; const v=(b[0]-a[0])>0&&(e.timeStamp-b[0])<90? (b[1]-a[1])/(b[0]-a[0]) : 0;
+        const proj=v*300*(1+Math.min(2.5,Math.abs(v))*.45); const target=Math.round(this.pos-proj/this.sp); const dist=Math.abs(target-this.pos); this.to(target,clamp(300+dist*75,300,1400)); return; }
       if(cancel||lpFired) return; if(e.timeStamp-g.t0>600) return;
-      const it=e.target.closest('.cf-item'); if(!it) return; const i=+it.dataset.i;
-      if(SEL.on) return; if(i===Math.round(this.pos)) openReader(it.dataset.id); else this.to(i,420); };
-    el.addEventListener('pointerup',e=>end(e,false)); el.addEventListener('pointercancel',e=>end(e,true));
-    let wt=0; el.addEventListener('wheel',e=>{ if(Math.abs(e.deltaX)<=Math.abs(e.deltaY)) return; e.preventDefault(); this.stop(); this.moving(true); const n=this.items.length-1;
-      this.pos=clamp(this.pos+e.deltaX/this.sp,-.3,n+.3); this.layout(); clearTimeout(wt); wt=setTimeout(()=>this.to(Math.round(this.pos),300),120); },{passive:false}); }
+      const it=e.target.closest('.cf-item'); if(!it||it.style.display==='none') return; const i=+it.dataset.i, n=this.items.length;
+      if(SEL.on) return; if(i===cfMod(Math.round(this.pos),n)) openReader(it.dataset.id);
+      else { const base=Math.round(this.pos); let best=null; for(let s=-CF_WIN;s<=CF_WIN;s++) if(s&&cfMod(base+s,n)===i&&(best===null||Math.abs(base+s-this.pos)<Math.abs(best-this.pos))) best=base+s; if(best!==null) this.to(best,420); } };
+    root.addEventListener('pointerup',e=>end(e,false)); root.addEventListener('pointercancel',e=>end(e,true));
+    let wt=0; root.addEventListener('wheel',e=>{ if(Math.abs(e.deltaX)<=Math.abs(e.deltaY)) return; e.preventDefault(); this.stop(); this.moving(true);
+      this.pos+=e.deltaX/this.sp; this.layout(); clearTimeout(wt); wt=setTimeout(()=>this.to(Math.round(this.pos),300),120); },{passive:false}); }
 });
+
 const CF=makeCF(), SCF=makeCF();
 addEventListener('resize',()=>{ clearTimeout(CF.rt); CF.rt=setTimeout(()=>{ CF.size(); SCF.size(); },80); });
 
@@ -357,7 +364,8 @@ function renderLibrary(){ scopeUI();
 $('#q').addEventListener('input',e=>{ ui.q=e.target.value; renderLibrary(); });
 $('#sortBtn').addEventListener('click',e=>{ e.stopPropagation(); openMenu($('#sortBtn'),Object.entries(SORTS).map(([k,l])=>({label:l,on:ui.sort===k,run:()=>{ ui.sort=k; store.set('sort',k); renderLibrary(); $('#libScroll').scrollTop=0; }}))); });
 function seeAll(kind,series){ ui.series=null; ui.filter='all'; ui.q=''; $('#q').value='';
-  if(kind==='series'){ ui.series=series; ui.sort='title'; } else if(kind==='added') ui.sort='added'; else if(kind==='unread'){ ui.filter='unread'; ui.sort='title'; } else if(kind==='finished') ui.filter='finished';
+  if(kind==='added'){ setTab('recent'); return; }
+  if(kind==='series'){ ui.series=series; ui.sort='title'; } else if(kind==='unread'){ ui.filter='unread'; ui.sort='title'; } else if(kind==='finished') ui.filter='finished';
   store.set('sort',ui.sort); renderLibrary(); setTab('library'); $('#libScroll').scrollTop=0; }
 // A–Z jump index (drag along it like iOS)
 (()=>{ const az=$('#azIndex'); let pop=null, on=false;
@@ -398,7 +406,7 @@ shelfEl.addEventListener('click',e=>{ if(lpFired){ lpFired=false; e.preventDefau
 $('#fileIn').addEventListener('change',e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) importFiles(fs); });
 $('#settingsBtn').onclick=()=>openSettings();
 document.addEventListener('keydown',e=>{ if(R&&R.comic||document.querySelector('.mwrap')||ui.tab!=='home'||!CF.el||e.target.matches('input')) return;
-  if(e.key==='ArrowLeft') CF.to(Math.round(CF.pos)-1,320); else if(e.key==='ArrowRight') CF.to(Math.round(CF.pos)+1,320); else if(e.key==='Enter'){ const c=CF.items[Math.round(CF.pos)]; if(c) openReader(c.id); } });
+  if(e.key==='ArrowLeft') CF.to(Math.round(CF.pos)-1,320); else if(e.key==='ArrowRight') CF.to(Math.round(CF.pos)+1,320); else if(e.key==='Enter'){ const c=CF.items[cfMod(Math.round(CF.pos),CF.items.length)]; if(c) openReader(c.id); } });
 
 /* ---------- menus, sheets, modals ---------- */
 function openMenu(anchor,items,cls){ document.querySelector('.menu')?.remove(); const m=document.createElement('div'); m.className='menu'+(cls?' '+cls:''); m.setAttribute('role','menu');

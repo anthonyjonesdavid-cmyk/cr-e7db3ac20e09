@@ -157,7 +157,7 @@ with sync_playwright() as p:
     ok('reader ••• also adds; list keeps the order added',q==[{'name':'Inferno','items':['Nightfall 02','Iron Tide 01','Nightfall 01']}],json.dumps(q))
     pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(300)
     row=pg.evaluate("(()=>{const r=document.querySelector('.qrow'); const rows=[...document.querySelectorAll('#homeScroll .row-h h2')].map(h=>h.textContent); return r&&{h:r.querySelector('h2').textContent,n:r.querySelector('.qprog').textContent,t:[...r.querySelectorAll('.rc')].map(e=>e.getAttribute('aria-label')),rows}})()")
-    ok('Home row for the list with progress "0 of 3", right under Recently Added',row and row['h']=='Inferno' and row['n']=='0 of 3' and row['rows'][1]=='Inferno' and row['t'][0]=='1. Nightfall 02',json.dumps(row))
+    ok('Home row for the list with progress "0 of 3", first among rows (Recently Added is a tab)',row and row['h']=='Inferno' and row['n']=='0 of 3' and row['rows'][0]=='Inferno' and row['t'][0]=='1. Nightfall 02',json.dumps(row))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=300"); pg.wait_for_timeout(200); pg.screenshot(path=f'{SH}/{ENG}-v21-home-reading-list.png'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0")
     # reorder by dragging the handle
     pg.click('.qrow .row-h'); pg.wait_for_selector('#qeList'); pg.wait_for_timeout(200)

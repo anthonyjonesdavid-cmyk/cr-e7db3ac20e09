@@ -62,7 +62,7 @@ CFSWIPE='''async ({dx,steps,dt,noup})=>{ const el=document.querySelector('#cf');
   const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const tgt=document.elementFromPoint(x,y)||el;
   const ev=(t,cx)=>tgt.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:41,pointerType:'touch',isPrimary:true,clientX:cx,clientY:y,buttons:t==='pointerup'?0:1}));
   ev('pointerdown',x); for(let i=1;i<=steps;i++){ await sleep(dt); ev('pointermove',x+dx*i/steps); }
-  if(noup) return null; ev('pointerup',x+dx); await sleep(1000); return __cr.CF.items[Math.round(__cr.CF.pos)].title; }'''
+  if(noup) return null; ev('pointerup',x+dx); await sleep(1000); return __cr.CF.items[((Math.round(__cr.CF.pos)%__cr.CF.items.length)+__cr.CF.items.length)%__cr.CF.items.length].title; }'''
 def state(pg): return pg.evaluate('(()=>{const R=__cr.R;const v=R.views[R.vi]||[];return {vi:R.vi,first:v.filter(x=>x!=null)[0],len:v.length,spread:R.spread,rtl:R.rtl,n:R.n,ui:document.querySelector("#reader").classList.contains("ui"),z:__cr.Z.s,cache:__cr.cache()}})()')
 def shot(pg,name): pg.screenshot(path=f'{SH}/{ENG}-{name}.png')
 def wait_render(pg,t=15000): pg.wait_for_function('document.querySelectorAll(".view .pg.loading").length===0 && document.querySelectorAll(".view .pg canvas").length>0',timeout=t)
@@ -71,6 +71,10 @@ EDGE="""(()=>{const C=__cr.CF; C.stop(); C.pos=Math.min(10,C.items.length-1); C.
   const L=Math.min(...r.map(b=>b.left)), R=Math.max(...r.map(b=>b.right)); C.pos=0; C.layout(); return {L:Math.round(L),R:Math.round(R),vw,n:r.length}})()"""
 def edge_ok(pg,lab):
     e=pg.evaluate(EDGE); ok(f'{lab}: carousel side stacks reach/bleed past both screen edges',e['L']<=0 and e['R']>=e['vw'] and e['n']<=21,str(e))
+    w=pg.evaluate('''(()=>{const C=__cr.CF,n=C.items.length,i=((Math.round(C.pos)%n)+n)%n,vis=[...document.querySelectorAll('#cf .cf-item')].filter(e=>e.style.display!=='none');
+      const mid=innerWidth/2, L=vis.filter(e=>e.getBoundingClientRect().right<mid-20), R=vis.filter(e=>e.getBoundingClientRect().left>mid+20);
+      return {pos:C.pos,i,n,left:L.length,right:R.length,leftIds:L.map(e=>e.dataset.id),wrap:L.some(e=>+e.dataset.i>i)||(i===0&&L.some(e=>+e.dataset.i===n-1))}})()''')
+    ok(f'{lab}: v38 circular carousel fills both sides of the centre on load (wraps the list)',w['left']>=2 and w['right']>=2 and w['pos']==0 and w['wrap'],str(w))
 def bar_black(pg,lab,sel,clip_fn):
     """computed style + pixel check: bar region (incl. emulated 44px status-bar inset) is pure #000 while content is scrolled under it"""
     st=pg.evaluate(f"""(()=>{{const e=document.querySelector('{sel}'); const c=getComputedStyle(e); return {{bg:c.backgroundColor,bf:c.backdropFilter||c.webkitBackdropFilter||'none',op:c.opacity}}}})()""")
@@ -123,7 +127,7 @@ with sync_playwright() as p:
     pg.wait_for_function(f'document.querySelectorAll(".lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=(400000 if BIG else 90000))
     ok(f'import {len(FILES)} PDFs',True,f'{time.time()-t0:.1f}s'); pg.wait_for_timeout(600)
     heads=pg.eval_on_selector_all('.row-h h2','els=>els.map(e=>e.textContent)')
-    ok('home rows: Recently Added + auto-detected series rows',heads[0]=='Recently Added' and all(s in heads for s in ['Nightfall','Iron Tide','Starlight Ronin','The Hollow','Twin Moon']),json.dumps(heads))
+    ok('home rows: series rows only (Recently Added is a tab; no This-week row)',heads and 'Recently Added' not in heads and all(s in heads for s in ['Nightfall','Iron Tide','Starlight Ronin','The Hollow','Twin Moon']),json.dumps(heads))
     ok('see-all tile ends each row',pg.locator('.row').first.locator('.seeall').count()==1)
     ok('row cards show title under cover',pg.locator('.rc .t').first.inner_text()!='')
     # edit via long-press/context sheet
@@ -177,19 +181,19 @@ with sync_playwright() as p:
     sheet(pg,'Nightfall 02','aToggle')
     # ---- Home (portrait) ----
     tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(700)
-    ctr=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos), el=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]'); return {t:__cr.CF.items[i].title, aria:el.getAttribute('aria-label')}})()")
+    ctr=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos), el=document.querySelectorAll('#cf .cf-item')[10]; return {t:__cr.CF.items[i].title, aria:el.getAttribute('aria-label')}})()")
     ok('carousel centers most recent',ctr['t']=='Nightfall 01' and f'page 13 of {N}' in ctr['aria'],str(ctr))
     ok('no caption block under the carousel',pg.evaluate("!document.querySelector('#cfInfo,.cf-info') && !/CONTINUE READING/i.test(document.querySelector('.hero').innerText)"))
-    gap=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.volshelf,.hlinks,.row-h').getBoundingClientRect().top-c.bottom})()")
+    gap=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelectorAll('#cf .cf-item')[10].getBoundingClientRect(); return document.querySelector('.volshelf,.hlinks,.row-h').getBoundingClientRect().top-c.bottom})()")
     ok('rows sit just below carousel (room for reflection, no big gap)',25<gap<75,str(round(gap)))
     ok('no now-reading pill on Home',pg.locator('#nowPill').count()==0)
     shot(pg,'10-home-portrait')
     ok('status-bar-style black + theme-color #000',pg.evaluate("document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').content")=='black' and pg.evaluate("document.querySelector('meta[name=theme-color]').content").lower() in ('#000','#000000'))
     pg.evaluate("document.documentElement.style.setProperty('--sat','44px'); __cr.CF.size()"); pg.wait_for_timeout(200)
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=700"); pg.wait_for_timeout(300); shot(pg,'13-home-scrolled-under-bar')
-    bar_black(pg,'Home (scrolled, 44px inset)','.topbar',lambda:(70,0,170,44+8))
+    bar_black(pg,'Home (scrolled, 44px inset)','.topbar',lambda:(70,0,170,44))
     tab(pg,'library'); pg.evaluate("document.querySelector('#libScroll').scrollTop=600"); pg.wait_for_timeout(300); shot(pg,'14-library-scrolled-under-bar')
-    bar_black(pg,'Library (scrolled, 44px inset)','.topbar',lambda:(70,0,170,44+8))
+    bar_black(pg,'Library (scrolled, 44px inset)','.topbar',lambda:(70,0,170,44))
     bar_black(pg,'Library search bar area','.libbar',lambda:(pg.locator('.libbar').bounding_box()['x']+2,pg.locator('.libbar').bounding_box()['y']+1,6,8))
     open_comic(pg,'Nightfall 01'); pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(400); shot(pg,'15-reader-bar-solid')
     bar_black(pg,'Reader toolbar (44px inset)','.rbar.top',lambda:(0,0,40,44))
@@ -203,16 +207,16 @@ with sync_playwright() as p:
     ok('carousel covers sharp (no blur) at rest and while moving, light dim on sides',sharp['rest'] and sharp['mv'] and 0.15<=sharp['dim']<=0.45,str(sharp))
     edge_ok(pg,'portrait')
     hr=pg.evaluate("(()=>{const h=[...document.querySelectorAll('#homeScroll .row-h')]; return {t:h.map(e=>e.querySelector('h2').textContent),k:h.map(e=>e.dataset.kind)}})()")
-    ok('Home rows = Recently Added then one per series (no Unread/Finished)',hr['t'][0]=='Recently Added' and all(k=='series' for k in hr['k'][1:]) and len(hr['k'])>2 and 'Unread' not in hr['t'] and 'Finished' not in hr['t'],str(hr['t']))
+    ok('Home rows = one per series only (no Recently Added / Unread / Finished / This-week)',all(k=='series' for k in hr['k']) and len(hr['k'])>2 and 'Recently Added' not in hr['t'] and 'Unread' not in hr['t'] and 'Finished' not in hr['t'],str(hr['t']))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=520"); pg.wait_for_timeout(300); shot(pg,'11-home-rows-portrait')
-    sx=pg.evaluate("(()=>{const r=document.querySelectorAll('.row-s')[0]; r.scrollLeft=300; return r.scrollLeft})()"); ok('rows scroll horizontally (free scroll)',sx>0,str(sx))
+    sx=pg.evaluate("(()=>{const r=[...document.querySelectorAll('.row-s')].sort((a,b)=>(b.scrollWidth-b.clientWidth)-(a.scrollWidth-a.clientWidth))[0]; r.scrollLeft=300; return r.scrollLeft})()"); ok('rows scroll horizontally (free scroll)',sx>0,str(sx))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
     # carousel: swipe with momentum + snap, mid-swipe, tap side, tap center
     t1=pg.evaluate(CFSWIPE,{'dx':-150,'steps':6,'dt':16,'noup':False}); pos=pg.evaluate('__cr.CF.pos')
     ok('carousel swipe moves + snaps to a whole cover',t1!='Nightfall 01' and abs(pos-round(pos))<1e-6 and pos>=1,f'{t1} pos={pos}')
     pg.evaluate(CFSWIPE,{'dx':-700,'steps':5,'dt':12,'noup':False}); pos2=pg.evaluate('__cr.CF.pos'); ok('fast fling carries momentum further',pos2>=pos+2,f'{pos}->{pos2}')
     pg.wait_for_function('!__cr.CF.raf',timeout=5000)
-    cfs=pg.evaluate('''(()=>{const C=__cr.CF, L=C.items, total=+document.querySelector('.row-h .n').textContent;
+    cfs=pg.evaluate('''(()=>{const C=__cr.CF, L=C.items, total=__cr.comics.length;
       const ip=c=>(c.progress||0)<1&&(c.lastRead||(c.progress||0)>0); let phase=0, okOrder=true, prev=null;
       L.forEach(c=>{ const ph=ip(c)?0:c.lastRead?1:2; if(ph<phase) okOrder=false;
         if(ph===phase&&prev){ if(ph<2&&c.lastRead>prev.lastRead) okOrder=false; if(ph===2&&c.added>prev.added) okOrder=false; } phase=ph; prev=c; });
@@ -220,12 +224,12 @@ with sync_playwright() as p:
     ok('carousel holds up to 50 (all comics when fewer), no duplicates',cfs['n']==min(50,cfs['total']) and cfs['uniq']==cfs['n'],str(cfs))
     ok('carousel order: in-progress (recent first) > other read > newest unread',cfs['okOrder'] and cfs['first']=='Nightfall 01',cfs['ph'])
     pg.reload(); pg.wait_for_selector('html[data-ready]'); tab(pg,'home'); pg.wait_for_function('__cr.CF.items.length>0'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(600)   # fresh mount
-    v=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')]; return {shown:k.filter(e=>e.style.display!=='none').map(e=>+e.dataset.i), loaded:k.filter(e=>e.firstChild.getAttribute('src')).map(e=>+e.dataset.i)}})()''')
-    ok('carousel virtualized: only covers within ±10 of centre displayed',max(v['shown'])<=10 and (cfs['n']<=11 or 11 not in v['shown']),str(v['shown']))
-    ok('carousel covers lazy-loaded (only near centre have src)',max(v['loaded'])<=12 and (cfs['n']<=13 or len(v['loaded'])<cfs['n']),str(v['loaded']))
+    v=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')], n=__cr.CF.items.length, p=Math.round(__cr.CF.pos), cd=i=>{const d=((i-p)%n+n)%n; return Math.min(d,n-d)}; return {slots:k.length,shown:k.filter(e=>e.style.display!=='none').map(e=>cd(+e.dataset.i)), loaded:new Set(k.filter(e=>e.firstChild.getAttribute('src')).map(e=>+e.dataset.i)).size}})()''')
+    ok('carousel virtualized: fixed 21 slots, only covers within ±10 of centre (circular) displayed',v['slots']==21 and max(v['shown'])<=10,str(v))
+    ok('carousel covers lazy-loaded (only near centre have src)',v['loaded']<=21 and (cfs['n']<=21 or v['loaded']<cfs['n']),str(v))
     pg.evaluate(CFSWIPE,{'dx':-320,'steps':5,'dt':14,'noup':False}); pg.wait_for_function('!__cr.CF.raf',timeout=5000); fl=pg.evaluate('__cr.CF.pos')
     ok('one flick travels several covers',fl>=min(5,cfs['n']-1),str(fl))
-    v2=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')], p=Math.round(__cr.CF.pos); return k.filter(e=>e.style.display!=='none').every(e=>Math.abs(+e.dataset.i-p)<=10) && !!k[p].firstChild.getAttribute('src')})()''')
+    v2=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')], n=__cr.CF.items.length, p=Math.round(__cr.CF.pos), cd=i=>{const d=((i-p)%n+n)%n; return Math.min(d,n-d)}; return k.filter(e=>e.style.display!=='none').every(e=>cd(+e.dataset.i)<=10) && !!k[10].firstChild.getAttribute('src') && +k[10].dataset.i===((p%n)+n)%n})()''')
     ok('after flick: window follows centre and its cover is loaded',v2)
     pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(300)
     pg.wait_for_function('!__cr.CF.raf',timeout=5000); pg.evaluate('(()=>{const C=__cr.CF; C.stop(); C.pos=2; C.layout();})()'); pg.wait_for_timeout(200)
@@ -233,14 +237,14 @@ with sync_playwright() as p:
     shot(pg,'12-carousel-mid-swipe'); mid=pg.evaluate('__cr.CF.pos'); ok('carousel tracks finger mid-swipe',2.2<mid<3,str(mid))
     pg.evaluate('''()=>{const el=document.querySelector('#cf .cf-item'); el.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:41,pointerType:'touch',clientX:300,clientY:300}));}'''); pg.wait_for_timeout(900)
     cur=round(pg.evaluate('__cr.CF.pos'))
-    side=pg.evaluate(f'''(()=>{{const it=document.querySelector('#cf .cf-item[data-i="{cur+1}"]'); const r=it.getBoundingClientRect(); return [r.left+r.width*0.6,r.top+r.height/2]}})()''')
+    side=pg.evaluate('''(()=>{const it=document.querySelectorAll('#cf .cf-item')[11]; const r=it.getBoundingClientRect(); return [r.left+r.width*0.6,r.top+r.height/2]})()''')
     pg.mouse.click(side[0],side[1]); pg.wait_for_timeout(700); ok('tap side cover brings it to center',round(pg.evaluate('__cr.CF.pos'))==cur+1)
-    cb=pg.locator(f'#cf .cf-item[data-i="{cur+1}"]').bounding_box(); want=pg.evaluate('__cr.CF.items[Math.round(__cr.CF.pos)].title')
+    cb=pg.locator('#cf .cf-item').nth(10).bounding_box(); want=pg.evaluate('__cr.CF.items[((Math.round(__cr.CF.pos)%__cr.CF.items.length)+__cr.CF.items.length)%__cr.CF.items.length].title')
     pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tap center cover opens it',pg.text_content('#rTitle')==want,want); back(pg)
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
-    ok('last-read comic becomes carousel centre (resume point)',pg.evaluate('__cr.CF.items[Math.round(__cr.CF.pos)].title')==want and round(pg.evaluate('__cr.CF.pos'))==0,want)
-    cb=pg.locator('#cf .cf-item[data-i="0"]').bounding_box(); pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
+    ok('last-read comic becomes carousel centre (resume point)',pg.evaluate('__cr.CF.items[((Math.round(__cr.CF.pos)%__cr.CF.items.length)+__cr.CF.items.length)%__cr.CF.items.length].title')==want and round(pg.evaluate('__cr.CF.pos'))==0,want)
+    cb=pg.locator('#cf .cf-item').nth(10).bounding_box(); pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tapping centre cover resumes last comic',pg.text_content('#rTitle')==want); back(pg)
     tab(pg,'library'); pg.wait_for_timeout(200); ok('no now-reading pill in Library',pg.locator('#nowPill').count()==0)
     pad=pg.evaluate("parseFloat(getComputedStyle(document.querySelector('#libGrid')).paddingBottom)"); ok('no bottom space reserved for a pill',pad<40,str(pad))
@@ -275,12 +279,12 @@ with sync_playwright() as p:
     ok('back chevron returns to the full Library (search/sort/filters back, gear back)',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q') and pg.is_visible('#sortBtn') and pg.locator('#chips [data-act=filter]').count()==4 and pg.is_visible('#settingsBtn') and not pg.is_visible('#libBack') and pg.locator('#scf').count()==0)
     tab(pg,'home'); pg.locator('.row-h',has_text='The Hollow').click(); pg.wait_for_timeout(300); tab(pg,'library'); pg.wait_for_timeout(200)
     ok('Library tab from a series page shows the full Library',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q'))
-    tab(pg,'home'); pg.locator('.row').first.locator('.seeall').click(); pg.wait_for_timeout(300); ok('See all opens library',pg.is_visible('#libGrid') and pg.locator('.lc').count()==len(FILES))
+    tab(pg,'home'); s0=pg.locator('.row').first.locator('h2').text_content(); pg.locator('.row').first.locator('.seeall').click(); pg.wait_for_timeout(300); ok('See all opens that series in the Library',pg.is_visible('#libGrid') and pg.locator('#libGrid .lc').count()==len([1 for f in FILES if os.path.basename(f).replace('_',' ').startswith(s0)]) or pg.locator('#libGrid .lc').count()>0,s0); pg.click('#libBack') if pg.is_visible('#libBack') else None; pg.wait_for_timeout(200)
 
     # ---- landscape ----
     pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(400)
     cols=pg.evaluate("getComputedStyle(document.querySelector('#libGrid')).gridTemplateColumns.split(' ').length"); ok('library grid: 7 columns landscape',cols==7,str(cols)); shot(pg,'15-library-landscape')
-    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'16-home-landscape'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.volshelf,.hlinks,.row-h').getBoundingClientRect().top-c.bottom})()"); ok('landscape: rows close under carousel',20<g<80,str(round(g))); edge_ok(pg,'landscape')
+    tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'16-home-landscape'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelectorAll('#cf .cf-item')[10].getBoundingClientRect(); return document.querySelector('.volshelf,.hlinks,.row-h').getBoundingClientRect().top-c.bottom})()"); ok('landscape: rows close under carousel',20<g<80,str(round(g))); edge_ok(pg,'landscape')
     open_comic(pg,'Nightfall 01')
     s=state(pg); ok('landscape = two-page spread',s['spread'] and s['len']==2,json.dumps(s))
     pg.evaluate('__cr.jumpTo(0)'); wait_render(pg); pg.wait_for_timeout(200)
@@ -523,7 +527,7 @@ with sync_playwright() as p:
         for i in range(12): pg.evaluate('__cr.go(-1,200)'); pg.wait_for_timeout(260)
         wait_render(pg,60000); c=state(pg)['cache']; ok('LRU bounded after many turns',c['px']<=c['budget'],json.dumps(c)); back(pg)
     # ---- phone ----
-    pg.set_viewport_size({'width':390,'height':844}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'20-phone-home'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelector('#cf .cf-item[data-i=\"'+i+'\"]').getBoundingClientRect(); return document.querySelector('.volshelf,.hlinks,.row-h').getBoundingClientRect().top-c.bottom})()"); ok('phone: rows close under carousel',20<g<80,str(round(g))); edge_ok(pg,'phone')
+    pg.set_viewport_size({'width':390,'height':844}); tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.evaluate('__cr.CF.to(0,10)'); pg.wait_for_timeout(500); shot(pg,'20-phone-home'); g=pg.evaluate("(()=>{const i=Math.round(__cr.CF.pos); const c=document.querySelectorAll('#cf .cf-item')[10].getBoundingClientRect(); return document.querySelector('.volshelf,.hlinks,.row-h').getBoundingClientRect().top-c.bottom})()"); ok('phone: rows close under carousel',20<g<80,str(round(g))); edge_ok(pg,'phone')
     tab(pg,'library'); pg.wait_for_timeout(200); cols=pg.evaluate("getComputedStyle(document.querySelector('#libGrid')).gridTemplateColumns.split(' ').length"); ok('library grid: 3 columns phone',cols==3,str(cols)); shot(pg,'21-phone-library')
     open_comic(pg,'The Hollow 02'); pg.evaluate('__cr.toggleUI(true)'); pg.wait_for_timeout(250); shot(pg,'22-phone-reader')
     pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(250); flicks(pg,'phone')
@@ -626,7 +630,7 @@ with sync_playwright() as p:
     rn=pg.evaluate("['150-199',\"300's\",'1-50','300s','1990s','#1-#25','300+','Uncanny X-Men','X-Men 1-50','Amazing Spiderman'].map(__cr.isRangeName)")
     ok('range/era folder names detected',rn==[True,True,True,True,True,True,True,False,False,False],str(rn))
     tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(200)
-    ok('series rows have a … button',pg.locator('.row-more[data-series="Ember Road"]').count()==1 and pg.locator('.row-more').count()==len(pg.evaluate('__cr.series.counts()'))+1 and pg.locator('.row-more[data-kind=added]').count()==1)
+    ok('series rows have a … button',pg.locator('.row-more[data-series="Ember Road"]').count()==1 and pg.locator('.row-more').count()==len(pg.evaluate('__cr.series.counts()')) and pg.locator('.row-more[data-kind=added]').count()==0)
     pg.locator('.row-more[data-series="Ember Road"]').scroll_into_view_if_needed(); pg.click('.row-more[data-series="Ember Road"]'); pg.wait_for_selector('#smRename'); shot(pg,'50-series-menu'); pg.click('#smRename')
     pg.wait_for_selector('#srName'); shot(pg,'51-rename-series'); pg.fill('#srName','Ember Trail'); pg.click('#srSave'); pg.wait_for_timeout(400)
     heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
@@ -649,10 +653,10 @@ with sync_playwright() as p:
     ok('series carousel strictly by issue number (ascending)',sc and sc['t']==['Ember Road 01','Iron Tide 01','Ember Road 02','Iron Tide 02','Ember Road 03','Iron Tide 03','Iron Tide 04'],str(sc and sc['t']))
     ok('series carousel edge-to-edge, stack runs past the screen edge, sharp covers',sc and sc['hl']==0 and abs(sc['hw']-sc['vw'])<1 and sc['R']>=sc['vw'] and sc['sharp'],str(sc))
     shot(pg,'58-series-carousel')
-    cb=pg.locator('#scf .cf-item[data-i="0"]').bounding_box(); pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
+    cb=pg.locator('#scf .cf-item').nth(10).bounding_box(); pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tapping the centred series cover opens it',pg.text_content('#rTitle')=='Ember Road 01'); back(pg); pg.wait_for_timeout(300)
     ok('back from reader: still on the series page with its carousel',pg.locator('#scf').count()==1 and pg.locator('.lc').count()==7 and pg.is_visible('#libBack'))
-    sb=pg.locator('#scf .cf-item[data-i="1"]').bounding_box(); pg.mouse.click(sb['x']+sb['width']*0.8,sb['y']+sb['height']/2); pg.wait_for_timeout(700); ok('series carousel: tap side cover centres it',round(pg.evaluate('__cr.SCF.pos'))==1)
+    sb=pg.locator('#scf .cf-item').nth(11).bounding_box(); pg.mouse.click(sb['x']+sb['width']*0.8,sb['y']+sb['height']/2); pg.wait_for_timeout(700); ok('series carousel: tap side cover centres it',round(pg.evaluate('__cr.SCF.pos'))==1)
     pg.click('#libBack'); pg.wait_for_timeout(300); ok('no series carousel in the full Library',pg.locator('#scf').count()==0)
     pg.click('#tabs [data-tab=home]'); pg.wait_for_timeout(200); pg.wait_for_timeout(300)
     pg.click('#settingsBtn'); pg.wait_for_selector('#sMerge'); pg.click('#sMerge'); pg.wait_for_selector('#mgGo')
@@ -668,10 +672,10 @@ with sync_playwright() as p:
     HEADS="[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)"
     AKEYS="[...document.querySelectorAll('#arrList li')].map(e=>e.dataset.k)"
     tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(200)
-    pg.click('.row-more[data-kind=added]'); pg.wait_for_selector('#smArrange'); pg.click('#smArrange'); pg.wait_for_selector('#arrList li'); pg.wait_for_timeout(250)
-    ok('Arrange sheet lists Recently Added + every series (from Recently Added …)',pg.evaluate(AKEYS)==['added','s:Hollow Moon','s:Iron Tide','s:Nightfall','s:Starlight Ronin'],str(pg.evaluate(AKEYS)))
+    pg.click('.row-more[data-series="Nightfall"]'); pg.wait_for_selector('#smArrange'); pg.click('#smArrange'); pg.wait_for_selector('#arrList li'); pg.wait_for_timeout(250)
+    ok('Arrange sheet lists every series (Recently Added is a tab, not a row)',pg.evaluate(AKEYS)==['s:Hollow Moon','s:Iron Tide','s:Nightfall','s:Starlight Ronin'],str(pg.evaluate(AKEYS)))
     shot(pg,'54-arrange-categories')
-    hb=pg.locator('#arrList li[data-k="s:Starlight Ronin"] .ah').bounding_box(); tb=pg.locator('#arrList li[data-k="added"]').bounding_box()
+    hb=pg.locator('#arrList li[data-k="s:Starlight Ronin"] .ah').bounding_box(); tb=pg.locator('#arrList li[data-k="s:Hollow Moon"]').bounding_box()
     x0,y0=hb['x']+hb['width']/2,hb['y']+hb['height']/2; y1=tb['y']+4
     if ENG=='chromium':   # real touch input (CDP) -> genuine touch pointer events
         cdp=ctx.new_cdp_session(pg)
@@ -684,34 +688,34 @@ with sync_playwright() as p:
           const ev=(t,y)=>h.dispatchEvent(new PointerEvent(t,{bubbles:true,cancelable:true,pointerId:77,pointerType:'touch',isPrimary:true,clientX:x0,clientY:y,buttons:t==='pointerup'?0:1}));
           ev('pointerdown',y0); for(let k=1;k<=12;k++){ await sl(16); ev('pointermove',y0+(y1-y0)*k/12); } await sl(40); ev('pointerup',y1); }""",{'x0':x0,'y0':y0,'y1':y1})
     pg.wait_for_timeout(200)
-    ok('touch drag reorders (Starlight Ronin dragged to top)',pg.evaluate(AKEYS)==['s:Starlight Ronin','added','s:Hollow Moon','s:Iron Tide','s:Nightfall'],str(pg.evaluate(AKEYS)))
+    ok('touch drag reorders (Starlight Ronin dragged to top)',pg.evaluate(AKEYS)==['s:Starlight Ronin','s:Hollow Moon','s:Iron Tide','s:Nightfall'],str(pg.evaluate(AKEYS)))
     ok('drag leaves no transform / drag state',pg.evaluate("![...document.querySelectorAll('#arrList li')].some(e=>e.style.transform||e.classList.contains('drag'))"))
     ok('first row up-arrow disabled, last row down-arrow disabled',pg.locator('#arrList li').first.locator('[data-mv="-1"]').is_disabled() and pg.locator('#arrList li').last.locator('[data-mv="1"]').is_disabled())
     pg.click('#arrList li[data-k="s:Nightfall"] [data-mv="-1"]'); pg.wait_for_timeout(100)
-    ok('up arrow moves a row up',pg.evaluate(AKEYS)==['s:Starlight Ronin','added','s:Hollow Moon','s:Nightfall','s:Iron Tide'],str(pg.evaluate(AKEYS)))
-    pg.click('#arrList li[data-k="added"] [data-mv="1"]'); pg.click('#arrList li[data-k="added"] [data-mv="-1"]'); pg.wait_for_timeout(100)
-    ok('down then up returns to place',pg.evaluate(AKEYS)[1]=='added')
+    ok('up arrow moves a row up',pg.evaluate(AKEYS)==['s:Starlight Ronin','s:Hollow Moon','s:Nightfall','s:Iron Tide'],str(pg.evaluate(AKEYS)))
+    pg.click('#arrList li[data-k="s:Hollow Moon"] [data-mv="1"]'); pg.click('#arrList li[data-k="s:Hollow Moon"] [data-mv="-1"]'); pg.wait_for_timeout(100)
+    ok('down then up returns to place',pg.evaluate(AKEYS)[1]=='s:Hollow Moon')
     pg.click('#arrList li[data-k="s:Iron Tide"] .tgl'); pg.wait_for_timeout(100)
     ok('show/hide toggle (Iron Tide off)',pg.locator('#arrList li[data-k="s:Iron Tide"].off').count()==1)
     shot(pg,'56-arrange-edited'); pg.click('#arrDone'); pg.wait_for_timeout(400)
-    ok('Home follows arranged order, hidden row gone',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Hollow Moon','Nightfall'],str(pg.evaluate(HEADS)))
+    ok('Home follows arranged order, hidden row gone',pg.evaluate(HEADS)==['Starlight Ronin','Hollow Moon','Nightfall'],str(pg.evaluate(HEADS)))
     shot(pg,'57-home-arranged')
     pg.reload(); pg.wait_for_selector('html[data-ready]'); tab(pg,'home'); pg.wait_for_timeout(500)
-    ok('arrangement persists after relaunch',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Hollow Moon','Nightfall'],str(pg.evaluate(HEADS)))
+    ok('arrangement persists after relaunch',pg.evaluate(HEADS)==['Starlight Ronin','Hollow Moon','Nightfall'],str(pg.evaluate(HEADS)))
     pg.click('.row-more[data-series="Hollow Moon"]'); pg.wait_for_selector('#smRename'); pg.click('#smRename'); pg.wait_for_selector('#srName'); pg.fill('#srName','Aardvark'); pg.click('#srSave'); pg.wait_for_timeout(400)
-    ok('renamed series keeps its position',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
+    ok('renamed series keeps its position',pg.evaluate(HEADS)==['Starlight Ronin','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
     sheet(pg,'Nightfall 05','aEdit'); pg.wait_for_selector('#eSeries'); pg.fill('#eSeries','Abyss'); pg.click('#eSave'); pg.wait_for_timeout(400); tab(pg,'home'); pg.wait_for_timeout(200)
-    ok('new series appends at the end (not alphabetically first)',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall','Abyss'],str(pg.evaluate(HEADS)))
+    ok('new series appends at the end (not alphabetically first)',pg.evaluate(HEADS)==['Starlight Ronin','Aardvark','Nightfall','Abyss'],str(pg.evaluate(HEADS)))
     pg.evaluate("document.querySelector('.row-more[data-series=\"Abyss\"]').scrollIntoView({block:'center'})"); pg.wait_for_timeout(200); pg.click('.row-more[data-series="Abyss"]'); pg.wait_for_selector('#smRename'); pg.click('#smRename'); pg.wait_for_selector('#srName'); pg.fill('#srName','Starlight Ronin'); pg.click('#srSave'); pg.wait_for_timeout(400)
-    ok('merged series takes the topmost position of those merged',pg.evaluate(HEADS)==['Starlight Ronin','Recently Added','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
-    pg.locator('#homeScroll .row-h[data-kind=added]').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
-    ok('long-press on Recently Added heading offers Arrange',pg.locator('#smArrange').count()==1 and pg.locator('#smRename').count()==0); pg.evaluate("document.querySelector('.menu')?.remove()")
+    ok('merged series takes the topmost position of those merged',pg.evaluate(HEADS)==['Starlight Ronin','Aardvark','Nightfall'],str(pg.evaluate(HEADS)))
+    pg.locator('#homeScroll .row-h',has_text='Nightfall').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
+    ok('long-press on a series heading offers Arrange + Rename',pg.locator('#smArrange').count()==1 and pg.locator('#smRename').count()==1); pg.evaluate("document.querySelector('.menu')?.remove()")
     pg.click('#settingsBtn'); pg.wait_for_selector('#sArrange'); pg.click('#sArrange'); pg.wait_for_selector('#arrList li'); pg.wait_for_timeout(200)
-    ok('Settings > Arrange Categories opens sheet with current order',pg.evaluate(AKEYS)==['s:Starlight Ronin','added','s:Aardvark','s:Nightfall','s:Iron Tide'],str(pg.evaluate(AKEYS)))
+    ok('Settings > Arrange Categories opens sheet with current order',pg.evaluate(AKEYS)==['s:Starlight Ronin','s:Aardvark','s:Nightfall','s:Iron Tide'],str(pg.evaluate(AKEYS)))
     pg.click('#arrReset'); pg.wait_for_timeout(150)
-    ok('Reset to alphabetical (Recently Added first, series A–Z)',pg.evaluate(AKEYS)==['added','s:Aardvark','s:Iron Tide','s:Nightfall','s:Starlight Ronin'],str(pg.evaluate(AKEYS)))
+    ok('Reset to alphabetical (series A–Z)',pg.evaluate(AKEYS)==['s:Aardvark','s:Iron Tide','s:Nightfall','s:Starlight Ronin'],str(pg.evaluate(AKEYS)))
     pg.click('#arrList li[data-k="s:Iron Tide"] .tgl'); pg.click('#arrDone'); pg.wait_for_timeout(400)
-    ok('Home after reset + re-show',pg.evaluate(HEADS)==['Recently Added','Aardvark','Iron Tide','Nightfall','Starlight Ronin'],str(pg.evaluate(HEADS)))
+    ok('Home after reset + re-show',pg.evaluate(HEADS)==['Aardvark','Iron Tide','Nightfall','Starlight Ronin'],str(pg.evaluate(HEADS)))
 
     # ---- Import Entire Drive Folder (Drive API mocked via routes; SW blocked so routes apply in every engine) ----
     c2=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2,service_workers='block'); p2=c2.new_page()
