@@ -28,6 +28,8 @@ RS="""(()=>{const K=__cr.rack.RK, st=document.querySelector('#rkStage').getBound
   return {on:K.on,a:K.a,raf:!!K.raf,N:K.N,T:K.T,step:K.step,front:K.front,repeats:K.repeats,title:document.querySelector('#rkTitle').textContent,sub:document.querySelector('#rkSub').textContent,
     pockets:pk.length,filled:pk.filter(e=>e.querySelector('img[src^="blob:"]')).length,wingsVisible:new Set(vis.map(e=>e.dataset.w)).size,left:xs.filter(x=>x<-20).length,right:xs.filter(x=>x>20).length,
     fill:sc.height/st.height,sign:(document.querySelector('.rksign')||{}).textContent,
+    tilt:(()=>{const e=pk.find(e=>e.classList.contains('front')); if(!e) return null; const m=new DOMMatrix(getComputedStyle(e).transform), h=e.offsetHeight, top=m.transformPoint(new DOMPoint(0,-h,0)), bot=m.transformPoint(new DOMPoint(0,0,0)); return {topZ:top.z,botZ:bot.z,R:K.R}})(),
+    cream:getComputedStyle(document.querySelector('.rkpole')).backgroundImage,
     frontIds:pk.filter(e=>e.dataset.w==='0').map(e=>e.querySelector('.pkc').dataset.rk), overflow:document.documentElement.scrollWidth>innerWidth}})()"""
 def rs(pg): return pg.evaluate(RS)
 def drag(pg,dx,steps=6,hold=0):
@@ -61,10 +63,12 @@ with sync_playwright() as p:
         pg.click('.tyr:has-text("1984")'); pg.wait_for_timeout(500); s=rs(pg)
         ok(f'{lab}: tap a year label opens its rack ("On the racks · Jan 1984")',s['on'] and s['title']=='On the racks · Jan 1984',s['title'])
         ok(f'{lab}: every pocket filled (6 wings × 8 tiers); small library repeats to fill',s['pockets']==48 and s['filled']==48 and s['repeats'] and 'repeats' in s['sub'] and pg.evaluate("(e=>e.scrollWidth<=e.clientWidth+1)(document.querySelector('#rkSub'))"),json.dumps(s))
-        ok(f'{lab}: tall rack: fills most of the screen height, sign "COMICS", several wings visible around the pole',s['fill']>=.8 and s['sign']=='COMICS' and s['wingsVisible']>=5 and s['left']>0 and s['right']>0,json.dumps(s))
+        ok(f'{lab}: tall rack: fills most of the screen height, v36 sign "COMICS FOR ALL AGES", several wings visible around the pole',s['fill']>=.8 and s['sign']=='COMICSFOR ALL AGES' and s['wingsVisible']>=5 and s['left']>0 and s['right']>0,json.dumps(s))
         ok(f'{lab}: no horizontal overflow',not s['overflow'])
         bars(pg,lab,sat,'rack')
-        pg.screenshot(path=f'{SH}/{ENG}-v26-rack-{lab}.png')
+        ok(f'{lab}: v36 tilt: front comics sit in the pocket by the pole and their TOP leans OUT away from it',s['tilt'] and s['tilt']['topZ']>s['tilt']['botZ']+5 and abs(s['tilt']['botZ']-s['tilt']['R'])<3,json.dumps(s['tilt']))
+        ok(f'{lab}: v36 cream wire frame / pole',('246, 241, 228' in s['cream']),s['cream'])
+        pg.screenshot(path=f'{SH}/{ENG}-v36-rack-{lab}.png')
         if full:
             near=pg.evaluate("""(()=>{const K=__cr.rack.RK, d=c=>__cr.dates.of(c), ym=K.ym; const dist=c=>{const x=d(c); return x?Math.abs(x.y*12+(x.m||6)-1-ym):1e9};
               const ids=new Set([...document.querySelectorAll('#rkRotor .pk[data-w="0"] .pkc')].map(b=>b.dataset.rk)); const all=__cr.comics.slice().sort((a,b)=>dist(a)-dist(b));
@@ -75,13 +79,13 @@ with sync_playwright() as p:
             drag(pg,-300,steps=4); pg.wait_for_timeout(60); a1=rs(pg); pg.wait_for_timeout(120); a2=rs(pg)
             ok('swipe spins around the pole with momentum',a1['raf'] and abs(a2['a']-a1['a'])>0.5,json.dumps([a1['a'],a2['a']]))
             pg.wait_for_function('!__cr.rack.RK.raf',timeout=8000); s=rs(pg); ok('settles facing a wing (60° steps)',abs(s['a']/60-round(s['a']/60))<1e-3,json.dumps(s['a']))
-            pg.screenshot(path=f'{SH}/{ENG}-v26-rack-turned-{lab}.png')
+            pg.screenshot(path=f'{SH}/{ENG}-v36-rack-turned-{lab}.png')
             pg.evaluate("__cr.rack.RK.a=0"); pg.click('#rkLeft'); pg.wait_for_function('!__cr.rack.RK.raf'); ok('spin button turns one wing',abs(rs(pg)['a']-60)<1e-3)
             pg.click('#rkRight'); pg.wait_for_function('!__cr.rack.RK.raf')
             side=pg.locator('#rkRotor .pk[data-w="1"] .pkc').first; side.click(); pg.wait_for_timeout(80); pg.wait_for_function('!__cr.rack.RK.raf'); s=rs(pg)
             ok('tap a cover on a side wing turns it to the front (does not open)',s['front']==1 and pg.is_visible('#rack') and not pg.is_visible('#reader'),json.dumps(s['front']))
             tgt=pg.locator('#rkRotor .pk.front .pkc').nth(3); tid=tgt.get_attribute('data-rk'); tgt.click(); pg.wait_for_timeout(120); pull=pg.evaluate("!!document.querySelector('.rkpull')")
-            pg.screenshot(path=f'{SH}/{ENG}-v26-rack-pullout-{lab}.png'); pg.wait_for_selector('#reader:not(.hidden)'); pg.wait_for_timeout(500)
+            pg.screenshot(path=f'{SH}/{ENG}-v36-rack-pullout-{lab}.png'); pg.wait_for_selector('#reader:not(.hidden)'); pg.wait_for_timeout(500)
             ok('tap a front cover: pulls out (animated) and opens in the reader',pull and pg.evaluate('__cr.R.comic.id')==tid)
             pg.evaluate('__cr.toggleUI(true)'); pg.click('#rBack'); pg.wait_for_selector('#shelf:not(.hidden)'); pg.wait_for_timeout(300)
             ok('closing the reader returns to the rack',pg.is_visible('#rack') and rs(pg)['title']=='On the racks · Jan 1984')

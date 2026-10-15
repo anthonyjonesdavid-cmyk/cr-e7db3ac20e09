@@ -1,5 +1,13 @@
 # Comic Shelf: change log
 
+## cr-v36 — 2026-10-15
+
+- Timeline rack redesigned after real spinner racks: fixed tilt direction — each comic's bottom sits in the wire pocket by the pole and its TOP leans OUT, cover facing out and tilted back.
+- Cream/off-white wire frame, pole and base; tier wires on every wing; wire pocket lips at the bottom of each pocket; lower tiers overlap so issues behind peek out above.
+- Two-line header sign "COMICS / FOR ALL AGES" (own text, no logos).
+- Always-full/backfill, month logic, taps and performance unchanged.
+- Tests: e2e_v26 adds tilt-direction and cream-frame checks (62 checks); screenshots renamed webkit-v36-rack-*.
+
 ## cr-v35 — 2026-10-14
 
 - Spines: issue count and volume/years line removed (both still in the accessible label).

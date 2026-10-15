@@ -625,7 +625,7 @@ const ymLabel=i=>`${MONTHS[i%12].slice(0,3)} ${Math.floor(i/12)}`;
 function rackCenter(list){ const v=list.map(x=>ymOf(x.d)).sort((a,b)=>a-b); return v[Math.floor((v.length-1)/2)]; }
 const RK={on:false,ym:0,win:0,items:[],N:6,T:8,a:0,v:0,raf:0,drag:null,step:60,front:0};
 const rmq=matchMedia('(prefers-reduced-motion: reduce)'); const reduced=()=>rmq.matches;
-const TILT=16;   // covers lean back in their wire pockets
+const TILT=-24;   // v36: bottom sits in the wire pocket by the pole, TOP leans OUT (away from the pole), cover facing out and tilted back like a real spinner rack
 // every pocket filled: nearest dates first (outward from the month), then undated issues; repeats only if the library is smaller than the rack
 function rackItems(ym,cap){ const all=comics.map(c=>({c,d:dateOf(c)})); const dated=all.filter(x=>x.d).map(x=>({...x,i:ymOf(x.d)})), und=all.filter(x=>!x.d);
   dated.sort((a,b)=>Math.abs(a.i-ym)-Math.abs(b.i-ym)||a.i-b.i||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c));
@@ -647,7 +647,7 @@ function renderRack(){ const cap=RK.N*RK.T, {L,uniq,lo,hi,repeats}=rackItems(RK.
   $('#rkSub').textContent=uniq?`${uniq} issue${uniq===1?'':'s'} · ${lo===hi?sh(lo):`${sh(lo)} – ${sh(hi)}`}${repeats?(innerWidth<560?' · repeats':' · repeats to fill'):''}`:'No comics yet';
   const ord=wingOrder(RK.N); let h=''; for(let w=0;w<RK.N;w++) h+=`<div class="wing" data-w="${w}"></div>`;
   L.forEach((x,k)=>{ const w=ord[Math.floor(k/RK.T)], t=k%RK.T; h+=`<div class="pk" data-w="${w}" data-t="${t}"><button class="pkc" data-rk="${x.c.id}" aria-label="${esc(x.c.title)}${x.d?', '+esc(fmtDate(x.d)):''}"><img src="${cover(x.c)}" alt="" draggable="false"></button></div>`; });
-  $('#rkRotor').innerHTML=h+'<div class="rkpole"></div><div class="rksign"><span>COMICS</span></div>'; $('#rkEmpty').classList.toggle('hidden',uniq>0);
+  $('#rkRotor').innerHTML=h+'<div class="rkpole"></div><div class="rksign" aria-label="Comics for all ages"><span class="rs-a">COMICS</span><span class="rs-b">FOR ALL AGES</span></div>'; $('#rkEmpty').classList.toggle('hidden',uniq>0);
   RK.els=[...$('#rkRotor').querySelectorAll('.pk,.wing')]; rackLayout(); rackApply(); }
 function rackApply(){ const a=RK.a;
   // every pocket gets its full transform (wing angle + spin) so the rack is right even where nested preserve-3d gets flattened

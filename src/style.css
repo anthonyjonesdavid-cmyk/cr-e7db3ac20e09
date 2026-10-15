@@ -483,3 +483,13 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .spine .sp-rule.sp-rb{top:auto;bottom:12px}
 .spine.out{transform:translateY(-16px) rotateX(-10deg) scale(1.05);z-index:2;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 22px -6px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.3)}
 @media (prefers-reduced-motion:reduce){.spine{transition:none}.spine.out{transform:none}}
+
+/* v36 spinner rack: cream wire frame, tops lean out, tier wires, pocket lips, two-line header sign */
+.pk::before{border-color:#eee6d2;left:-5px;right:-5px;top:auto;height:34%;border-width:2px}
+.pk::after{background:linear-gradient(90deg,transparent 20%,#e8dfc8 20% calc(20% + 2px),transparent calc(20% + 2px) calc(80% - 2px),#e8dfc8 calc(80% - 2px) 80%,transparent 80%),linear-gradient(#f1ead8,#f1ead8) 0 0/100% 3px no-repeat;height:22%}
+.wing{background:linear-gradient(90deg,#e9e1cc 0 2px,transparent 2px calc(100% - 2px),#e9e1cc calc(100% - 2px)),repeating-linear-gradient(180deg,transparent 0 calc(var(--pitch) + 4px),rgba(233,225,204,.55) calc(var(--pitch) + 4px) calc(var(--pitch) + 6px))}
+.rkpole{background:linear-gradient(90deg,#9c9584,#f6f1e4 40%,#d9d1bd 60%,#8a8473);width:12px;left:-6px}
+.rkbase{background:radial-gradient(ellipse at 50% 35%,#fffdf6,#e2dac6 55%,#a39b87)}
+.rksign{flex-direction:column;gap:2px;background:linear-gradient(#fbfaf5,#ece8dc);border:3px solid #eee6d2;border-radius:2px;height:calc(var(--sign) * .86);left:calc(var(--pw) * -.95);width:calc(var(--pw) * 1.9)}
+.rksign .rs-a{font:900 calc(var(--sign) * .36)/1 "Arial Black","Helvetica Neue",Arial,sans-serif;letter-spacing:.04em;color:#1d3fae;text-shadow:1.5px 1.5px 0 #c8242a}
+.rksign .rs-b{font:900 calc(var(--sign) * .2)/1 "Arial Black","Helvetica Neue",Arial,sans-serif;letter-spacing:.08em;color:#c8242a}
