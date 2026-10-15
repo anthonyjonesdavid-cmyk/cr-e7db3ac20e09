@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v37 — 2026-10-15
+
+- Fix: rack header sign flickered while spinning (red "FOR ALL AGES" z-fighting with the white board). The sign is now one flat layer: board and lettering baked into a single SVG background, no child text layers, `transform-style: flat`, lifted 2px off the pole's plane (pole pushed back 1px).
+- Audited the rest of the rack: pockets/covers/lips are flat children of each pocket; wings sit 3px behind pockets; base lives outside the rotor — no other coplanar 3D layers.
+- Tests: e2e_v26 checks the sign is a single SVG layer, not coplanar with the pole (66 checks).
+
 ## cr-v36 — 2026-10-15
 
 - Timeline rack redesigned after real spinner racks: fixed tilt direction — each comic's bottom sits in the wire pocket by the pole and its TOP leans OUT, cover facing out and tilted back.

@@ -625,6 +625,8 @@ const ymLabel=i=>`${MONTHS[i%12].slice(0,3)} ${Math.floor(i/12)}`;
 function rackCenter(list){ const v=list.map(x=>ymOf(x.d)).sort((a,b)=>a-b); return v[Math.floor((v.length-1)/2)]; }
 const RK={on:false,ym:0,win:0,items:[],N:6,T:8,a:0,v:0,raf:0,drag:null,step:60,front:0};
 const rmq=matchMedia('(prefers-reduced-motion: reduce)'); const reduced=()=>rmq.matches;
+// v37: the header sign is ONE flat layer — board + lettering baked into a single SVG background (no child text layers that z-fight while spinning)
+const RK_SIGN='url("data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 90"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfaf5"/><stop offset="1" stop-color="#ece8dc"/></linearGradient></defs><rect width="200" height="90" fill="url(#g)"/><g font-family="Arial Black,Helvetica Neue,Arial,sans-serif" font-weight="900" text-anchor="middle"><text x="101.5" y="47.5" font-size="36" letter-spacing="1.4" fill="#c8242a">COMICS</text><text x="100" y="46" font-size="36" letter-spacing="1.4" fill="#1d3fae">COMICS</text><text x="100" y="74" font-size="19" letter-spacing="1.6" fill="#c8242a">FOR ALL AGES</text></g></svg>')+'")';
 const TILT=-24;   // v36: bottom sits in the wire pocket by the pole, TOP leans OUT (away from the pole), cover facing out and tilted back like a real spinner rack
 // every pocket filled: nearest dates first (outward from the month), then undated issues; repeats only if the library is smaller than the rack
 function rackItems(ym,cap){ const all=comics.map(c=>({c,d:dateOf(c)})); const dated=all.filter(x=>x.d).map(x=>({...x,i:ymOf(x.d)})), und=all.filter(x=>!x.d);
@@ -647,8 +649,8 @@ function renderRack(){ const cap=RK.N*RK.T, {L,uniq,lo,hi,repeats}=rackItems(RK.
   $('#rkSub').textContent=uniq?`${uniq} issue${uniq===1?'':'s'} · ${lo===hi?sh(lo):`${sh(lo)} – ${sh(hi)}`}${repeats?(innerWidth<560?' · repeats':' · repeats to fill'):''}`:'No comics yet';
   const ord=wingOrder(RK.N); let h=''; for(let w=0;w<RK.N;w++) h+=`<div class="wing" data-w="${w}"></div>`;
   L.forEach((x,k)=>{ const w=ord[Math.floor(k/RK.T)], t=k%RK.T; h+=`<div class="pk" data-w="${w}" data-t="${t}"><button class="pkc" data-rk="${x.c.id}" aria-label="${esc(x.c.title)}${x.d?', '+esc(fmtDate(x.d)):''}"><img src="${cover(x.c)}" alt="" draggable="false"></button></div>`; });
-  $('#rkRotor').innerHTML=h+'<div class="rkpole"></div><div class="rksign" aria-label="Comics for all ages"><span class="rs-a">COMICS</span><span class="rs-b">FOR ALL AGES</span></div>'; $('#rkEmpty').classList.toggle('hidden',uniq>0);
-  RK.els=[...$('#rkRotor').querySelectorAll('.pk,.wing')]; rackLayout(); rackApply(); }
+  $('#rkRotor').innerHTML=h+'<div class="rkpole"></div><div class="rksign" role="img" aria-label="Comics for all ages"></div>'; $('#rkEmpty').classList.toggle('hidden',uniq>0);
+  $('#rkRotor .rksign').style.backgroundImage=RK_SIGN; RK.els=[...$('#rkRotor').querySelectorAll('.pk,.wing')]; rackLayout(); rackApply(); }
 function rackApply(){ const a=RK.a;
   // every pocket gets its full transform (wing angle + spin) so the rack is right even where nested preserve-3d gets flattened
   RK.front=((Math.round(-a/RK.step)%RK.N)+RK.N)%RK.N;

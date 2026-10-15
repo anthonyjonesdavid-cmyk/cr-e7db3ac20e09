@@ -493,3 +493,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .rksign{flex-direction:column;gap:2px;background:linear-gradient(#fbfaf5,#ece8dc);border:3px solid #eee6d2;border-radius:2px;height:calc(var(--sign) * .86);left:calc(var(--pw) * -.95);width:calc(var(--pw) * 1.9)}
 .rksign .rs-a{font:900 calc(var(--sign) * .36)/1 "Arial Black","Helvetica Neue",Arial,sans-serif;letter-spacing:.04em;color:#1d3fae;text-shadow:1.5px 1.5px 0 #c8242a}
 .rksign .rs-b{font:900 calc(var(--sign) * .2)/1 "Arial Black","Helvetica Neue",Arial,sans-serif;letter-spacing:.08em;color:#c8242a}
+
+/* v37: sign = one flat layer (SVG board+text background), lifted 2px off the pole's plane so the two never z-fight */
+.rksign{background:#f5f2e8 center/100% 100% no-repeat;transform:translateZ(2px);transform-style:flat;backface-visibility:hidden}
+.rkpole{transform:translateZ(-1px)}
