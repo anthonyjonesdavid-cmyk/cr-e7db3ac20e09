@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v39 — 2026-10-16
+
+- Settings: "Keep screen awake while reading" toggle (off by default, stored in localStorage `cr.keepAwake`). When on, holds a Screen Wake Lock (`navigator.wakeLock.request('screen')`) only while the reader is open; re-acquired on `visibilitychange` when the app becomes visible again mid-read; released when leaving the reader or turning the toggle off.
+- Unsupported browsers show a short note under the toggle (needs iOS 16.4+); no video fallback.
+- Tests: new e2e_v39 (mocked wakeLock): default off, ≥40px target, acquire on open, drop on hide / re-acquire on show, release on close and on toggle off, nothing outside the reader, persistence, unsupported note — 4 sizes.
+
 ## cr-v38 — 2026-10-15
 
 - Home: removed the "This week in… / On sale this month in past years" row and the "Recently Added" row (Arrange Categories now lists series and reading lists only).

@@ -138,12 +138,22 @@ function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length
 addEventListener('pagehide',saveNow); document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveNow(); });
 
 /* ---- open / close ---- */
+/* v39: keep the screen awake while the reader is open (Settings toggle, off by default). Screen Wake Lock API; re-acquired when the app becomes visible again. */
+const Wake={lock:null,busy:null,
+  supported:()=>!!(navigator.wakeLock&&navigator.wakeLock.request),
+  want(){ return !!store.get('keepAwake',false)&&!!R.comic&&document.visibilityState==='visible'; },
+  async sync(){ if(this.busy) await this.busy;
+    if(this.want()){ if(this.lock||!this.supported()) return;
+      this.busy=(async()=>{ try{ const l=await navigator.wakeLock.request('screen'); if(!this.want()){ await l.release().catch(()=>{}); return; } this.lock=l; l.addEventListener&&l.addEventListener('release',()=>{ if(this.lock===l) this.lock=null; }); }catch(e){ console.warn('wake lock',e&&e.message); } })();
+      await this.busy; this.busy=null; }
+    else if(this.lock){ const l=this.lock; this.lock=null; try{ await l.release(); }catch(e){} } } };
+document.addEventListener('visibilitychange',()=>Wake.sync());
 async function openReader(id,opts={}){ const {push=true}=opts;
   const c=comics.find(x=>x.id===id); if(!c){ toast('Comic not found'); return; }
   if(push) try{ history.pushState({r:id},'','#/read/'+id); }catch(e){}
   // reading list context: opened from a list row -> that list's order decides the next issue (remembered for Continue reading / reload)
   if('queue' in opts){ c.lastQueue=opts.queue||null; } const lq=queues.find(q=>q.id===c.lastQueue&&q.items.includes(c.id)); R.queue=lq?lq.id:null;
-  R.gen++; R.comic=c; R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
+  R.gen++; R.comic=c; Wake.sync(); R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
   hideToast(); readerEl.classList.remove('hidden'); readerEl.classList.add('ui'); $('#shelf').classList.add('hidden'); $('#rTitle').textContent=c.title; zoomer.replaceChildren(); R.viewEl=null;
   let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); }catch(err){ console.warn(err); toast('Could not open this comic: '+(err.message||err)); closeReader(); return; }
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
@@ -155,7 +165,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; R.views=[]; if(d) d.destroy().catch(()=>{});
+function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
   readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
