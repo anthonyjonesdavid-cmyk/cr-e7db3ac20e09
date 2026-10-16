@@ -528,6 +528,44 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .segctl button{min-width:84px;padding:0 10px}
 @media (max-width:700px){.segctl button .rl{display:none}.segctl button .rs{display:inline}}
 @media (max-width:440px){.segctl button{min-width:0;padding:0 8px;font-size:13px}}
+
+/* ---------- v40: night at the comic shop — flat 2D layers on the stage (never inside the 3D rotor: no coplanar z-fighting) ---------- */
+.rkmood{position:absolute;left:calc(var(--padx) + 6px);bottom:calc(var(--sab) + 12px);z-index:6;display:flex;gap:8px}
+.moodbtn{height:40px;min-width:44px;padding:0 14px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;background:#000c;border:.5px solid #333;color:#d8d8dc;font-size:14px;font-weight:600}
+.moodbtn .i{width:18px;height:18px}
+.moodbtn[aria-pressed="true"]{background:#3a2a12;border-color:#a8792f;color:#ffd58a}
+.rklamp,.rkvig{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .6s ease}
+.rklamp{z-index:0;background:
+  radial-gradient(ellipse 42% 30% at 50% 4%,rgba(255,214,150,.55),rgba(255,190,110,.18) 45%,transparent 75%),
+  radial-gradient(ellipse 60% 70% at 50% 48%,rgba(255,170,80,.20),rgba(120,70,30,.10) 45%,transparent 72%),
+  linear-gradient(180deg,#1a120b 0%,#0e0a07 62%,#17100a 62.2%,#0b0806 100%)}
+.rkvig{z-index:4;background:radial-gradient(ellipse 75% 70% at 50% 46%,transparent 52%,rgba(0,0,0,.55) 80%,rgba(0,0,0,.85) 100%)}
+#rack.night #rkStage{background:#0b0806}
+#rack.night .rklamp,#rack.night .rkvig{opacity:1}
+#rkScene{z-index:1}
+@media (prefers-reduced-motion:reduce){.rklamp,.rkvig{transition:none}}
+
+/* ---------- v40: back-issue bin (longbox seen from slightly above; our own cardboard + bags) ---------- */
+#bin{position:absolute;inset:0;z-index:41;background:#000;display:flex;flex-direction:column}#bin.hidden{display:none}
+#bin .pillbtn{height:40px;padding:0 18px}
+#binStage{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;
+  background:radial-gradient(ellipse 70% 55% at 50% 30%,#2a2724 0%,#141312 60%,#070707 100%)}
+.bn-back{position:absolute;left:50%;transform:translateX(-50%);width:calc(var(--bcw) * 1.3);top:calc(62% - var(--bch) * 1.75);height:calc(var(--bch) * 1.5);
+  background:linear-gradient(180deg,#8a6a43,#6e5232);border-radius:4px 4px 0 0;box-shadow:inset 0 0 0 2px #5c4428,inset 0 14px 18px -10px rgba(0,0,0,.6)}
+#binCards{position:absolute;left:50%;top:calc(62% - var(--bch) * .62);width:0;height:0}
+.bn-c{position:absolute;left:0;top:0;width:var(--bcw);height:var(--bch);padding:0;border:0;background:#222;transform-origin:50% 100%;will-change:transform,opacity;border-radius:2px;
+  box-shadow:0 -1px 0 rgba(255,255,255,.18),0 10px 18px rgba(0,0,0,.55)}
+.bn-c img{position:absolute;inset:4px 3px 0 3px;width:calc(100% - 6px);height:calc(100% - 4px);object-fit:cover;object-position:top;pointer-events:none}
+/* the bag: clear plastic sheen + a folded flap at the top, drawn with gradients (one flat element per card) */
+.bn-bag{position:absolute;inset:0;pointer-events:none;border-radius:2px;border:1px solid rgba(255,255,255,.22);
+  background:linear-gradient(115deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 28%,rgba(255,255,255,0) 62%,rgba(255,255,255,.10) 78%,rgba(255,255,255,0) 92%)}
+.bn-tab{position:absolute;left:-1px;right:-1px;top:-9px;height:10px;pointer-events:none;border-radius:2px 2px 0 0;background:linear-gradient(180deg,rgba(235,240,245,.38),rgba(235,240,245,.16));border:1px solid rgba(255,255,255,.25);border-bottom:0}
+.bn-c.lift{box-shadow:0 -1px 0 rgba(255,255,255,.25),0 26px 40px rgba(0,0,0,.75)}
+.bn-front{position:absolute;left:50%;transform:translateX(-50%);width:calc(var(--bcw) * 1.4);top:calc(62% - var(--bch) * .24);bottom:0;z-index:495;pointer-events:none;
+  background:linear-gradient(180deg,#a47e50 0%,#8f6c42 30%,#6f5332 100%);border-radius:3px 3px 0 0;box-shadow:0 -6px 16px rgba(0,0,0,.55),inset 0 3px 0 rgba(255,235,200,.25)}
+.bn-front i{position:absolute;left:50%;top:22px;transform:translateX(-50%);width:28%;height:20px;border-radius:10px;background:#3b2c1b;box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}   /* hand hole */
+.bn-c.lift{z-index:600!important}
+.bn-hint{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 10px);text-align:center;color:#c9b493;font-size:13px;z-index:700;margin:0;pointer-events:none}
 </style>
 </head>
 <body>
@@ -539,7 +577,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="rknav"><button class="icbtn" id="rkPrev" aria-label="Previous month"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn" id="rkNext" aria-label="Next month"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></div></header>
     <div id="rkStage"><div id="rkScene"><div id="rkRotor"></div><div class="rkbase"><i></i></div></div>
       <p id="rkEmpty" class="rkempty hidden">No comics yet — import some to fill the rack.</p>
-      <button class="icbtn rkspin" id="rkLeft" aria-label="Spin left"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn rkspin" id="rkRight" aria-label="Spin right"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></section>
+      <div class="rkmood"><button class="moodbtn" id="rkNight" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Night</span></button><button class="moodbtn" id="rkRain" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M7 16a4 4 0 1 1 .5-8 6 6 0 0 1 11.5 2 3.5 3.5 0 0 1-1 6.9H7z"/><path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/></svg><span>Rain</span></button></div><div class="rklamp" aria-hidden="true"></div><div class="rkvig" aria-hidden="true"></div><button class="icbtn rkspin" id="rkLeft" aria-label="Spin left"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn rkspin" id="rkRight" aria-label="Spin right"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></section>
   <header class="topbar"><div class="tb-row">
     <button class="icbtn" id="libBack" aria-label="Back to Library"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -560,8 +598,14 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       <button class="txtbtn" id="selAll">Select All</button><span id="selCount" class="selcount">0 selected</span>
       <button class="txtbtn" id="selRemove" disabled aria-label="Remove from Series">Remove<span class="w">&nbsp;from Series</span></button><button class="pillbtn" id="selMove" disabled aria-label="Move to Series">Move<span class="w">&nbsp;to Series</span>…</button></div></div>
   </main>
+  <section id="bin" class="hidden" aria-label="Back-issue bin"><header class="rkbar"><div class="tb-row rk-row">
+    <button class="icbtn" id="binClose" aria-label="Close bin"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="rkt"><h2>Back-issue bin</h2><small id="binSub"></small></div>
+    <div class="rknav"><button class="pillbtn" id="binDig" aria-label="Dig: shuffle in a random handful">Dig</button></div></div></header>
+    <div id="binStage"><div class="bn-back" aria-hidden="true"></div><div id="binCards"></div><div class="bn-front" aria-hidden="true"><i></i></div>
+      <p class="bn-hint">Swipe to flip · tap the raised comic to read</p></div></section>
   <main id="recent" class="tabview hidden" aria-label="Recently Added"><div class="scrollv" id="recScroll"><div class="lgrid rgrid" id="recGrid"></div></div></main>
-  <main id="timeline" class="tabview hidden" aria-label="Timeline"><div class="tlbar"><div class="tldec" id="tlDec" aria-label="Jump to decade"></div><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div><div class="scrollv" id="tlScroll"></div></main>
+  <main id="timeline" class="tabview hidden" aria-label="Timeline"><div class="tlbar"><div class="tldec" id="tlDec" aria-label="Jump to decade"></div><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlBin" aria-label="Back-issue bin"><svg class="i" viewBox="0 0 24 24"><path d="M3 9h18l-2 11H5z"/><path d="M7 9V5h3v4M11 9V4h3v5M15 9V6h3v3"/></svg></button><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div><div class="scrollv" id="tlScroll"></div></main>
 </section>
 
 <!-- ================= READER ================= -->
@@ -586,7 +630,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=39',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=40',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
 <script type="module">
 /* ================= CONFIG: Google Drive import =================
@@ -991,7 +1035,7 @@ function renderRecent(){ const g=$('#recGrid'); if(!g) return; const L=comics.sl
   g.innerHTML=L.length?L.map(c=>`<button class="lc" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}">${coverBox(c)}</button>`).join(''):`<div class="lempty" style="grid-column:1/-1">No comics yet.</div>`; }
 function renderShelf(){ renderHome(); renderLibrary(); if(ui.tab==='recent') renderRecent(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
-  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL) renderTimeline(); $('#recent').classList.toggle('hidden',t!=='recent'); if(t==='recent') renderRecent(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
+  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL) renderTimeline(); $('#recent').classList.toggle('hidden',t!=='recent'); if(t!=='timeline'&&typeof BIN!=='undefined'&&BIN.on) closeBin(); if(typeof Rain!=='undefined') Rain.sync(false); if(t==='recent') renderRecent(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
 function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
@@ -1437,6 +1481,8 @@ async function openSettings(){
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSkipBlack" ${store.get('skipBlack',true)?'checked':''}><span>Skip blank pages<small>Leaves out blank pages: black ones (like a black “TM &amp; ©” page between ads) and nearly white ones. Each comic can override this in Edit.</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sPanels" ${store.get('panelView',true)?'checked':''}><span>Guided panel view<small>Double-tap a panel to zoom to it, then swipe panel by panel. Double-tap again for the full page.</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSingle" ${store.get('singleLandscape',false)?'checked':''}><span>Single page in landscape<small>Off shows two-page spreads when the iPad is sideways</small></span></label>
+    <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sNight" ${store.get('nightShop',false)?'checked':''}><span>Night at the comic shop<small>Spinner rack in a dim shop under a warm lamp; it turns slowly when you leave it alone</small></span></label>
+    <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sRain" ${store.get('rainSound',false)?'checked':''}><span>Rain sound<small>Soft rain while you browse the Timeline</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sAwake" ${store.get('keepAwake',false)?'checked':''}><span>Keep screen awake while reading<small id="sAwakeNote">${Wake.supported()?'Only while a comic is open; the screen sleeps normally everywhere else':'Not supported in this browser. Needs iOS 16.4 or later (Safari or the Home Screen app)'}</small></span></label>
     <div class="sgrp"><b>Google Drive folder</b><span id="sFolderCur">${esc(Drive.folder().name||'Folder')} · <code>${esc(Drive.folder().id)}</code>${store.get('driveFolder',null)?'':' (default)'}</span>
       <div class="frow"><input id="sFolder" type="url" placeholder="Paste a Drive folder link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn ghost" id="sFolderSave">Save</button></div>
@@ -1448,7 +1494,7 @@ async function openSettings(){
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
-  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sAwake').addEventListener('change',e=>{ store.set('keepAwake',e.target.checked); Wake.sync(); }); w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked)); w.querySelector('#sPanels').addEventListener('change',e=>store.set('panelView',e.target.checked)); w.querySelector('#sSkipBlack').addEventListener('change',e=>{ store.set('skipBlack',e.target.checked); if(R.comic) dispatchEvent(new CustomEvent('cr-black',{detail:R.comic.id})); });
+  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sNight').addEventListener('change',e=>setNight(e.target.checked)); w.querySelector('#sRain').addEventListener('change',e=>setRain(e.target.checked)); w.querySelector('#sAwake').addEventListener('change',e=>{ store.set('keepAwake',e.target.checked); Wake.sync(); }); w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked)); w.querySelector('#sPanels').addEventListener('change',e=>store.set('panelView',e.target.checked)); w.querySelector('#sSkipBlack').addEventListener('change',e=>{ store.set('skipBlack',e.target.checked); if(R.comic) dispatchEvent(new CustomEvent('cr-black',{detail:R.comic.id})); });
     const cur=()=>{ const f=Drive.folder(); w.querySelector('#sFolderCur').innerHTML=`${esc(f.name||'Folder')} · <code>${esc(f.id)}</code>${store.get('driveFolder',null)?'':' (default)'}`; };
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
@@ -1577,8 +1623,8 @@ function rackCoast(){ cancelAnimationFrame(RK.raf); let last=performance.now();
   RK.raf=requestAnimationFrame(f); }
 function rackSpin(dir){ cancelAnimationFrame(RK.raf); RK.raf=0; const t=Math.round(RK.a/RK.step)*RK.step+dir*RK.step; if(reduced()){ RK.a=t; rackApply(); } else rackSnapTo(t); }
 function rackSnapTo(t){ cancelAnimationFrame(RK.raf); const a0=RK.a,t0=performance.now(),D=420; const f=x=>{ const k=Math.min(1,(x-t0)/D), e=1-Math.pow(1-k,3); RK.a=a0+(t-a0)*e; rackApply(); if(k<1) RK.raf=requestAnimationFrame(f); else RK.raf=0; }; RK.raf=requestAnimationFrame(f); }
-function openRack(ym){ if(!(ym>0)) return; RK.on=true; RK.ym=ym; $('#rack').classList.remove('hidden'); renderRack(); }
-function closeRack(){ RK.on=false; cancelAnimationFrame(RK.raf); RK.raf=0; const r=$('#rack'); if(r){ r.classList.add('hidden'); $('#rkRotor').innerHTML=''; } document.querySelectorAll('.rkpull').forEach(e=>e.remove()); }
+function openRack(ym){ if(!(ym>0)) return; RK.on=true; RK.ym=ym; $('#rack').classList.remove('hidden'); renderRack(); nightUI(); Rain.sync(false); }
+function closeRack(){ RK.on=false; if(typeof stopAuto==='function') stopAuto(); cancelAnimationFrame(RK.raf); RK.raf=0; const r=$('#rack'); if(r){ r.classList.add('hidden'); $('#rkRotor').innerHTML=''; } document.querySelectorAll('.rkpull').forEach(e=>e.remove()); }
 function rackPull(btn){ if(RK.pulling||(R&&R.comic)) return; const id=btn.dataset.rk, img=btn.querySelector('img'), r=img.getBoundingClientRect();
   if(reduced()||!r.width){ RK.pulling=id; openReader(id); setTimeout(()=>RK.pulling=null,400); return; }
   const cl=document.createElement('img'); cl.className='rkpull'; cl.src=img.src; Object.assign(cl.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px'}); document.body.appendChild(cl);
@@ -1586,7 +1632,7 @@ function rackPull(btn){ if(RK.pulling||(R&&R.comic)) return; const id=btn.datase
   cl.getBoundingClientRect(); cl.style.transform=`translate(${dx}px,${dy-r.height*.15}px) translateZ(0) scale(${s})`; RK.pulling=id;
   setTimeout(()=>{ openReader(id); setTimeout(()=>{ cl.remove(); btn.classList.remove('pulled'); RK.pulling=null; },400); },380); }
 { const st=$('#rkStage');
-  st.addEventListener('pointerdown',e=>{ if(e.button>0||e.target.closest('.rkspin')) return; cancelAnimationFrame(RK.raf); RK.raf=0; RK.v=0; RK.drag={x:e.clientX,y:e.clientY,a:RK.a,t:performance.now(),lx:e.clientX,moved:false,id:e.pointerId,tgt:e.target.closest('.pkc')}; try{ st.setPointerCapture(e.pointerId); }catch(_){} });
+  st.addEventListener('pointerdown',e=>{ if(e.button>0||e.target.closest('.rkspin,.rkmood')) return; cancelAnimationFrame(RK.raf); RK.raf=0; RK.v=0; RK.drag={x:e.clientX,y:e.clientY,a:RK.a,t:performance.now(),lx:e.clientX,moved:false,id:e.pointerId,tgt:e.target.closest('.pkc')}; try{ st.setPointerCapture(e.pointerId); }catch(_){} });
   st.addEventListener('pointermove',e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x; if(Math.abs(dx)>8||Math.abs(e.clientY-d.y)>8) d.moved=true; if(!d.moved) return;
     const now=performance.now(), deg=(st.clientWidth>0?180/Math.max(320,st.clientWidth*.9):.3); RK.a=d.a+dx*deg; const dt=Math.max(1,now-d.t); RK.v=Math.max(-1.1,Math.min(1.1,.7*RK.v+.3*((e.clientX-d.lx)*deg/dt))); d.t=now; d.lx=e.clientX; rackApply(); });
   const up=e=>{ const d=RK.drag; if(!d||e.pointerId!==d.id) return; RK.drag=null;
@@ -2033,7 +2079,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if(push) try{ history.pushState({r:id},'','#/read/'+id); }catch(e){}
   // reading list context: opened from a list row -> that list's order decides the next issue (remembered for Continue reading / reload)
   if('queue' in opts){ c.lastQueue=opts.queue||null; } const lq=queues.find(q=>q.id===c.lastQueue&&q.items.includes(c.id)); R.queue=lq?lq.id:null;
-  R.gen++; R.comic=c; Wake.sync(); R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
+  R.gen++; R.comic=c; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
   hideToast(); readerEl.classList.remove('hidden'); readerEl.classList.add('ui'); $('#shelf').classList.add('hidden'); $('#rTitle').textContent=c.title; zoomer.replaceChildren(); R.viewEl=null;
   let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); }catch(err){ console.warn(err); toast('Could not open this comic: '+(err.message||err)); closeReader(); return; }
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
@@ -2045,7 +2091,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); R.views=[]; if(d) d.destroy().catch(()=>{});
+function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
   readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
@@ -2444,8 +2490,90 @@ function panelsAfterRender(){ if(P.internal||!P.on) return; const want=P.key; P.
   setTimeout(()=>{ if(R.vi===k&&!P.on&&Z.s<=1.01) enterPanels(null,want); },60); }
 pexit.addEventListener('click',()=>exitPanels(true));
 addEventListener('resize',()=>{ if(P.on) placeMask(false); });
+/* ---------- v40: back-issue bin (Timeline) ---------- */
+// A longbox seen from slightly above: bagged comics stand in a row, tops showing. Swipe riffles them forward (~120ms a card, with momentum);
+// the front comic lifts to show its cover; tap it to read. Virtualized: a fixed pool of BIN_SLOTS cards is re-bound as you flip.
+const BIN_SLOTS=30, BIN_BEHIND=2, BIN_MS=120, BIN_DIG=8;
+var BIN={on:false,ids:[],pos:0,raf:0,drag:null,els:[]};
+const binShuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+function openBin(){ if(!comics.length){ toast('Import some comics to fill the bin'); return; }
+  BIN.on=true; BIN.ids=binShuffle(comics.map(c=>c.id)); BIN.pos=0; $('#bin').classList.remove('hidden');
+  const box=$('#binCards'); if(!BIN.els.length||!box.children.length){ box.innerHTML=Array.from({length:BIN_SLOTS},()=>`<button class="bn-c" tabindex="-1" style="display:none"><img alt="" decoding="async" draggable="false"><span class="bn-bag"></span><span class="bn-tab"></span></button>`).join(''); BIN.els=[...box.children]; }
+  binLayout(); Rain.sync(); }
+function closeBin(){ BIN.on=false; cancelAnimationFrame(BIN.raf); BIN.raf=0; $('#bin').classList.add('hidden'); Rain.sync(); }
+function binLayout(){ if(!BIN.on) return; const n=BIN.ids.length, st=$('#binStage'), H=st.clientHeight||600, W=st.clientWidth||400;
+  const cw=Math.min(W*.56,H*.30,300), ch=cw*1.5, step=ch*.045, base=Math.floor(BIN.pos), lift=ch*.36;
+  st.style.setProperty('--bcw',cw+'px'); st.style.setProperty('--bch',ch+'px');
+  $('#binSub').textContent=n?`${Math.min(n,Math.round(BIN.pos)+1)} of ${n} · from your whole collection`:'';
+  BIN.els.forEach((el,s)=>{ const k=base-BIN_BEHIND+s; if(k<0||k>=n){ if(el.style.display!=='none') el.style.display='none'; el.dataset.k=''; el.classList.remove('lift','front-out'); return; }
+    const c=comics.find(x=>x.id===BIN.ids[k]); if(!c){ el.style.display='none'; return; }
+    const o=k-BIN.pos, im=el.firstChild; el.style.display=''; el.dataset.k=k; el.dataset.id=c.id; el.setAttribute('aria-label',c.title);
+    if(im.dataset.cid!==c.id){ im.dataset.cid=c.id; const u=cover(c); if(u) im.src=u; else im.removeAttribute('src'); }
+    let ty,rx,sc,op=1;
+    if(o<=-1){ ty=ch*.55; rx=-80; sc=1.04; op=Math.max(0,1.6+o); }                 // flipped forward, falling toward you
+    else if(o<0){ const t=-o; ty=-lift*(1-t)+ch*.55*t; rx=-80*t; sc=1+.04*t; }     // the front one tipping over
+    else if(o<1){ const t=o; ty=-lift*(1-t)+(-step)*t; rx=6*t; sc=1-.006*t; }       // next one rising into the lifted spot
+    else { ty=-o*step; rx=6; sc=Math.max(.75,1-.006*o); }                              // standing in the box, receding
+    el.style.transform=`perspective(1100px) translate3d(-50%,${ty.toFixed(1)}px,${(-Math.max(0,o)*6).toFixed(1)}px) rotateX(${rx.toFixed(1)}deg) scale(${sc.toFixed(3)})`;
+    el.style.opacity=op.toFixed(2); el.style.zIndex=String(500-Math.round(o*10)); el.classList.toggle('lift',Math.abs(o)<.5); el.classList.toggle('front-out',o<-.5); }); }
+function binTo(t,dur){ cancelAnimationFrame(BIN.raf); const n=BIN.ids.length; t=clamp(Math.round(t),0,Math.max(0,n-1)); const from=BIN.pos;
+  if(dur==null) dur=clamp(Math.abs(t-from)*BIN_MS,BIN_MS,1600); BIN.lastDur=dur; if(reduced()){ BIN.pos=t; binLayout(); return; }
+  const t0=performance.now(), f=now=>{ const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,2.2); BIN.pos=from+(t-from)*e; binLayout(); if(k<1) BIN.raf=requestAnimationFrame(f); else { BIN.raf=0; BIN.pos=t; binLayout(); } };
+  BIN.raf=requestAnimationFrame(f); }
+function binDig(){ const n=BIN.ids.length; if(n<2) return; const at=Math.round(BIN.pos)+1, keep=new Set(BIN.ids.slice(0,at));
+  const pool=binShuffle(comics.map(c=>c.id).filter(id=>!keep.has(id))).slice(0,BIN_DIG), ps=new Set(pool);
+  BIN.ids=BIN.ids.slice(0,at).concat(pool,BIN.ids.slice(at).filter(id=>!ps.has(id))); binLayout(); binTo(at,BIN_MS*1.5); toast(`Dug up ${pool.length} comic${pool.length===1?'':'s'}`); }
+{ const st=$('#binStage'), PX=70;
+  st.addEventListener('pointerdown',e=>{ if(e.button>0) return; cancelAnimationFrame(BIN.raf); BIN.raf=0; BIN.drag={id:e.pointerId,x:e.clientX,y:e.clientY,p0:BIN.pos,moved:false,s:[[e.timeStamp,0]],tgt:e.target.closest('.bn-c')}; try{ st.setPointerCapture(e.pointerId); }catch(_){} });
+  st.addEventListener('pointermove',e=>{ const d=BIN.drag; if(!d||e.pointerId!==d.id) return; const dx=e.clientX-d.x, dy=e.clientY-d.y, m=dy-dx;   // pull down or swipe left = forward
+    if(!d.moved&&Math.hypot(dx,dy)<8) return; d.moved=true; d.s.push([e.timeStamp,m]); if(d.s.length>8) d.s.shift();
+    BIN.pos=clamp(d.p0+m/PX,-.3,BIN.ids.length-.7); binLayout(); });
+  const up=e=>{ const d=BIN.drag; if(!d||e.pointerId!==d.id) return; BIN.drag=null;
+    if(!d.moved){ const el=d.tgt; if(!el||el.style.display==='none') return; const k=+el.dataset.k; if(k===Math.round(BIN.pos)) openReader(el.dataset.id); else binTo(k); return; }
+    const s=d.s.filter(q=>d.s[d.s.length-1][0]-q[0]<=100), a=s[0], b=s[s.length-1], v=(b[0]-a[0])>0&&(e.timeStamp-b[0])<90?(b[1]-a[1])/(b[0]-a[0]):0;   // px/ms
+    binTo(BIN.pos+(Math.abs(v)<.5?0:clamp(v*120/PX,-12,12))); };   // momentum only for a real flick
+  st.addEventListener('pointerup',up); st.addEventListener('pointercancel',up);
+  st.addEventListener('wheel',e=>{ e.preventDefault(); const d=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX; binTo(Math.round(BIN.pos)+(d>0?1:-1)); },{passive:false});
+  $('#tlBin').addEventListener('click',openBin); $('#binClose').addEventListener('click',closeBin); $('#binDig').addEventListener('click',binDig);
+  addEventListener('resize',()=>{ if(BIN.on) binLayout(); });
+  addEventListener('keydown',e=>{ if(!BIN.on||(R&&R.comic)) return; if(e.key==='ArrowRight'||e.key==='ArrowDown') binTo(Math.round(BIN.pos)+1); else if(e.key==='ArrowLeft'||e.key==='ArrowUp') binTo(Math.round(BIN.pos)-1); else if(e.key==='Enter'){ const id=BIN.ids[Math.round(BIN.pos)]; if(id) openReader(id); } else if(e.key==='Escape') closeBin(); }); }
+
+/* ---------- v40: night at the comic shop (rack screen) + rain sound ---------- */
+// Night: dim shop + warm lamp glow (flat 2D layers on the stage, never inside the 3D rotor — v37 lesson) and slow idle auto-rotation.
+var NIGHT={araf:0,last:0,t:0,idle:()=>window.__crIdle||5000,speed:5};   // deg/s
+const nightOn=()=>!!store.get('nightShop',false);
+function setNight(v){ store.set('nightShop',!!v); nightUI(); }
+function nightUI(){ const on=nightOn(), r=$('#rack'); if(r) r.classList.toggle('night',on); const b=$('#rkNight'); if(b) b.setAttribute('aria-pressed',on); const s=$('#sNight'); if(s) s.checked=on;
+  stopAuto(); if(on) armAuto(true); }
+function stopAuto(){ cancelAnimationFrame(NIGHT.araf); NIGHT.araf=0; clearTimeout(NIGHT.t); RK.auto=false; }
+function armAuto(soon){ clearTimeout(NIGHT.t); if(!RK.on||!nightOn()||reduced()) return; NIGHT.t=setTimeout(startAuto,soon?Math.min(900,NIGHT.idle()):NIGHT.idle()); }
+function startAuto(){ if(!RK.on||!nightOn()||reduced()||RK.drag||RK.raf||RK.pulling){ armAuto(false); return; } RK.auto=true; let last=performance.now();
+  const f=t=>{ if(!RK.auto) return; const dt=Math.min(50,t-last); last=t; RK.a-=NIGHT.speed*dt/1000; rackApply(); NIGHT.araf=requestAnimationFrame(f); }; NIGHT.araf=requestAnimationFrame(f); }
+function rackTouched(){ stopAuto(); armAuto(false); }
+// Rain: soft filtered noise from the Web Audio API. Starts only from a tap; plays while the Timeline tab (or its rack/bin) is on screen; stops when leaving or hidden.
+var Rain={ctx:null,gain:null,playing:false,unlocked:false,
+  wanted(){ return !!store.get('rainSound',false)&&(TL.on||RK.on||BIN.on)&&!(R&&R.comic)&&document.visibilityState==='visible'; },
+  build(){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false; const ctx=this.ctx=new AC(), sr=ctx.sampleRate, len=sr*2, buf=ctx.createBuffer(2,len,sr);
+    for(let ch=0;ch<2;ch++){ const d=buf.getChannelData(ch); let b=0; for(let i=0;i<len;i++){ const w=Math.random()*2-1; b=(b+.02*w)/1.02; d[i]=w*.35+b*3.2; } }   // white + brown noise: hiss + rumble
+    const src=ctx.createBufferSource(); src.buffer=buf; src.loop=true;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=320; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; lp.Q.value=.4;
+    this.gain=ctx.createGain(); this.gain.gain.value=0; src.connect(hp); hp.connect(lp); lp.connect(this.gain); this.gain.connect(ctx.destination); src.start(); return true; },
+  sync(gesture){ if(gesture) this.unlocked=true; const want=this.wanted()&&this.unlocked;
+    if(want&&!this.playing){ if(!this.ctx&&!this.build()) return; this.playing=true; try{ this.ctx.resume(); }catch(e){} const g=this.gain.gain, t=this.ctx.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(.16,t+1.2); }
+    else if(!want&&this.playing){ this.playing=false; const g=this.gain.gain, t=this.ctx.currentTime; g.cancelScheduledValues(t); g.setValueAtTime(g.value,t); g.linearRampToValueAtTime(0,t+.25); const c=this.ctx; setTimeout(()=>{ if(!this.playing) try{ c.suspend(); }catch(e){} },300); }
+    const b=$('#rkRain'); if(b) b.setAttribute('aria-pressed',!!store.get('rainSound',false)); const s=$('#sRain'); if(s) s.checked=!!store.get('rainSound',false); } };
+function setRain(v){ store.set('rainSound',!!v); Rain.sync(true); }
+document.addEventListener('visibilitychange',()=>Rain.sync(false));
+// iOS only lets audio start inside a user gesture: the first tap anywhere unlocks it (the context is created/resumed inside that tap)
+['pointerup','touchend','keydown'].forEach(t=>document.addEventListener(t,()=>{ if(Rain.unlocked) return; Rain.unlocked=true; if(store.get('rainSound',false)){ if(!Rain.ctx) Rain.build(); try{ Rain.ctx&&Rain.ctx.resume(); }catch(e){} } Rain.sync(false); },{capture:true,passive:true}));
+{ $('#rkNight').addEventListener('click',()=>setNight(!nightOn())); $('#rkRain').addEventListener('click',()=>setRain(!store.get('rainSound',false)));
+  const st=$('#rkStage'); ['pointerdown','pointerup','pointercancel','wheel'].forEach(t=>st.addEventListener(t,e=>{ if(!e.target.closest('.rkmood')) rackTouched(); },{passive:true}));
+  ['rkLeft','rkRight','rkPrev','rkNext'].forEach(id=>$('#'+id).addEventListener('click',rackTouched));
+  addEventListener('keydown',()=>{ if(RK.on) rackTouched(); });
+  rmq.addEventListener&&rmq.addEventListener('change',()=>{ stopAuto(); armAuto(false); });
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') stopAuto(); else armAuto(false); }); }
 /* ================= boot ================= */
-window.__cr={wake:Wake,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},dates:{of:dateOf,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},dates:{of:dateOf,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);

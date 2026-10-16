@@ -7,7 +7,7 @@
     <div class="rknav"><button class="icbtn" id="rkPrev" aria-label="Previous month"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn" id="rkNext" aria-label="Next month"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></div></header>
     <div id="rkStage"><div id="rkScene"><div id="rkRotor"></div><div class="rkbase"><i></i></div></div>
       <p id="rkEmpty" class="rkempty hidden">No comics yet — import some to fill the rack.</p>
-      <button class="icbtn rkspin" id="rkLeft" aria-label="Spin left"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn rkspin" id="rkRight" aria-label="Spin right"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></section>
+      <div class="rkmood"><button class="moodbtn" id="rkNight" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span>Night</span></button><button class="moodbtn" id="rkRain" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M7 16a4 4 0 1 1 .5-8 6 6 0 0 1 11.5 2 3.5 3.5 0 0 1-1 6.9H7z"/><path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/></svg><span>Rain</span></button></div><div class="rklamp" aria-hidden="true"></div><div class="rkvig" aria-hidden="true"></div><button class="icbtn rkspin" id="rkLeft" aria-label="Spin left"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button><button class="icbtn rkspin" id="rkRight" aria-label="Spin right"><svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button></div></section>
   <header class="topbar"><div class="tb-row">
     <button class="icbtn" id="libBack" aria-label="Back to Library"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="icbtn" id="settingsBtn" aria-label="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -28,8 +28,14 @@
       <button class="txtbtn" id="selAll">Select All</button><span id="selCount" class="selcount">0 selected</span>
       <button class="txtbtn" id="selRemove" disabled aria-label="Remove from Series">Remove<span class="w">&nbsp;from Series</span></button><button class="pillbtn" id="selMove" disabled aria-label="Move to Series">Move<span class="w">&nbsp;to Series</span>…</button></div></div>
   </main>
+  <section id="bin" class="hidden" aria-label="Back-issue bin"><header class="rkbar"><div class="tb-row rk-row">
+    <button class="icbtn" id="binClose" aria-label="Close bin"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="rkt"><h2>Back-issue bin</h2><small id="binSub"></small></div>
+    <div class="rknav"><button class="pillbtn" id="binDig" aria-label="Dig: shuffle in a random handful">Dig</button></div></div></header>
+    <div id="binStage"><div class="bn-back" aria-hidden="true"></div><div id="binCards"></div><div class="bn-front" aria-hidden="true"><i></i></div>
+      <p class="bn-hint">Swipe to flip · tap the raised comic to read</p></div></section>
   <main id="recent" class="tabview hidden" aria-label="Recently Added"><div class="scrollv" id="recScroll"><div class="lgrid rgrid" id="recGrid"></div></div></main>
-  <main id="timeline" class="tabview hidden" aria-label="Timeline"><div class="tlbar"><div class="tldec" id="tlDec" aria-label="Jump to decade"></div><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div><div class="scrollv" id="tlScroll"></div></main>
+  <main id="timeline" class="tabview hidden" aria-label="Timeline"><div class="tlbar"><div class="tldec" id="tlDec" aria-label="Jump to decade"></div><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlBin" aria-label="Back-issue bin"><svg class="i" viewBox="0 0 24 24"><path d="M3 9h18l-2 11H5z"/><path d="M7 9V5h3v4M11 9V4h3v5M15 9V6h3v3"/></svg></button><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div><div class="scrollv" id="tlScroll"></div></main>
 </section>
 
 <!-- ================= READER ================= -->
@@ -54,5 +60,5 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=39',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=40',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>

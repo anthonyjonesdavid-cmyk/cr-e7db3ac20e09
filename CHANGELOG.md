@@ -1,5 +1,13 @@
 # Comic Shelf: change log
 
+## cr-v40 — 2026-10-16
+
+- Timeline: **Back-issue bin** (button beside the rack). A longbox seen from slightly above — our own cardboard box and clear bags drawn with CSS — with bagged comics standing in a row, tops showing. Drag or swipe to riffle forward (120ms a card, momentum on a flick); the front comic lifts to show its cover; tap it to read. **Dig** shuffles a random handful from the whole collection in right after the front comic. Drawn from the full library, virtualized to a pool of 30 cards. Close button; Esc/arrow keys too.
+- Rack screen: **Night at the comic shop** toggle (also in Settings; off by default, persisted). Dim shop and warm lamp glow from CSS gradients + vignette, as flat 2D layers beside the 3D scene (never inside the rotor — v37 lesson). The rack slowly auto-rotates when idle; touch pauses it and it resumes ~5s after the last touch. No auto-rotate with prefers-reduced-motion.
+- **Rain sound** toggle (rack screen + Settings; off by default): soft rain generated with the Web Audio API (white + brown noise through high/low-pass filters). Starts only after a user tap; plays while the Timeline tab (list, rack or bin) is on screen; stops when leaving Timeline, opening a comic, or when the app is hidden.
+- Home unchanged.
+- Tests: new e2e_v40 (bin layout/riffle/momentum/Dig/tap-to-read/close, 2,000-comic virtualization, night toggle + persistence + Settings mirror, auto-rotate idle/pause/resume/reduced-motion, sign stable every frame while rotating, rain start/stop rules) at 4 sizes.
+
 ## cr-v39 — 2026-10-16
 
 - Settings: "Keep screen awake while reading" toggle (off by default, stored in localStorage `cr.keepAwake`). When on, holds a Screen Wake Lock (`navigator.wakeLock.request('screen')`) only while the reader is open; re-acquired on `visibilitychange` when the app becomes visible again mid-read; released when leaving the reader or turning the toggle off.

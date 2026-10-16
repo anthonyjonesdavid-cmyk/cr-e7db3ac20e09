@@ -507,3 +507,41 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .segctl button{min-width:84px;padding:0 10px}
 @media (max-width:700px){.segctl button .rl{display:none}.segctl button .rs{display:inline}}
 @media (max-width:440px){.segctl button{min-width:0;padding:0 8px;font-size:13px}}
+
+/* ---------- v40: night at the comic shop — flat 2D layers on the stage (never inside the 3D rotor: no coplanar z-fighting) ---------- */
+.rkmood{position:absolute;left:calc(var(--padx) + 6px);bottom:calc(var(--sab) + 12px);z-index:6;display:flex;gap:8px}
+.moodbtn{height:40px;min-width:44px;padding:0 14px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;background:#000c;border:.5px solid #333;color:#d8d8dc;font-size:14px;font-weight:600}
+.moodbtn .i{width:18px;height:18px}
+.moodbtn[aria-pressed="true"]{background:#3a2a12;border-color:#a8792f;color:#ffd58a}
+.rklamp,.rkvig{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .6s ease}
+.rklamp{z-index:0;background:
+  radial-gradient(ellipse 42% 30% at 50% 4%,rgba(255,214,150,.55),rgba(255,190,110,.18) 45%,transparent 75%),
+  radial-gradient(ellipse 60% 70% at 50% 48%,rgba(255,170,80,.20),rgba(120,70,30,.10) 45%,transparent 72%),
+  linear-gradient(180deg,#1a120b 0%,#0e0a07 62%,#17100a 62.2%,#0b0806 100%)}
+.rkvig{z-index:4;background:radial-gradient(ellipse 75% 70% at 50% 46%,transparent 52%,rgba(0,0,0,.55) 80%,rgba(0,0,0,.85) 100%)}
+#rack.night #rkStage{background:#0b0806}
+#rack.night .rklamp,#rack.night .rkvig{opacity:1}
+#rkScene{z-index:1}
+@media (prefers-reduced-motion:reduce){.rklamp,.rkvig{transition:none}}
+
+/* ---------- v40: back-issue bin (longbox seen from slightly above; our own cardboard + bags) ---------- */
+#bin{position:absolute;inset:0;z-index:41;background:#000;display:flex;flex-direction:column}#bin.hidden{display:none}
+#bin .pillbtn{height:40px;padding:0 18px}
+#binStage{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;
+  background:radial-gradient(ellipse 70% 55% at 50% 30%,#2a2724 0%,#141312 60%,#070707 100%)}
+.bn-back{position:absolute;left:50%;transform:translateX(-50%);width:calc(var(--bcw) * 1.3);top:calc(62% - var(--bch) * 1.75);height:calc(var(--bch) * 1.5);
+  background:linear-gradient(180deg,#8a6a43,#6e5232);border-radius:4px 4px 0 0;box-shadow:inset 0 0 0 2px #5c4428,inset 0 14px 18px -10px rgba(0,0,0,.6)}
+#binCards{position:absolute;left:50%;top:calc(62% - var(--bch) * .62);width:0;height:0}
+.bn-c{position:absolute;left:0;top:0;width:var(--bcw);height:var(--bch);padding:0;border:0;background:#222;transform-origin:50% 100%;will-change:transform,opacity;border-radius:2px;
+  box-shadow:0 -1px 0 rgba(255,255,255,.18),0 10px 18px rgba(0,0,0,.55)}
+.bn-c img{position:absolute;inset:4px 3px 0 3px;width:calc(100% - 6px);height:calc(100% - 4px);object-fit:cover;object-position:top;pointer-events:none}
+/* the bag: clear plastic sheen + a folded flap at the top, drawn with gradients (one flat element per card) */
+.bn-bag{position:absolute;inset:0;pointer-events:none;border-radius:2px;border:1px solid rgba(255,255,255,.22);
+  background:linear-gradient(115deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 28%,rgba(255,255,255,0) 62%,rgba(255,255,255,.10) 78%,rgba(255,255,255,0) 92%)}
+.bn-tab{position:absolute;left:-1px;right:-1px;top:-9px;height:10px;pointer-events:none;border-radius:2px 2px 0 0;background:linear-gradient(180deg,rgba(235,240,245,.38),rgba(235,240,245,.16));border:1px solid rgba(255,255,255,.25);border-bottom:0}
+.bn-c.lift{box-shadow:0 -1px 0 rgba(255,255,255,.25),0 26px 40px rgba(0,0,0,.75)}
+.bn-front{position:absolute;left:50%;transform:translateX(-50%);width:calc(var(--bcw) * 1.4);top:calc(62% - var(--bch) * .24);bottom:0;z-index:495;pointer-events:none;
+  background:linear-gradient(180deg,#a47e50 0%,#8f6c42 30%,#6f5332 100%);border-radius:3px 3px 0 0;box-shadow:0 -6px 16px rgba(0,0,0,.55),inset 0 3px 0 rgba(255,235,200,.25)}
+.bn-front i{position:absolute;left:50%;top:22px;transform:translateX(-50%);width:28%;height:20px;border-radius:10px;background:#3b2c1b;box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}   /* hand hole */
+.bn-c.lift{z-index:600!important}
+.bn-hint{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 10px);text-align:center;color:#c9b493;font-size:13px;z-index:700;margin:0;pointer-events:none}
