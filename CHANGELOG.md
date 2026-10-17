@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v41 — 2026-10-17
+
+- Timeline: **decade chips fixed.** Every chip now jumps to the first issue of its decade and stays lit. Root causes: (1) the scroll-spy ran on every frame of the smooth jump and called `scrollIntoView` on the chip strip, which in WebKit cancels the in-flight scroll of the grid — the jump stopped and the previous chip re-lit; (2) the jump offset used `offsetTop` (measured from the Timeline view, not the scroller), so it overshot by the bar height; (3) a decade near the end can't scroll to the top, so the spy re-highlighted the previous decade. Now the target is measured with rects, the tapped chip stays lit until you scroll the grid yourself, the strip is scrolled without `scrollIntoView`, the strip pans horizontally only and chips use `touch-action: manipulation`.
+- Chips cover every decade in range; a decade with no issues jumps to the nearest one with a short note.
+- **Built-in release list**: 766 issues of your Drive library dated from the Fandom comics wikis (series and volume matched by folder — e.g. Fantastic Four Heroes Reborn → Vol 2, X-Men (1991) → Vol 2, Wolverine → Vol 2). Used only when an issue has no date from you, the file, its metadata or an online lookup; dates you set by hand are never changed. Undated/estimated issues in the library: 855 → 89.
+- New suite `test/e2e_v41.py` (touch taps on every chip at 4 sizes, after scrolling the strip and the grid, empty decade, built-in list vs manual dates).
+
 ## cr-v40 — 2026-10-16
 
 - Timeline: **Back-issue bin** (button beside the rack). A longbox seen from slightly above — our own cardboard box and clear bags drawn with CSS — with bagged comics standing in a row, tops showing. Drag or swipe to riffle forward (120ms a card, momentum on a flick); the front comic lifts to show its cover; tap it to read. **Dig** shuffles a random handful from the whole collection in right after the front comic. Drawn from the full library, virtualized to a pool of 30 cards. Close button; Esc/arrow keys too.

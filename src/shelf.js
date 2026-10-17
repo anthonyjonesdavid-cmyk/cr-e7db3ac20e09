@@ -90,7 +90,7 @@ function renderRecent(){ const g=$('#recGrid'); if(!g) return; const L=comics.sl
   g.innerHTML=L.length?L.map(c=>`<button class="lc" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}">${coverBox(c)}</button>`).join(''):`<div class="lempty" style="grid-column:1/-1">No comics yet.</div>`; }
 function renderShelf(){ renderHome(); renderLibrary(); if(ui.tab==='recent') renderRecent(); setTab(ui.tab); if(TL.on) renderTimeline(); }
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
-  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL) renderTimeline(); $('#recent').classList.toggle('hidden',t!=='recent'); if(t!=='timeline'&&typeof BIN!=='undefined'&&BIN.on) closeBin(); if(typeof Rain!=='undefined') Rain.sync(false); if(t==='recent') renderRecent(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
+  $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL){ TL.pin=null; renderTimeline(); } $('#recent').classList.toggle('hidden',t!=='recent'); if(t!=='timeline'&&typeof BIN!=='undefined'&&BIN.on) closeBin(); if(typeof Rain!=='undefined') Rain.sync(false); if(t==='recent') renderRecent(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
 function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
 function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
@@ -272,7 +272,7 @@ const PULL_MS=220;   // v35: book slides up and tips toward the viewer, then the
 const nowD=()=>new Date(window.__crNow||Date.now());   // __crNow: test hook
 // trusted dates only, in this order: set by you > looked up online > embedded metadata > file name. ≈ estimates are excluded.
 function weekDate(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.onlineDate&&c.onlineDate.y) return c.onlineDate; if(c.metaDate&&c.metaDate.y) return c.metaDate;
-  return dateFromName(c.fileName)||dateFromName(c.title)||null; }
+  return dateFromName(c.fileName)||dateFromName(c.title)||embDate(c)||null; }
 
 /* ---------- 3D coverflow: touch-tracked, momentum, snaps to center ---------- */
 // one factory, two carousels: Home (CF) and the series page (SCF)
@@ -561,14 +561,15 @@ async function openSettings(){
 /* ---------- release dates + Timeline ---------- */
 let dateOv=new Map();   // file key -> {y,m}: manual dates (IndexedDB 'overrides'), re-applied when the same file is imported again
 function applyDateOv(c){ const k=fileKeys(c).find(k=>dateOv.has(k)); if(k) c.dateManual=dateOv.get(k); return c; }
+function embDate(c){ const r=(c.driveId&&EMBED_DATES.d[c.driveId])||(c.fileName&&EMBED_DATES.f[c.fileName]); return r?{y:r[0],m:r[1],src:'catalog'}:null; }
 function dateOf(c){ if(c.dateManual&&c.dateManual.y) return {...c.dateManual,src:'manual'}; if(c.metaDate&&c.metaDate.y) return c.metaDate;
-  return dateFromName(c.fileName)||dateFromName(c.title)||(c.onlineDate&&c.onlineDate.y?c.onlineDate:null)||lookupDate(c.series,issueNo(c.title),c.title,c.fileName,c.autoSeries)||null; }
+  return dateFromName(c.fileName)||dateFromName(c.title)||(c.onlineDate&&c.onlineDate.y?c.onlineDate:null)||embDate(c)||lookupDate(c.series,issueNo(c.title),c.title,c.fileName,c.autoSeries)||null; }
 async function setDate(c,d){ if(d) c.dateManual={y:d.y,m:d.m||0}; else delete c.dateManual;
   for(const k of fileKeys(c)){ if(d){ dateOv.set(k,c.dateManual); await ovPut({k,date:c.dateManual}); } else { dateOv.delete(k); await ovDel(k); } }
   await dbPut(c); renderShelf(); }
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const fmtDate=d=>d?`${d.src==='lookup'?'≈ ':''}${d.m?MONTHS[d.m-1].slice(0,3)+' ':''}${d.y}`:'Unknown';
-const SRC_TXT={online:'Looked up online',manual:'Set by you',meta:'From the file’s metadata',name:'From the file name',lookup:'Estimated from series history'};
+const SRC_TXT={online:'Looked up online',manual:'Set by you',meta:'From the file’s metadata',name:'From the file name',lookup:'Estimated from series history',catalog:'Built-in release list (comics wikis)'};
 // comics imported before v24: read embedded dates once, idle-paced
 async function backfillDates(){ for(const c of comics){ if(c.dateV===DATE_V||R&&R.comic) continue; let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); c.metaDate=await pdfDate(doc); }catch(e){} finally{ try{ doc&&await doc.destroy(); }catch(e){} }
   c.dateV=DATE_V; await dbPut(c); if(c.metaDate&&TL.on) renderTimeline(); await new Promise(r=>setTimeout(r,120)); } }
@@ -618,16 +619,29 @@ function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,ye
     return `<div class="tc" data-dec="${dec}" data-ym="${ym}">${lab?`<button class="tyr" data-act="${d?'rack':'noop'}" data-ym="${ym}" aria-label="${d?`Spinner rack, ${lab}`:lab}">${lab}${d?IC.rack:''}</button>`:''}<button class="tcb" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}${d?', '+esc(fmtDate(d)):''}">${coverBox(c)}<span class="tt">${esc(c.title)}</span><span class="td${d&&d.src==='lookup'?' est':''}">${d?esc(fmtDate(d)):'Unknown date'}</span></button></div>`; };
   for(const y of years) by.get(y).forEach((x,k)=>{ h+=card(x.c,x.d,k===0?String(y):''); });
   unk.forEach((c,k)=>{ h+=card(c,null,k===0?'Unknown':''); });
-  const decades=[...new Set(years.map(y=>Math.floor(y/10)*10))];
+  const decades=[]; if(years.length) for(let d=Math.floor(years[0]/10)*10;d<=years.at(-1);d+=10) decades.push(d);   // v41: every decade in range; empty ones jump to the nearest with a note
   $('#tlDec').innerHTML=decades.map(d=>`<button class="chip" data-dec="${d}">${d}s</button>`).join('')+(unk.length?'<button class="chip" data-dec="unk">Unknown</button>':'');
   el.innerHTML=comics.length?`<div class="tlg" id="tlGrid">${h}</div>${unk.length?'<p class="tlhint">Unknown dates: long-press an issue to set one, or use Look Up Release Dates in Settings.</p>':''}`:'<p class="qempty">No comics yet.</p>';
   $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
 function tlFirstVisible(){ const el=$('#tlScroll'), top=el.getBoundingClientRect().top; for(const c of el.querySelectorAll('.tc')){ const r=c.getBoundingClientRect(); if(r.bottom>top+8) return c; } return null; }
-function tlSpy(){ const c=tlFirstVisible(), cur=c&&c.dataset.dec; $('#tlDec').querySelectorAll('.chip').forEach(b=>{ const on=b.dataset.dec===cur; if(b.classList.contains('on')!==on){ b.classList.toggle('on',on); if(on) b.scrollIntoView({inline:'nearest',block:'nearest'}); } }); }
+// v41 decade chips. Root causes of "the chip does nothing" on iPad: tlSpy ran on every scroll frame of the smooth jump and called
+// chip.scrollIntoView(), which in WebKit cancels the in-flight smooth scroll of #tlScroll (jump stops after a few px, old chip re-lit);
+// the target offset used offsetTop (relative to #timeline, not the scroller); and a decade near the end can't reach the top, so the spy
+// re-highlighted the previous decade. Now: rect-based target, the tapped chip is pinned until YOU scroll, strip scrolled without scrollIntoView.
+function tlChipShow(b){ const st=$('#tlDec'), l=b.offsetLeft-st.offsetLeft, r=l+b.offsetWidth; if(l<st.scrollLeft) st.scrollLeft=l-6; else if(r>st.scrollLeft+st.clientWidth) st.scrollLeft=r-st.clientWidth+6; }
+function tlLight(dec){ $('#tlDec').querySelectorAll('.chip').forEach(b=>{ const on=b.dataset.dec===String(dec); if(b.classList.contains('on')!==on){ b.classList.toggle('on',on); if(on) tlChipShow(b); } }); }
+function tlSpy(){ if(TL.pin!=null) return tlLight(TL.pin); const c=tlFirstVisible(); tlLight(c?c.dataset.dec:''); }
+function tlJump(dec){ const el=$('#tlScroll'); dec=String(dec); let s=el.querySelector(`.tc[data-dec="${dec}"]`), land=dec;
+  if(!s&&dec!=='unk'){ const have=[...new Set([...el.querySelectorAll('.tc')].map(c=>c.dataset.dec).filter(d=>d!=='unk'))].map(Number);
+    if(have.length){ const n=have.sort((a,b)=>Math.abs(a-dec)-Math.abs(b-dec)||b-a)[0]; land=String(n); s=el.querySelector(`.tc[data-dec="${n}"]`); toast(`No issues from the ${dec}s — showing the ${n}s`); } }
+  if(!s) return; TL.pin=land; tlLight(land);
+  const top=Math.max(0,Math.min(el.scrollHeight-el.clientHeight,el.scrollTop+s.getBoundingClientRect().top-el.getBoundingClientRect().top-8));
+  el.scrollTo({top,behavior:reduced()?'auto':'smooth'}); }
 function openTimeline(){ setTab('timeline'); }
 function closeTimeline(){ if(TL.on) setTab('home'); }
 $('#tlScroll').addEventListener('scroll',()=>requestAnimationFrame(tlSpy),{passive:true});
-$('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(!b) return; const el=$('#tlScroll'), s=el.querySelector(`.tc[data-dec="${b.dataset.dec}"]`); if(s) el.scrollTo({top:Math.max(0,s.offsetTop-8),behavior:reduced()?'auto':'smooth'}); });
+$('#tlDec').addEventListener('click',e=>{ const b=e.target.closest('[data-dec]'); if(b) tlJump(b.dataset.dec); });
+['touchstart','pointerdown','wheel','keydown'].forEach(t=>$('#tlScroll').addEventListener(t,()=>{ TL.pin=null; },{passive:true}));
 $('#tlRack').addEventListener('click',()=>{ const c=tlFirstVisible(); let ym=c&&+c.dataset.ym; if(!ym){ const d=comics.map(dateOf).filter(Boolean).map(ymOf).sort((a,b)=>a-b); ym=d[Math.floor((d.length-1)/2)]; } if(ym) openRack(ym); else toast('Set a release date on some issues first'); });
 
 /* ---------- spinner rack (v25): the issues that were "on the racks" around a month ---------- */

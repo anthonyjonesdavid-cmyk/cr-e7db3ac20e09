@@ -100,7 +100,7 @@ with sync_playwright() as p:
                 reborn:of({title:'Fantastic Four 003',series:'Fantastic Four (Heroes Reborn)',fileName:'Fantastic Four - Heroes Reborn 03.pdf'}),
                 year96:L('Fantastic Four (1996)',3), year62:L('Fantastic Four',3,'(1962)'), vol1:L('Fantastic Four Vol. 1',3), plain:L('Fantastic Four',3)}})()""")
             ok('Vol 2 / v2 in the series or file name: no 1960s estimate (Unknown)',e['v2file'] is None and e['v2series'] is None,json.dumps(e))
-            ok('"Heroes Reborn" / a (1996) start year: no estimate',e['reborn'] is None and e['year96'] is None,json.dumps(e))
+            ok('"Heroes Reborn" / a (1996) start year: no 1961-run estimate (v41: the real file is in the built-in list as Vol 2 #3, Jan 1997)',(e['reborn'] is None or (e['reborn']['src']=='catalog' and e['reborn']['y']==1997 and e['reborn']['m']==1)) and e['year96'] is None,json.dumps(e))
             ok('plain / Vol 1 / matching year still get the ≈ estimate',e['plain']=={'y':1962,'m':1,'src':'lookup'} and e['vol1']==e['plain'] and e['year62']==e['plain'],json.dumps(e))
             # ---- online lookup (mocked wiki): Settings button
             pg.evaluate("__cr.dates.set(__cr.comics.find(c=>c.title==='Iron Tide 04'),null)")   # Iron Tide 04 becomes unknown: eligible, but not on the mock wiki
