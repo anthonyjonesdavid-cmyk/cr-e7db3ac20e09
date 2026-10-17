@@ -431,7 +431,7 @@ function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.seq.len
 const hideBubble=ms=>setTimeout(()=>{ bubble.classList.add('hidden'); scrubbing=false; },ms);
 scrub.addEventListener('input',()=>{ scrubbing=true; clearTimeout(R.uiT); showBubble(); });
 scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(R.seq[+scrub.value-1]??0); hideBubble(600); });
-$('#rGrid').onclick=openPages; $('#rMore').onclick=e=>{ e.stopPropagation(); const c=R.comic; if(!c) return; openMenu($('#rMore'),[{label:'Add to Reading List…',icon:IC.list,id:'rmQueue',run:()=>addToQueue(c.id)}]); }; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
+$('#rGrid').onclick=openPages; $('#rMore').onclick=e=>{ e.stopPropagation(); const c=R.comic; if(!c) return; openMenu($('#rMore'),[{label:'Issue Info',icon:IC.book,id:'rmInfo',run:readerInfo},{label:'Add to Reading List…',icon:IC.list,id:'rmQueue',run:()=>addToQueue(c.id)}]); }; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
 let pagesIO=null;
 function openPages(){ const grid=$('#pgrid'), cur=new Set(pagesOf(R.views[R.vi]));
   grid.innerHTML=R.seq.map((i,k)=>`<button data-p="${i}" class="${cur.has(i)?'cur':''}"><div class="th"></div><span>${k+1}</span></button>`).join('');

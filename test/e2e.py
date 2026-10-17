@@ -221,13 +221,14 @@ with sync_playwright() as p:
       L.forEach(c=>{ const ph=ip(c)?0:c.lastRead?1:2; if(ph<phase) okOrder=false;
         if(ph===phase&&prev){ if(ph<2&&c.lastRead>prev.lastRead) okOrder=false; if(ph===2&&c.added>prev.added) okOrder=false; } phase=ph; prev=c; });
       return {n:L.length,total,uniq:new Set(L.map(c=>c.id)).size,okOrder,first:L[0].title,ph:L.map(c=>ip(c)?0:c.lastRead?1:2).join('')}})()''')
-    ok('carousel holds up to 50 (all comics when fewer), no duplicates',cfs['n']==min(50,cfs['total']) and cfs['uniq']==cfs['n'],str(cfs))
-    ok('carousel order: in-progress (recent first) > other read > newest unread',cfs['okOrder'] and cfs['first']=='Nightfall 01',cfs['ph'])
+    ok('carousel holds every comic (v42), no duplicates',cfs['n']==cfs['total'] and cfs['uniq']==cfs['n'],str(cfs))
+    ro=pg.evaluate('''(()=>{ const t=c=>{ const d=__cr.dates.of(c); return d?d.y*12+((d.m||6)-1):Infinity; }, v=__cr.CF.items.map(t), f=v.filter(x=>x!==Infinity), u=v.indexOf(Infinity); return f.every((x,i)=>!i||f[i-1]<=x)&&(u<0||v.slice(u).every(x=>x===Infinity)); })()''')
+    ok('carousel order (v42): release date oldest first, undated at the end',ro,cfs['ph'])
     pg.reload(); pg.wait_for_selector('html[data-ready]'); tab(pg,'home'); pg.wait_for_function('__cr.CF.items.length>0'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(600)   # fresh mount
     v=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')], n=__cr.CF.items.length, p=Math.round(__cr.CF.pos), cd=i=>{const d=((i-p)%n+n)%n; return Math.min(d,n-d)}; return {slots:k.length,shown:k.filter(e=>e.style.display!=='none').map(e=>cd(+e.dataset.i)), loaded:new Set(k.filter(e=>e.firstChild.getAttribute('src')).map(e=>+e.dataset.i)).size}})()''')
     ok('carousel virtualized: fixed 21 slots, only covers within ±10 of centre (circular) displayed',v['slots']==21 and max(v['shown'])<=10,str(v))
     ok('carousel covers lazy-loaded (only near centre have src)',v['loaded']<=21 and (cfs['n']<=21 or v['loaded']<cfs['n']),str(v))
-    pg.evaluate(CFSWIPE,{'dx':-320,'steps':5,'dt':14,'noup':False}); pg.wait_for_function('!__cr.CF.raf',timeout=5000); fl=pg.evaluate('__cr.CF.pos')
+    p0=pg.evaluate('__cr.CF.pos'); pg.evaluate(CFSWIPE,{'dx':-320,'steps':5,'dt':14,'noup':False}); pg.wait_for_function('!__cr.CF.raf',timeout=5000); fl=abs(pg.evaluate('__cr.CF.pos')-p0)
     ok('one flick travels several covers',fl>=min(5,cfs['n']-1),str(fl))
     v2=pg.evaluate('''(()=>{const k=[...document.querySelectorAll('#cf .cf-item')], n=__cr.CF.items.length, p=Math.round(__cr.CF.pos), cd=i=>{const d=((i-p)%n+n)%n; return Math.min(d,n-d)}; return k.filter(e=>e.style.display!=='none').every(e=>cd(+e.dataset.i)<=10) && !!k[10].firstChild.getAttribute('src') && +k[10].dataset.i===((p%n)+n)%n})()''')
     ok('after flick: window follows centre and its cover is loaded',v2)
@@ -243,7 +244,7 @@ with sync_playwright() as p:
     pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tap center cover opens it',pg.text_content('#rTitle')==want,want); back(pg)
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
-    ok('last-read comic becomes carousel centre (resume point)',pg.evaluate('__cr.CF.items[((Math.round(__cr.CF.pos)%__cr.CF.items.length)+__cr.CF.items.length)%__cr.CF.items.length].title')==want and round(pg.evaluate('__cr.CF.pos'))==0,want)
+    ok('last-read comic becomes carousel centre (resume point)',pg.evaluate('__cr.CF.items[((Math.round(__cr.CF.pos)%__cr.CF.items.length)+__cr.CF.items.length)%__cr.CF.items.length].title')==want,want)
     cb=pg.locator('#cf .cf-item').nth(10).bounding_box(); pg.mouse.click(cb['x']+cb['width']/2,cb['y']+cb['height']/2); pg.wait_for_selector('#reader:not(.hidden)'); wait_render(pg)
     ok('tapping centre cover resumes last comic',pg.text_content('#rTitle')==want); back(pg)
     tab(pg,'library'); pg.wait_for_timeout(200); ok('no now-reading pill in Library',pg.locator('#nowPill').count()==0)

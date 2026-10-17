@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v42 — 2026-10-17
+
+- **Creator credits.** The issue info sheet (long-press) and the reader's More › Issue Info show Writer and Artist (penciller) as tappable names. A name opens a dark, compact creator page: every issue in your library by that creator, grouped by series, oldest first; covers open the issue. Name variants are merged (Jim Lee / James Lee, John Romita Jr. / John Romita, Jr., Erik Larsen / Erik J. Larsen, Louise Simonson / Louise Jones, …). Built-in data (`src/credits-data.js`) covers 778 issues, 202 creators, from the Fandom comics wikis.
+- **Home carousel in release order**, oldest → newest, with the Timeline's dates (yours > built-in/looked-up > file name > estimate); undated issues at the end; still circular (newest wraps to oldest). Opens on the issue you read most recently, otherwise on the oldest.
+- Amazing Spider-Man ASM001–ASM012 (the "400's" folder) confirmed as Vol 2 (1999): dated Jan–Dec 1999 and credited. Undated issues in the library: 89 → 77.
+- New suite `test/e2e_v42.py`.
+
 ## cr-v41 — 2026-10-17
 
 - Timeline: **decade chips fixed.** Every chip now jumps to the first issue of its decade and stays lit. Root causes: (1) the scroll-spy ran on every frame of the smooth jump and called `scrollIntoView` on the chip strip, which in WebKit cancels the in-flight scroll of the grid — the jump stopped and the previous chip re-lit; (2) the jump offset used `offsetTop` (measured from the Timeline view, not the scroller), so it overshot by the bar height; (3) a decade near the end can't scroll to the top, so the spy re-highlighted the previous decade. Now the target is measured with rects, the tapped chip stays lit until you scroll the grid yourself, the strip is scrolled without `scrollIntoView`, the strip pans horizontally only and chips use `touch-action: manipulation`.

@@ -162,12 +162,13 @@ function carryRow(from,to){ const p=rowPrefs(); if(!p.saved&&!p.hidden.length) r
   const idx=order.findIndex(k=>keys.has(k)); const allHidden=[...keys].filter(k=>order.includes(k)).every(k=>p.hidden.includes(k));
   const no=order.filter(k=>!keys.has(k)); if(idx>=0) no.splice(Math.min(idx,no.length),0,tk); else no.push(tk);
   const nh=p.hidden.filter(k=>!keys.has(k)); if(allHidden) nh.push(tk); setRowPrefs(no,nh); }
-// carousel: in-progress (most recently read first), then other read comics, then newest unread; de-duplicated, max CF_MAX
+// carousel (v42): every issue in release order, see heroList
 const CF_MAX=50, CF_WIN=10;
-function heroList(){ const seen=new Set(), out=[], push=L=>{ for(const c of L){ if(out.length>=CF_MAX) return; if(!seen.has(c.id)){ seen.add(c.id); out.push(c); } } };
-  const read=comics.filter(c=>c.lastRead).sort((a,b)=>b.lastRead-a.lastRead);
-  push(read.filter(inProg)); push(read); push(comics.filter(c=>!c.lastRead).sort((a,b)=>b.added-a.added)); push(comics.slice().sort((a,b)=>b.added-a.added));
-  return out; }
+// v42: Home carousel in release order, oldest -> newest (same dates as the Timeline: yours > embedded/looked-up > file name > estimate); undated at the end.
+// Circular, so the newest wraps to the oldest. It opens on the issue you read most recently (in-progress first), else on the oldest.
+function heroList(){ const t=c=>{ const d=dateOf(c); return d?ymOf(d):Infinity; };
+  return comics.slice().sort((a,b)=>{ const x=t(a), y=t(b); return x!==y?(x===Infinity?1:y===Infinity?-1:x-y):(a.series||'').localeCompare(b.series||'')||byIssue(a,b); }); }
+function heroStart(L){ const read=L.filter(c=>c.lastRead).sort((a,b)=>b.lastRead-a.lastRead), c=read.find(inProg)||read[0]; return c?L.indexOf(c):0; }
 const cfItemsHTML=L=>L.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="${c.id}" style="display:none"><img alt="${esc(c.title)}" decoding="async" draggable="false"><div class="dim"></div></div>`).join('');
 // series page carousel: strictly by issue number (ascending), then title
 const seriesHeroList=s=>comics.filter(c=>(c.series||'')===s).sort(byIssue);
@@ -187,7 +188,7 @@ function renderHome(){
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
   el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
-  CF.mount($('#cf'),cf);
+  CF.mount($('#cf'),cf); const st=heroStart(cf); if(st){ CF.pos=st; CF.size(); }
 }
 
 /* ---------- shelf of volumes (v30): one book spine per series/volume (Library grouping incl. Move to Series), on a dark wooden shelf ---------- */
@@ -421,7 +422,7 @@ function modal(html,onOpen,cls){ return new Promise(res=>{ const w=document.crea
   onOpen&&onOpen(w,close); }); }
 async function confirmBox(title,msg,ok='Delete'){ return (await modal(`<div class="mh"><h3>${esc(title)}</h3></div><div class="mb"><p class="confirm-msg">${esc(msg)}</p></div><div class="mf"><button class="btn ghost" data-r="no">Cancel</button><button class="btn red" data-r="yes" id="confirmOk">${esc(ok)}</button></div>`)).r==='yes'; }
 async function actionSheet(id){ const c=comics.find(x=>x.id===id); if(!c) return; document.querySelector('.mwrap')?.remove();
-  const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>
+  const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>${creditsHTML(c)?`<div class="crwrap">${creditsHTML(c)}</div>`:''}
     <button class="act" data-r="read" id="aRead">${IC.book}${c.lastRead&&!isDone(c)?'Continue Reading':'Read'}</button>
     <button class="act" data-r="queue" id="aQueue">${IC.list}Add to Reading List…</button>
     <button class="act" data-r="edit" id="aEdit">${IC.edit}Edit Title &amp; Series</button>

@@ -545,3 +545,21 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .bn-front i{position:absolute;left:50%;top:22px;transform:translateX(-50%);width:28%;height:20px;border-radius:10px;background:#3b2c1b;box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}   /* hand hole */
 .bn-c.lift{z-index:600!important}
 .bn-hint{position:absolute;left:0;right:0;bottom:calc(var(--sab) + 10px);text-align:center;color:#c9b493;font-size:13px;z-index:700;margin:0;pointer-events:none}
+
+/* v42 creator credits */
+.credits{display:flex;flex-direction:column;gap:2px;padding:6px 0 2px}
+.crwrap{padding:0 16px 8px;border-bottom:.5px solid var(--sep)}
+.crrow{display:flex;align-items:center;gap:8px;min-height:40px}
+.crl{flex:none;width:52px;color:var(--mut);font-size:13px}
+.crv{display:flex;flex-wrap:wrap;gap:4px 6px}
+.crn{min-height:40px;min-width:40px;padding:0 12px;border-radius:20px;background:var(--el);color:#fff;font-size:14px;font-weight:600}
+.crn:active{background:var(--el2)}
+#creator{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}#creator.hidden{display:none}
+#creator .rkt h2{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#crBody{flex:1;min-height:0;padding:4px var(--padr) calc(24px + var(--sab)) var(--padx)}
+.crg h3{margin:14px 0 8px;font-size:15px;font-weight:700;display:flex;gap:8px;align-items:baseline}.crg h3 small{color:var(--mut);font-weight:500;font-size:12px}
+.crgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px 8px}
+@media (max-width:560px){.crgrid{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}}
+.crc{display:flex;flex-direction:column;gap:3px;text-align:left;min-width:0}
+.crc .tt{font-size:11.5px;color:#e5e5ea;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crc .td{font-size:10.5px;color:var(--mut)}
+.rinfo{display:flex;gap:12px;align-items:center;margin-bottom:6px}.rinfo img{width:52px;border-radius:4px}.rinfo b{display:block}.rinfo span{color:var(--mut);font-size:13px}
