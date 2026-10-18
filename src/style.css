@@ -563,3 +563,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .crc{display:flex;flex-direction:column;gap:3px;text-align:left;min-width:0}
 .crc .tt{font-size:11.5px;color:#e5e5ea;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crc .td{font-size:10.5px;color:var(--mut)}
 .rinfo{display:flex;gap:12px;align-items:center;margin-bottom:6px}.rinfo img{width:52px;border-radius:4px}.rinfo b{display:block}.rinfo span{color:var(--mut);font-size:13px}
+
+/* v44: Home without category rows: carousel, shelf and Continue Reading fill the screen (no empty band at the bottom on iPad) */
+#homeScroll.norows{display:flex;flex-direction:column;min-height:100%}
+#homeScroll.norows>.rows{flex:1;display:flex;flex-direction:column;justify-content:space-between;padding-bottom:calc(16px + var(--sab))}
+/* shelf stays snug under the carousel (v34 rule); on tall screens the Continue Reading covers grow to use the height instead of leaving a band */
+#homeScroll.norows>.rows>.cont{--rw:clamp(112px,calc((100vh - 820px)*.42 + 112px),230px)}
+.scoph{padding:10px var(--padx) 4px}.scoph h2{margin:0;font-size:22px;font-weight:700}.scoph small{color:var(--mut);font-size:13px}

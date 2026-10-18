@@ -28,7 +28,7 @@ with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     for (w,h,lab,dpr,sat,sab) in [(1024,1366,'ipad-portrait',2,24,20),(1366,1024,'ipad-landscape',2,24,20),(390,844,'iphone-390',3,47,34),(430,932,'iphone-430',3,59,34)]:
         ctx=b.new_context(viewport={'width':w,'height':h},has_touch=True,device_scale_factor=dpr)
-        ctx.add_init_script(f"window.__crNoScan=true; document.addEventListener('DOMContentLoaded',()=>{{document.documentElement.style.setProperty('--sat','{sat}px');document.documentElement.style.setProperty('--sab','{sab}px')}})")
+        ctx.add_init_script(f"window.__crNoScan=true; if(localStorage.getItem('cr.homeRows')==null) localStorage.setItem('cr.homeRows','true'); document.addEventListener('DOMContentLoaded',()=>{{document.documentElement.style.setProperty('--sat','{sat}px');document.documentElement.style.setProperty('--sab','{sab}px')}})")
         pg=ctx.new_page(); pg.on('pageerror',lambda e:errors.append(str(e)))
         pg.goto(URL); pg.wait_for_selector('html[data-ready]'); full=lab=='ipad-portrait'
         importf(pg,DATED+(EXTRA if full else []),len(DATED)+(len(EXTRA) if full else 0))

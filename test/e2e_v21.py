@@ -46,7 +46,7 @@ def sharp(im): g=im.convert('L').filter(ImageFilter.FIND_EDGES); return ImageSta
 with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     ctx=b.new_context(viewport={'width':1024,'height':1366},has_touch=True,device_scale_factor=2)
-    ctx.add_init_script("window.__crNoScan=true; document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.setProperty('--sat','24px');document.documentElement.style.setProperty('--sab','20px')})")   # iPad standalone insets
+    ctx.add_init_script("window.__crNoScan=true; if(localStorage.getItem('cr.homeRows')==null) localStorage.setItem('cr.homeRows','true'); document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.setProperty('--sat','24px');document.documentElement.style.setProperty('--sab','20px')})")   # iPad standalone insets
     pg=ctx.new_page(); pg.on('pageerror',lambda e:None if 'ResizeObserver loop' in str(e) else errors.append('pageerror: '+str(e)))   # the RO-loop notice is benign per spec (notifications are delivered next frame)
     pg.on('console',lambda m: errors.append(f'console.error: {m.text}') if m.type=='error' and 'google' not in m.text else None)
     ctx.route(__import__('re').compile(r'https://([a-z0-9-]+\.)*(google|googleapis|gstatic)\.com/'),lambda r:r.abort())
@@ -272,7 +272,7 @@ with sync_playwright() as p:
     # ======== 6. phones (standalone insets) ========
     for (w,h,lab) in [(390,844,'iphone-390'),(430,932,'iphone-430')]:
         c2=b.new_context(viewport={'width':w,'height':h},has_touch=True,device_scale_factor=3,is_mobile=(ENG=='chromium'))
-        c2.add_init_script("window.__crNoScan=true; document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.setProperty('--sat','47px');document.documentElement.style.setProperty('--sab','34px')})")
+        c2.add_init_script("window.__crNoScan=true; if(localStorage.getItem('cr.homeRows')==null) localStorage.setItem('cr.homeRows','true'); document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.setProperty('--sat','47px');document.documentElement.style.setProperty('--sab','34px')})")
         p2=c2.new_page(); p2.goto(URL); p2.wait_for_selector('html[data-ready]'); p2.set_input_files('#fileIn',[files[0]]); p2.wait_for_function('document.querySelectorAll(".lc").length==1 && !document.querySelector(".toast .tb")',timeout=60000)
         pg_=pg; pg=p2; open_comic(pg,'Panel Lab 01'); pg.evaluate('__cr.jumpTo(2)'); wait_render(pg); pg.evaluate('__cr.toggleUI(false)'); pg.wait_for_timeout(300)
         s=enter(pg,2); ok(f'{lab}: panel view',s['on'] and s['i']==2,json.dumps(s)); fits(s,lab)

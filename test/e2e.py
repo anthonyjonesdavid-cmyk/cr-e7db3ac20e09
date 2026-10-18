@@ -111,7 +111,7 @@ FILES=sorted(f for f in os.listdir(T) if f.endswith('.pdf') and (BIG or f!='Atla
 with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     ctx=b.new_context(viewport={'width':820,'height':1180},has_touch=True,device_scale_factor=2)
-    ctx.add_init_script('window.__crNoScan=true; try{ if(!sessionStorage.__pv){ sessionStorage.__pv=1; localStorage.setItem("cr.panelView","false"); } }catch(e){}')   # double-tap = plain 2.5x zoom here; guided panel view has its own suite (test/e2e_v21.py)   # timing-sensitive gesture tests: no background blank-page scan here (it has its own tests in c3)
+    ctx.add_init_script('window.__crNoScan=true; if(localStorage.getItem("cr.homeRows")==null) localStorage.setItem("cr.homeRows","true"); try{ if(!sessionStorage.__pv){ sessionStorage.__pv=1; localStorage.setItem("cr.panelView","false"); } }catch(e){}')   # double-tap = plain 2.5x zoom here; guided panel view has its own suite (test/e2e_v21.py)   # timing-sensitive gesture tests: no background blank-page scan here (it has its own tests in c3)
     pg=ctx.new_page()
     pg.on('pageerror',lambda e:errors.append('pageerror: '+str(e)))
     # hermetic: Google (GIS / Picker) is blocked here; the live check exercises the real sign-in popup

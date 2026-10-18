@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v44 — 2026-10-18
+
+- Home is now the carousel, the shelf and Continue Reading. The category rows (series and reading lists) are hidden behind **Settings › Show category rows on Home** (off by default; turn it on to bring them back exactly as before, including your arranged order).
+- The shelf now has a spine for every reading list and a **Misc** spine for issues without a series, next to the series spines (Mini-Series included). A reading-list spine opens the list in its order (issues opened from it continue in the list); Misc opens the issues without a series. Library is unchanged.
+- Without the rows, the shelf and Continue Reading spread to fill the screen, so iPad doesn't end in an empty band.
+- Tests that expected the rows now turn the setting on first; new suite `test/e2e_v44.py`.
+
 ## cr-v43 — 2026-10-17
 
 - Home: **Continue Reading** row directly under the spine shelf, above the series rows. In-progress issues (started, not finished), most recently read first, with the thin progress bar and “p. 12 of 24” under each cover; tapping resumes at the saved page. When a series’ most recently read issue is finished, its next unread issue joins the row (“Next · p. 1 of …”). Hidden when empty.

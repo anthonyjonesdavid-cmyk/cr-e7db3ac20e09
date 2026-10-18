@@ -584,6 +584,13 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .crc{display:flex;flex-direction:column;gap:3px;text-align:left;min-width:0}
 .crc .tt{font-size:11.5px;color:#e5e5ea;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crc .td{font-size:10.5px;color:var(--mut)}
 .rinfo{display:flex;gap:12px;align-items:center;margin-bottom:6px}.rinfo img{width:52px;border-radius:4px}.rinfo b{display:block}.rinfo span{color:var(--mut);font-size:13px}
+
+/* v44: Home without category rows: carousel, shelf and Continue Reading fill the screen (no empty band at the bottom on iPad) */
+#homeScroll.norows{display:flex;flex-direction:column;min-height:100%}
+#homeScroll.norows>.rows{flex:1;display:flex;flex-direction:column;justify-content:space-between;padding-bottom:calc(16px + var(--sab))}
+/* shelf stays snug under the carousel (v34 rule); on tall screens the Continue Reading covers grow to use the height instead of leaving a band */
+#homeScroll.norows>.rows>.cont{--rw:clamp(112px,calc((100vh - 820px)*.42 + 112px),230px)}
+.scoph{padding:10px var(--padx) 4px}.scoph h2{margin:0;font-size:22px;font-weight:700}.scoph small{color:var(--mut);font-size:13px}
 </style>
 </head>
 <body>
@@ -648,7 +655,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=43',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=44',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="creator" class="hidden" aria-label="Creator"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="crClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -1050,7 +1057,7 @@ async function migrateCovers(){ const todo=comics.filter(c=>(c.coverV||0)<COVER_
     try{ await recover(c,c.coverMode||'auto'); }catch(e){ console.warn('cover migration failed for',c.title,e); c.coverV=COVER_V; try{ await dbPut(c); }catch(_){} } }
   store.set('coverMig',COVER_V); }
 // app launch / restore from the back-forward cache: back to Home (no series page, no search), at the top
-function launchHome(){ closeRack(); closeTimeline(); ui.series=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
+function launchHome(){ closeRack(); closeTimeline(); ui.series=null; ui.queue=null; ui.q=''; ui.filter='all'; const q=$('#q'); if(q) q.value=''; renderLibrary(); setTab('home'); const h=$('#homeScroll'); if(h) h.scrollTop=0; }
 addEventListener('pageshow',e=>{ if(e.persisted&&!(R&&R.comic)) launchHome(); });
 // v38: Recently Added tab — every comic, newest first, compact grid; re-rendered only when the list changed (keeps scroll position)
 function renderRecent(){ const g=$('#recGrid'); if(!g) return; const L=comics.slice().sort((a,b)=>b.added-a.added), sig=L.map(c=>c.id+'.'+(c.coverV||'')+(c.cover?1:0)).join(',');
@@ -1060,10 +1067,10 @@ function renderShelf(){ renderHome(); renderLibrary(); if(ui.tab==='recent') ren
 function setTab(t){ if(t!==ui.tab&&SEL.on) exitSel(); ui.tab=t; $('#shelf').classList.toggle('libtab',t==='library'); document.querySelectorAll('#tabs button').forEach(b=>{ b.classList.toggle('on',b.dataset.tab===t); b.setAttribute('aria-selected',b.dataset.tab===t); });
   $('#home').classList.toggle('hidden',t!=='home'); $('#library').classList.toggle('hidden',t!=='library'); const wasTL=TL.on; TL.on=t==='timeline'; $('#timeline').classList.toggle('hidden',!TL.on); if(TL.on&&!wasTL){ TL.pin=null; renderTimeline(); } $('#recent').classList.toggle('hidden',t!=='recent'); if(t!=='timeline'&&typeof BIN!=='undefined'&&BIN.on) closeBin(); if(typeof Rain!=='undefined') Rain.sync(false); if(t==='recent') renderRecent(); scopeUI(); if(t==='home') CF.size(); else if(t==='library') SCF.size(); }
 // series page = Library scoped to one series: just carousel + grid, a back chevron replaces the gear
-function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&ui.series!=null); }
-function unscope(){ ui.series=null; renderLibrary(); $('#libScroll').scrollTop=0; }
+function scopeUI(){ $('#shelf').classList.toggle('scoped',ui.tab==='library'&&(ui.series!=null||!!ui.queue)); }
+function unscope(){ ui.series=null; ui.queue=null; renderLibrary(); $('#libScroll').scrollTop=0; }
 $('#libBack').addEventListener('click',unscope);
-$('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.tab==='library'&&ui.series!=null){ ui.series=null; renderLibrary(); } setTab(b.dataset.tab); });
+$('#tabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.tab==='library'&&(ui.series!=null||ui.queue)){ ui.series=null; ui.queue=null; renderLibrary(); } setTab(b.dataset.tab); });
 
 const coverBox=c=>`<div class="cvr"><img src="${cover(c)}" alt="" decoding="async" loading="lazy" draggable="false">${isDone(c)?`<span class="done" aria-label="Finished">${IC.check}</span>`:''}</div>${inProg(c)?`<div class="pl"><i style="width:${Math.max(2,pctOf(c))}%"></i></div>`:'<div class="pl none"></div>'}`;
 const emptyHTML=()=>`<div class="empty">${IC.book}<h2>No comics yet</h2><p>Import PDF comics from Google Drive or the Files app. They're stored on this device only and never uploaded.</p><div class="ebtns"><button class="pillbtn" data-act="drive">From Google Drive</button><button class="pillbtn ghost" data-act="import">From Files</button></div></div>`;
@@ -1156,21 +1163,25 @@ const cfItemsHTML=L=>L.map((c,i)=>`<div class="cf-item" data-i="${i}" data-id="$
 // series page carousel: strictly by issue number (ascending), then title
 const seriesHeroList=s=>comics.filter(c=>(c.series||'')===s).sort(byIssue);
 function renderSeriesHero(){ const sh=$('#seriesHero'); if(!sh) return;
+  const qq=ui.queue&&queues.find(x=>x.id===ui.queue);
+  if(qq||ui.series===''){ const t=qq?qq.name:'Misc', sub=qq?`Reading list · ${queueStat(qq).x} of ${queueStat(qq).y} read`:`${libList().length} issues without a series`; SCF.stop(); SCF.el=null; SCF.items=[]; sh.dataset.sig='h:'+t+sub; sh.innerHTML=`<div class="scoph"><h2>${esc(t)}</h2><small>${esc(sub)}</small></div>`; return; }
   if(!ui.series||!comics.length){ if(sh.dataset.sig){ sh.dataset.sig=''; sh.innerHTML=''; SCF.stop(); SCF.el=null; SCF.items=[]; } return; }
   const L=seriesHeroList(ui.series), sig=ui.series+'|'+L.map(c=>c.id+'.'+(c.coverV||'')).join(',');
   if(sh.dataset.sig===sig) return; sh.dataset.sig=sig; SCF.stop();
   if(!L.length){ sh.innerHTML=''; SCF.el=null; SCF.items=[]; return; }
   sh.innerHTML=`<div class="hero shero"><div class="cf" id="scf" aria-label="${esc(ui.series)}">${cfItemsHTML(L)}</div></div>`; SCF.mount($('#scf'),L); }
+// v44: category rows (series + reading lists) under Continue Reading are behind this Settings toggle, off by default. Turn it on to bring them back.
+const homeRows=()=>!!store.get('homeRows',false);
 function renderHome(){
   const el=$('#homeScroll'); if(!comics.length){ el.innerHTML=emptyHTML(); Drive.preload(); CF.items=[]; CF.el=null; return; }
   const cf=heroList();
   const groups=new Map(); comics.forEach(c=>{ const s=(c.series||'').trim(); if(s){ if(!groups.has(s)) groups.set(s,[]); groups.get(s).push(c); } });
   let rows=''; const hid=new Set(rowPrefs().hidden);
-  rowKeys().filter(k=>!hid.has(k)).forEach(k=>{ if(k==='added') rows+=rowHTML('Recently Added',comics.slice().sort((a,b)=>b.added-a.added),'added');
+  if(homeRows()) rowKeys().filter(k=>!hid.has(k)).forEach(k=>{ if(k==='added') rows+=rowHTML('Recently Added',comics.slice().sort((a,b)=>b.added-a.added),'added');
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${contRowHTML()}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
+  el.classList.toggle('norows',!homeRows()); el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${contRowHTML()}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
   CF.mount($('#cf'),cf); const st=heroStart(cf); if(st){ CF.pos=st; CF.size(); }
 }
 
@@ -1219,13 +1230,19 @@ function titleInk(acc,body){ let k=.85, out=mixHex(hexRGB(acc),[255,255,255],k);
 const spineKey=c=>c.cover?(c.coverV||0)+':'+(c.cover.byteLength||c.cover.size||0):'';
 function spineVars(f){ const done=f.spineV===SPINE_V&&f.spineAcc&&f.spineK===spineKey(f); const body=done?f.spineB:'#0b0b0d', acc=done?f.spineAcc:'#8a8a90';
   return {body,acc,ink:titleInk(acc,body)}; }
-function volShelfHTML(groups){ if(!groups.size) return '';
+function volShelfHTML(groups){ if(!comics.length) return '';
   const vols=[...groups].map(([name,list])=>({name,list:list.slice().sort(byIssue)})).sort((a,b)=>byTitle({title:a.name},{title:b.name}));
   const books=vols.map(({name,list})=>{ const f=list[0], {vol,yr}=volInfo(name,list), hv=hashN(name+'h')%4, V=spineVars(f), sw=spineW(list.length);
     const disp=spineName(name), st=spineStyle(disp+' '+name), F=SPINE_FONTS[st], tfs=Math.round(clamp((sw-12)*.62,16,36));   // v35: title only — fills most of the spine width
     return `<button class="spine" data-act="spine" data-series="${esc(name)}" data-cid="${f.id}" data-font="${st}" style="--sw:${sw}px;--sb:${V.body};--sa:${V.acc};--si:${V.ink};--sh:${hv}px;--tfs:${tfs}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(disp)}${vol?', volume '+vol:''}${yr?', '+yr:''}, ${list.length} issue${list.length===1?'':'s'}">
       <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(disp)}</span><span class="sp-rule sp-rb" aria-hidden="true"></span></button>`; }).join('');
-  return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}</div></section>`; }
+  // v44: every reading list and the issues without a series ("Misc") get a spine too, so all of them are reachable from the shelf
+  const extra=(label,attr,list,key)=>{ const f=list[0], V=spineVars(f), hv=hashN(key+'h')%4, sw=spineW(list.length), st=spineStyle(label+' '+key), F=SPINE_FONTS[st], tfs=Math.round(clamp((sw-12)*.62,16,36));
+    return `<button class="spine sp-x" data-act="spine" ${attr} data-cid="${f.id}" data-font="${st}" style="--sw:${sw}px;--sb:${V.body};--sa:${V.acc};--si:${V.ink};--sh:${hv}px;--tfs:${tfs}px;--ff:'${F.f}';--fs:${F.s};--ls:${F.ls};--sk:${F.sk||0}deg;--fw:${F.w||400};--tt:${F.up?'uppercase':'none'}" aria-label="${esc(label)}, ${list.length} issue${list.length===1?'':'s'}">
+      <span class="sp-rule" aria-hidden="true"></span><span class="sp-t">${esc(label)}</span><span class="sp-rule sp-rb" aria-hidden="true"></span></button>`; };
+  const ql=queues.slice().sort((a,b)=>a.created-b.created).filter(q=>queueComics(q).length).map(q=>extra(q.name,`data-q="${q.id}" data-kind="queue"`,queueComics(q),'q'+q.id)).join('');
+  const misc=comics.filter(c=>!(c.series||'').trim()); const mx=misc.length?extra('Misc','data-series="" data-misc="1"',misc.sort(byTitle),'misc'):'';
+  return `<section class="volshelf" aria-label="Shelf of volumes"><div class="vs-s">${books}${ql}${mx}</div></section>`; }
 // long titles shrink to fit the spine (down to 11px) before ellipsis
 function fitSpines(){ document.querySelectorAll('#homeScroll .spine .sp-t').forEach(t=>{ t.style.fontSize=''; const have=t.getBoundingClientRect().height; t.style.maxInlineSize='none'; const need=t.getBoundingClientRect().height; t.style.maxInlineSize=''; if(need<=have+1) return;
   const fs=parseFloat(getComputedStyle(t).fontSize); t.style.fontSize=Math.max(11,Math.floor(fs*have/need*.97*10)/10)+'px'; }); }
@@ -1248,7 +1265,7 @@ function colorStats(d){ const bins=new Map(), acc=new Map();
 async function spineSample(blob){ const bm=await createImageBitmap(blob), W=48, H=Math.max(24,Math.round(48*bm.height/bm.width));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d',{willReadFrequently:true}); x.drawImage(bm,0,0,W,H); bm.close&&bm.close();
   const st=colorStats(x.getImageData(0,0,W,H).data); freeCanvas(cv); return {...st,acc:st.acc||st.dom}; }
-function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>seeAll('series',el.dataset.series);
+function pullSpine(el){ if(el.classList.contains('out')) return; const go=()=>el.dataset.q?seeAll('queue',null,el.dataset.q):seeAll('series',el.dataset.series);
   if(reduced()){ go(); return; } el.classList.add('out'); setTimeout(()=>{ go(); el.classList.remove('out'); },PULL_MS); }
 const PULL_MS=220;   // v35: book slides up and tips toward the viewer, then the volume opens (never > 250ms)
 
@@ -1324,7 +1341,7 @@ addEventListener('resize',()=>{ clearTimeout(CF.rt); CF.rt=setTimeout(()=>{ CF.s
 /* ---------- Library ---------- */
 const FILTERS=[['all','All'],['unread','Unread'],['progress','In Progress'],['finished','Finished']];
 const SORTS={recent:'Recent',title:'Title',added:'Date Added',series:'Series'};
-function libList(){ const q=ui.q.trim().toLowerCase(); let L=comics.filter(c=>(ui.series==null||(c.series||'')===ui.series)&&(!q||c.title.toLowerCase().includes(q)||(c.series||'').toLowerCase().includes(q)));
+function libList(){ const q=ui.q.trim().toLowerCase(); if(ui.queue) return queueComics(queues.find(x=>x.id===ui.queue)); let L=comics.filter(c=>(ui.series==null||(c.series||'')===ui.series)&&(!q||c.title.toLowerCase().includes(q)||(c.series||'').toLowerCase().includes(q)));
   if(ui.filter==='unread') L=L.filter(isUnread); else if(ui.filter==='progress') L=L.filter(inProg); else if(ui.filter==='finished') L=L.filter(isDone);
   if(ui.sort==='title') L.sort(ui.series!=null?byIssue:byTitle); else if(ui.sort==='added') L.sort((a,b)=>b.added-a.added);
   else if(ui.sort==='series') L.sort((a,b)=>(!a.series)-(!b.series)||(a.series||'').localeCompare(b.series||'',undefined,{numeric:true})||byIssue(a,b));
@@ -1339,7 +1356,7 @@ function renderLibrary(){ scopeUI();
   $('#library .libbar').classList.remove('hidden'); $('#libScroll .empty')?.remove(); grid.style.display='';
   renderSeriesHero(); const L=libList(); const seen=new Set();
   grid.innerHTML=L.length? L.map(c=>{ const l=letterOf(c.title); const first=ui.sort==='title'&&!seen.has(l)&&(seen.add(l),true);
-    return `<button class="lc${SEL.ids.has(c.id)?' on':''}" data-act="open" data-id="${c.id}" data-title="${esc(c.title)}" aria-label="${esc(c.title)}"${first?` data-letter="${l}"`:''}>${coverBox(c)}<span class="ck" aria-hidden="true">${IC.check}</span></button>`; }).join('')
+    return `<button class="lc${SEL.ids.has(c.id)?' on':''}" data-act="open" data-id="${c.id}"${ui.queue?` data-q="${ui.queue}"`:''} data-title="${esc(c.title)}" aria-label="${esc(c.title)}"${first?` data-letter="${l}"`:''}>${coverBox(c)}<span class="ck" aria-hidden="true">${IC.check}</span></button>`; }).join('')
     : `<div class="lempty" style="grid-column:1/-1">No comics here${ui.q?` matching “${esc(ui.q)}”`:''}.</div>`;
   const showAZ=ui.sort==='title'&&ui.series==null&&L.length>0; az.classList.toggle('hidden',!showAZ); grid.style.setProperty('--azw',showAZ?'14px':'0px');
   if(SEL.on) syncSel();
@@ -1347,9 +1364,9 @@ function renderLibrary(){ scopeUI();
 }
 $('#q').addEventListener('input',e=>{ ui.q=e.target.value; renderLibrary(); });
 $('#sortBtn').addEventListener('click',e=>{ e.stopPropagation(); openMenu($('#sortBtn'),Object.entries(SORTS).map(([k,l])=>({label:l,on:ui.sort===k,run:()=>{ ui.sort=k; store.set('sort',k); renderLibrary(); $('#libScroll').scrollTop=0; }}))); });
-function seeAll(kind,series){ ui.series=null; ui.filter='all'; ui.q=''; $('#q').value='';
+function seeAll(kind,series,qid){ ui.series=null; ui.queue=null; ui.filter='all'; ui.q=''; $('#q').value='';
   if(kind==='added'){ setTab('recent'); return; }
-  if(kind==='series'){ ui.series=series; ui.sort='title'; } else if(kind==='unread'){ ui.filter='unread'; ui.sort='title'; } else if(kind==='finished') ui.filter='finished';
+  if(kind==='queue'){ ui.queue=qid; } else if(kind==='series'){ ui.series=series; ui.sort='title'; } else if(kind==='unread'){ ui.filter='unread'; ui.sort='title'; } else if(kind==='finished') ui.filter='finished';
   store.set('sort',ui.sort); renderLibrary(); setTab('library'); $('#libScroll').scrollTop=0; }
 // A–Z jump index (drag along it like iOS)
 (()=>{ const az=$('#azIndex'); let pop=null, on=false;
@@ -1523,6 +1540,7 @@ async function openSettings(){
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sSingle" ${store.get('singleLandscape',false)?'checked':''}><span>Single page in landscape<small>Off shows two-page spreads when the iPad is sideways</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sNight" ${store.get('nightShop',false)?'checked':''}><span>Night at the comic shop<small>Spinner rack in a dim shop under a warm lamp; it turns slowly when you leave it alone</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sRain" ${store.get('rainSound',false)?'checked':''}><span>Rain sound<small>Soft rain while you browse the Timeline</small></span></label>
+    <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sRows" ${homeRows()?'checked':''}><span>Show category rows on Home<small>Series and reading-list rows under Continue Reading. Off: Home is the carousel, the shelf and Continue Reading; every series and list is on the shelf and in Library.</small></span></label>
     <label class="tgl" style="margin-top:8px"><input type="checkbox" id="sAwake" ${store.get('keepAwake',false)?'checked':''}><span>Keep screen awake while reading<small id="sAwakeNote">${Wake.supported()?'Only while a comic is open; the screen sleeps normally everywhere else':'Not supported in this browser. Needs iOS 16.4 or later (Safari or the Home Screen app)'}</small></span></label>
     <div class="sgrp"><b>Google Drive folder</b><span id="sFolderCur">${esc(Drive.folder().name||'Folder')} · <code>${esc(Drive.folder().id)}</code>${store.get('driveFolder',null)?'':' (default)'}</span>
       <div class="frow"><input id="sFolder" type="url" placeholder="Paste a Drive folder link" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn ghost" id="sFolderSave">Save</button></div>
@@ -1534,7 +1552,7 @@ async function openSettings(){
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
-  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sNight').addEventListener('change',e=>setNight(e.target.checked)); w.querySelector('#sRain').addEventListener('change',e=>setRain(e.target.checked)); w.querySelector('#sAwake').addEventListener('change',e=>{ store.set('keepAwake',e.target.checked); Wake.sync(); }); w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked)); w.querySelector('#sPanels').addEventListener('change',e=>store.set('panelView',e.target.checked)); w.querySelector('#sSkipBlack').addEventListener('change',e=>{ store.set('skipBlack',e.target.checked); if(R.comic) dispatchEvent(new CustomEvent('cr-black',{detail:R.comic.id})); });
+  </div><div class="mf"><button class="btn" data-r="done">Done</button></div>`,w=>{ w.querySelector('#sNight').addEventListener('change',e=>setNight(e.target.checked)); w.querySelector('#sRows').addEventListener('change',e=>{ store.set('homeRows',e.target.checked); renderShelf(); }); w.querySelector('#sRain').addEventListener('change',e=>setRain(e.target.checked)); w.querySelector('#sAwake').addEventListener('change',e=>{ store.set('keepAwake',e.target.checked); Wake.sync(); }); w.querySelector('#sSingle').addEventListener('change',e=>store.set('singleLandscape',e.target.checked)); w.querySelector('#sPanels').addEventListener('change',e=>store.set('panelView',e.target.checked)); w.querySelector('#sSkipBlack').addEventListener('change',e=>{ store.set('skipBlack',e.target.checked); if(R.comic) dispatchEvent(new CustomEvent('cr-black',{detail:R.comic.id})); });
     const cur=()=>{ const f=Drive.folder(); w.querySelector('#sFolderCur').innerHTML=`${esc(f.name||'Folder')} · <code>${esc(f.id)}</code>${store.get('driveFolder',null)?'':' (default)'}`; };
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
@@ -2663,7 +2681,7 @@ document.addEventListener('click',e=>{ const b=e.target.closest('.crn[data-creat
 function readerInfo(){ const c=R.comic; if(!c) return; const d=dateOf(c);
   modal(`<div class="mh"><h3>Issue Info</h3></div><div class="mb"><div class="rinfo"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${d?esc(fmtDate(d)):'Unknown date'}</span></div></div>${creditsHTML(c)||'<p class="fhint">No creator credits for this issue.</p>'}</div><div class="mf"><button class="btn" data-r="done" id="riDone">Done</button></div>`,null,'rinfom'); }
 /* ================= boot ================= */
-window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},qs:{create:newQueue,seeAll},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);
