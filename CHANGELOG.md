@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v43 — 2026-10-17
+
+- Home: **Continue Reading** row directly under the spine shelf, above the series rows. In-progress issues (started, not finished), most recently read first, with the thin progress bar and “p. 12 of 24” under each cover; tapping resumes at the saved page. When a series’ most recently read issue is finished, its next unread issue joins the row (“Next · p. 1 of …”). Hidden when empty.
+- Long-press an issue in the row › **Remove from Continue Reading**: hides it without touching its progress; it comes back if you read it again.
+- Reuses the existing row/cover/progress components and the long-press sheet. The v1 single “Continue reading” card was removed in v7 and no code of it remained, so nothing is duplicated.
+- New suite `test/e2e_v43.py`.
+
 ## cr-v42 — 2026-10-17
 
 - **Creator credits.** The issue info sheet (long-press) and the reader's More › Issue Info show Writer and Artist (penciller) as tappable names. A name opens a dark, compact creator page: every issue in your library by that creator, grouped by series, oldest first; covers open the issue. Name variants are merged (Jim Lee / James Lee, John Romita Jr. / John Romita, Jr., Erik Larsen / Erik J. Larsen, Louise Simonson / Louise Jones, …). Built-in data (`src/credits-data.js`) covers 778 issues, 202 creators, from the Fandom comics wikis.

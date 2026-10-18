@@ -126,9 +126,9 @@ with sync_playwright() as p:
     t0=time.time(); pg.set_input_files('#fileIn',[f'{T}/{f}' for f in FILES])
     pg.wait_for_function(f'document.querySelectorAll(".lc").length=={len(FILES)} && !document.querySelector(".toast .tb")',timeout=(400000 if BIG else 90000))
     ok(f'import {len(FILES)} PDFs',True,f'{time.time()-t0:.1f}s'); pg.wait_for_timeout(600)
-    heads=pg.eval_on_selector_all('.row-h h2','els=>els.map(e=>e.textContent)')
+    heads=pg.eval_on_selector_all('.row:not(.cont) .row-h h2','els=>els.map(e=>e.textContent)')
     ok('home rows: series rows only (Recently Added is a tab; no This-week row)',heads and 'Recently Added' not in heads and all(s in heads for s in ['Nightfall','Iron Tide','Starlight Ronin','The Hollow','Twin Moon']),json.dumps(heads))
-    ok('see-all tile ends each row',pg.locator('.row').first.locator('.seeall').count()==1)
+    ok('see-all tile ends each row',pg.locator('.row:not(.cont)').first.locator('.seeall').count()==1)
     ok('row cards show title under cover',pg.locator('.rc .t').first.inner_text()!='')
     # edit via long-press/context sheet
     sheet(pg,'Glass Harbor','aEdit'); pg.fill('#eTitle','Glass Harbor (One-Shot)'); pg.click('#eSave'); pg.wait_for_timeout(200)
@@ -206,8 +206,8 @@ with sync_playwright() as p:
     sharp=pg.evaluate("(()=>{const C=__cr.CF; const chk=()=>[...document.querySelectorAll('#cf .cf-item')].filter(e=>e.style.display!=='none').every(e=>{const f=getComputedStyle(e.firstChild).filter, g=getComputedStyle(e).filter; return (f==='none'||!f)&&(g==='none'||!g)}); const rest=chk(); C.moving(true); C.pos=1.4; C.layout(); const mv=chk(); C.moving(false); C.pos=0; C.layout(); const dim=+document.querySelector('#cf .cf-item[data-i=\"1\"] .dim').style.opacity; return {rest,mv,dim}})()")
     ok('carousel covers sharp (no blur) at rest and while moving, light dim on sides',sharp['rest'] and sharp['mv'] and 0.15<=sharp['dim']<=0.45,str(sharp))
     edge_ok(pg,'portrait')
-    hr=pg.evaluate("(()=>{const h=[...document.querySelectorAll('#homeScroll .row-h')]; return {t:h.map(e=>e.querySelector('h2').textContent),k:h.map(e=>e.dataset.kind)}})()")
-    ok('Home rows = one per series only (no Recently Added / Unread / Finished / This-week)',all(k=='series' for k in hr['k']) and len(hr['k'])>2 and 'Recently Added' not in hr['t'] and 'Unread' not in hr['t'] and 'Finished' not in hr['t'],str(hr['t']))
+    hr=pg.evaluate("(()=>{const h=[...document.querySelectorAll('#homeScroll .row:not(.cont) .row-h')]; return {t:h.map(e=>e.querySelector('h2').textContent),k:h.map(e=>e.dataset.kind)}})()")
+    ok('Home rows = one per series only (+ v43 Continue Reading; no Recently Added / Unread / Finished / This-week)',all(k=='series' for k in hr['k']) and len(hr['k'])>2 and 'Recently Added' not in hr['t'] and 'Unread' not in hr['t'] and 'Finished' not in hr['t'],str(hr['t']))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=520"); pg.wait_for_timeout(300); shot(pg,'11-home-rows-portrait')
     sx=pg.evaluate("(()=>{const r=[...document.querySelectorAll('.row-s')].sort((a,b)=>(b.scrollWidth-b.clientWidth)-(a.scrollWidth-a.clientWidth))[0]; r.scrollLeft=300; return r.scrollLeft})()"); ok('rows scroll horizontally (free scroll)',sx>0,str(sx))
     pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(300)
@@ -280,7 +280,7 @@ with sync_playwright() as p:
     ok('back chevron returns to the full Library (search/sort/filters back, gear back)',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q') and pg.is_visible('#sortBtn') and pg.locator('#chips [data-act=filter]').count()==4 and pg.is_visible('#settingsBtn') and not pg.is_visible('#libBack') and pg.locator('#scf').count()==0)
     tab(pg,'home'); pg.locator('.row-h',has_text='The Hollow').click(); pg.wait_for_timeout(300); tab(pg,'library'); pg.wait_for_timeout(200)
     ok('Library tab from a series page shows the full Library',pg.locator('.lc').count()==len(FILES) and pg.is_visible('#q'))
-    tab(pg,'home'); s0=pg.locator('.row').first.locator('h2').text_content(); pg.locator('.row').first.locator('.seeall').click(); pg.wait_for_timeout(300); ok('See all opens that series in the Library',pg.is_visible('#libGrid') and pg.locator('#libGrid .lc').count()==len([1 for f in FILES if os.path.basename(f).replace('_',' ').startswith(s0)]) or pg.locator('#libGrid .lc').count()>0,s0); pg.click('#libBack') if pg.is_visible('#libBack') else None; pg.wait_for_timeout(200)
+    tab(pg,'home'); s0=pg.locator('.row:not(.cont)').first.locator('h2').text_content(); pg.locator('.row:not(.cont)').first.locator('.seeall').click(); pg.wait_for_timeout(300); ok('See all opens that series in the Library',pg.is_visible('#libGrid') and pg.locator('#libGrid .lc').count()==len([1 for f in FILES if os.path.basename(f).replace('_',' ').startswith(s0)]) or pg.locator('#libGrid .lc').count()>0,s0); pg.click('#libBack') if pg.is_visible('#libBack') else None; pg.wait_for_timeout(200)
 
     # ---- landscape ----
     pg.set_viewport_size({'width':1180,'height':820}); pg.wait_for_timeout(400)
@@ -634,7 +634,7 @@ with sync_playwright() as p:
     ok('series rows have a … button',pg.locator('.row-more[data-series="Ember Road"]').count()==1 and pg.locator('.row-more').count()==len(pg.evaluate('__cr.series.counts()')) and pg.locator('.row-more[data-kind=added]').count()==0)
     pg.locator('.row-more[data-series="Ember Road"]').scroll_into_view_if_needed(); pg.click('.row-more[data-series="Ember Road"]'); pg.wait_for_selector('#smRename'); shot(pg,'50-series-menu'); pg.click('#smRename')
     pg.wait_for_selector('#srName'); shot(pg,'51-rename-series'); pg.fill('#srName','Ember Trail'); pg.click('#srSave'); pg.wait_for_timeout(400)
-    heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
+    heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row:not(.cont) .row-h h2')].map(e=>e.textContent)")
     ok('rename series from Home row …',('Ember Trail' in heads) and ('Ember Road' not in heads) and dict(pg.evaluate('__cr.series.counts()')).get('Ember Trail')==3,str(heads))
     pg.locator('.row-h[data-series="Ember Trail"]').dispatch_event('contextmenu'); pg.wait_for_timeout(200)
     ok('long-press / context menu on series heading opens series menu',pg.locator('#smRename').count()==1); pg.click('#smRename'); pg.wait_for_selector('#srName'); shot(pg,'52-series-rename')
@@ -667,10 +667,10 @@ with sync_playwright() as p:
     pg.fill('#mgName','Hollow Moon'); shot(pg,'53-merge-series'); pg.click('#mgGo'); pg.wait_for_timeout(500)
     cnt=dict(pg.evaluate('__cr.series.counts()'))
     ok('merge sheet merges selected series into new name',cnt.get('Hollow Moon')==5 and 'The Hollow' not in cnt and 'Twin Moon' not in cnt,str(cnt))
-    tab(pg,'home'); heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)")
+    tab(pg,'home'); heads=pg.evaluate("[...document.querySelectorAll('#homeScroll .row:not(.cont) .row-h h2')].map(e=>e.textContent)")
     ok('Home rows updated after merge',heads.count('Hollow Moon')==1 and 'Twin Moon' not in heads and 'The Hollow' not in heads,str(heads))
     # ---- Arrange Categories: order, touch drag, arrows, hide, persist, rename/merge carry, new series append, reset ----
-    HEADS="[...document.querySelectorAll('#homeScroll .row-h h2')].map(e=>e.textContent)"
+    HEADS="[...document.querySelectorAll('#homeScroll .row:not(.cont) .row-h h2')].map(e=>e.textContent)"
     AKEYS="[...document.querySelectorAll('#arrList li')].map(e=>e.dataset.k)"
     tab(pg,'home'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(200)
     pg.click('.row-more[data-series="Nightfall"]'); pg.wait_for_selector('#smArrange'); pg.click('#smArrange'); pg.wait_for_selector('#arrList li'); pg.wait_for_timeout(250)

@@ -45,6 +45,7 @@ python3 test/e2e_v39.py webkit               # v39: Keep screen awake while read
 python3 test/e2e_v40.py webkit               # v40: back-issue bin + night at the comic shop (auto-rotate) + rain sound, 4 sizes
 python3 test/e2e_v41.py webkit               # v41: decade chips (touch taps, every chip, empty decade) + built-in release list, 4 sizes
 python3 test/e2e_v42.py webkit               # v42: creator credits + creator page, Home carousel in release order, 4 sizes
+python3 test/e2e_v43.py webkit               # v43: Continue Reading row on Home, 4 sizes
 python3 test/e2e_v29.py webkit               # two-page spreads: landscape full screen, portrait fit + in-view Rotate, pinch, turns, panels; 4 sizes (fixtures: test/gen_spreads.py)
 python3 test/e2e_v30.py webkit               # shelf of volumes on Home + v31 spine fonts/full names/contrast sweep + v35 book spines (rounded, cylindrical shading, accent bands, no count/vol line, glow titles ≥7:1, shrink-to-fit, 50–90px, 4–6px gaps, 220ms tip-out) (grouping, colours + contrast, IDB cache, tap/slide, reduced motion), 4 sizes
 python3 test/e2e_v32.py webkit               # page sharpness: canvas backing >= CSS x DPR after turns/rotation, iOS caps (iPad UA), 4 sizes

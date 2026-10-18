@@ -105,6 +105,21 @@ function rowHTML(title,list,kind,series){ if(!list.length) return ''; const see=
   const more=`<button class="row-more" data-act="smenu" data-kind="${kind}"${series!=null?` data-series="${esc(series)}"`:''} aria-label="Options for ${esc(title)}">${IC.more}</button>`;
   return `<section class="row"><div class="row-top"><button class="row-h" ${see}><h2>${esc(title)}</h2><span class="n">${list.length}</span>${IC.chev}</button>${more}</div>
   <div class="row-s">${list.slice(0,20).map(c=>`<button class="rc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}">${coverBox(c)}<div class="t">${esc(c.title)}</div></button>`).join('')}<button class="seeall" ${see}>${IC.grid}See all</button></div></section>`; }
+/* ---------- Continue Reading row (v43; replaces the v1 single "Continue reading" card, removed in v7): directly under the spine shelf ----------
+   in-progress issues, most recently read first; when a series' latest-read issue is finished, its next unread issue joins too.
+   Remove from Continue Reading only hides it (progress untouched) until you read it again. */
+const contHid=()=>store.get('contHide',{})||{};
+function contList(){ const H=contHid(), hidden=c=>H[c.id]!=null&&(c.lastRead||0)<=H[c.id], out=[], seen=new Set();
+  const cand=[]; comics.filter(inProg).forEach(c=>cand.push({c,t:c.lastRead||0}));
+  const by=new Map(); comics.forEach(c=>{ const s=(c.series||'').trim(); if(s){ if(!by.has(s)) by.set(s,[]); by.get(s).push(c); } });
+  for(const L of by.values()){ const cur=L.filter(c=>c.lastRead).sort((a,b)=>b.lastRead-a.lastRead)[0]; if(!cur||!isDone(cur)) continue;
+    const ord=L.slice().sort(byIssue), nx=ord.slice(ord.indexOf(cur)+1).find(isUnread); if(nx) cand.push({c:nx,t:cur.lastRead,next:true}); }
+  cand.sort((a,b)=>b.t-a.t).forEach(x=>{ if(!seen.has(x.c.id)&&!hidden(x.c)){ seen.add(x.c.id); out.push(x); } }); return out; }
+const pageOf=c=>{ const sk=skipList(c), n=Math.max(1,(c.pages||1)-sk.length), p=(c.page||0)+1-sk.filter(q=>q<(c.page||0)).length; return [Math.min(Math.max(1,p),n),n]; };
+function contRowHTML(){ const L=contList(); if(!L.length) return '';
+  return `<section class="row cont" id="contRow"><div class="row-top"><div class="row-h"><h2>Continue Reading</h2><span class="n">${L.length}</span></div></div>
+  <div class="row-s">${L.map(({c,next})=>{ const [p,n]=pageOf(c); return `<button class="rc" data-act="open" data-id="${c.id}" data-cont="1" aria-label="${next?'Next: ':'Continue '}${esc(c.title)}, page ${p} of ${n}">${coverBox(c)}<div class="t">${esc(c.title)}</div><div class="s">${next?'Next · ':''}p. ${p} of ${n}</div></button>`; }).join('')}</div></section>`; }
+async function contHide(id){ const c=comics.find(x=>x.id===id); if(!c) return; const H=contHid(); H[id]=c.lastRead||0; store.set('contHide',H); renderShelf(); toast('Removed from Continue Reading'); }
 /* ---------- reading lists (queues): named reading orders mixing any series; a comic opened from one continues in its order ---------- */
 let queues=[];
 const queueComics=q=>q?q.items.map(id=>comics.find(c=>c.id===id)).filter(Boolean):[];
@@ -187,7 +202,7 @@ function renderHome(){
     else if(k.startsWith('q:')){ const q=queues.find(x=>'q:'+x.id===k); if(q) rows+=queueRowHTML(q); }
     else { const s=k.slice(2); if(groups.has(s)) rows+=rowHTML(s,groups.get(s).sort(byIssue),'series',s); } });
   // Home rows: Recently Added + one per series only (Unread/Finished live as Library filter chips)
-  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
+  el.innerHTML=`<div class="hero"><div class="cf" id="cf" aria-label="Recently read">${cfItemsHTML(cf)}</div></div><div class="rows">${volShelfHTML(groups)}${contRowHTML()}${rows}</div>`; sampleSpines(); fitSpines(); document.fonts&&document.fonts.ready.then(fitSpines);
   CF.mount($('#cf'),cf); const st=heroStart(cf); if(st){ CF.pos=st; CF.size(); }
 }
 
@@ -387,7 +402,7 @@ let lp=null, lpFired=false;
 function cancelLP(){ if(lp){ clearTimeout(lp.t); lp=null; } }
 const shelfEl=$('#shelf');
 const lpTarget=e=>e.target.closest('[data-id]')||e.target.closest('#homeScroll .row-h');
-const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id) : t.dataset.kind==='queue'? queueMenu(t,t.dataset.q) : seriesMenu(t,t.dataset.kind==='series'?t.dataset.series:'');
+const lpRun=t=>t.dataset.id? actionSheet(t.dataset.id,{cont:!!t.dataset.cont}) : t.dataset.kind==='queue'? queueMenu(t,t.dataset.q) : seriesMenu(t,t.dataset.kind==='series'?t.dataset.series:'');
 shelfEl.addEventListener('pointerdown',e=>{ lpFired=false; if(SEL.on) return; const t=lpTarget(e); if(!t||e.button>0) return; cancelLP();
   lp={x:e.clientX,y:e.clientY,t:setTimeout(()=>{ lp=null; lpFired=true; try{navigator.vibrate&&navigator.vibrate(8)}catch(_){} lpRun(t); },520)}; });
 shelfEl.addEventListener('pointermove',e=>{ if(lp&&Math.hypot(e.clientX-lp.x,e.clientY-lp.y)>9) cancelLP(); });
@@ -421,16 +436,17 @@ function modal(html,onOpen,cls){ return new Promise(res=>{ const w=document.crea
   w.addEventListener('click',e=>{ if(e.target===w) close(null); const b=e.target.closest('[data-r]'); if(b) close(b.dataset.r); });
   onOpen&&onOpen(w,close); }); }
 async function confirmBox(title,msg,ok='Delete'){ return (await modal(`<div class="mh"><h3>${esc(title)}</h3></div><div class="mb"><p class="confirm-msg">${esc(msg)}</p></div><div class="mf"><button class="btn ghost" data-r="no">Cancel</button><button class="btn red" data-r="yes" id="confirmOk">${esc(ok)}</button></div>`)).r==='yes'; }
-async function actionSheet(id){ const c=comics.find(x=>x.id===id); if(!c) return; document.querySelector('.mwrap')?.remove();
+async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) return; document.querySelector('.mwrap')?.remove();
   const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>${creditsHTML(c)?`<div class="crwrap">${creditsHTML(c)}</div>`:''}
     <button class="act" data-r="read" id="aRead">${IC.book}${c.lastRead&&!isDone(c)?'Continue Reading':'Read'}</button>
     <button class="act" data-r="queue" id="aQueue">${IC.list}Add to Reading List…</button>
     <button class="act" data-r="edit" id="aEdit">${IC.edit}Edit Title &amp; Series</button>
     <button class="act" data-r="date" id="aDate">${IC.cal}Release Date<small class="actv">${esc(fmtDate(dateOf(c)))}</small></button>
     <button class="act" data-r="toggle" id="aToggle">${isDone(c)?IC.undo+'Mark as Unread':IC.done+'Mark as Finished'}</button>
+    ${o.cont?`<button class="act" data-r="conthide" id="aContHide">${IC.undo}Remove from Continue Reading</button>`:''}
     <button class="act red" data-r="delete" id="aDelete">${IC.trash}Delete from Device</button></div>
     <button class="cancel" data-r="cancel">Cancel</button>`,null,'sheet');
-  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id);
+  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id); else if(r==='conthide') contHide(id);
   else if(r==='toggle'){ if(isDone(c)){ c.progress=0; c.page=0; c.lastRead=0; } else { c.progress=1; } await dbPut(c); renderShelf(); } }
 async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   const series=[...new Set(comics.map(x=>x.series).filter(Boolean))].sort();
