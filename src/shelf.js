@@ -317,7 +317,7 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
     // v46 Home: the whole cover must fit between the header and the spine shelf (flush on it), with Continue Reading below when the rows are off
     if(this.el.id==='cf'){ const hs=$('#homeScroll'), sh=hs&&hs.querySelector('.volshelf'), cr=hs&&hs.classList.contains('norows')&&hs.querySelector('#contRow');
       if(hs&&hs.clientHeight){ const px=(e,k)=>parseFloat(getComputedStyle(e)[k])||0, crH=cr?cr.offsetHeight+px(cr,'marginTop')+px(cr,'marginBottom')+px(cr.parentElement,'paddingBottom'):0;
-        const avail=hs.clientHeight-(sh?sh.offsetHeight:0)-crH-10-10-2;
+        const avail=hs.clientHeight-(sh?sh.offsetHeight:0)-crH-6-10-2;
         const fitW=Math.floor(avail/1.5); if(fitW<this.cw){ this.cw=Math.max(110,fitW); this.sp=this.cw*.8;
           { const cw=this.cw, T=7, P=1100, z=cw*.55+(T-1)*cw*.2, need=(vw/2)*(P+z)/P; this.gap=clamp((need-cw*.8)/(T-1),cw*.12,cw*.5);
             this.win=CF_WIN; for(let k=2;k<=CF_WIN;k++){ const f=P/(P+cw*.55+(k-1)*cw*.2); if((cw*.8+(k-1)*this.gap-cw*.32)*f>vw/2){ this.win=k; break; } } } } } }
@@ -331,8 +331,9 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
       it.style.display=''; it.dataset.i=''+idx; it.dataset.id=c.id;
       if(im.dataset.cid!==c.id){ im.dataset.cid=c.id; im.alt=c.title||''; const u=cover(c); if(u) im.src=u; else im.removeAttribute('src'); }
       const sg=Math.sign(o)||0, a=Math.min(ao,1), x=sg*(a*cw*.8+Math.max(0,ao-1)*gap);
-      const z=-a*cw*.55-Math.max(0,ao-1)*cw*.2, rot=-clamp(o,-1,1)*52, sc=1-a*.1;
-      it.style.transform=`translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
+      // v47 Home: same tilt and depth, but #cf items pivot on their bottom edge and the perspective origin sits on that baseline, so every cover's bottom corners project onto the shelf line
+      { const z=-a*cw*.55-Math.max(0,ao-1)*cw*.2, rot=-clamp(o,-1,1)*52, sc=1-a*.1;
+      it.style.transform=`translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`; }
       it.style.zIndex=1000-Math.round(ao*100); it.lastChild.style.opacity=Math.min(.55,a*.3+Math.max(0,ao-1)*.04).toFixed(3);
       it.classList.toggle('lite',ao>2.5); }
     this.info(); },
