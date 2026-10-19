@@ -1,6 +1,6 @@
 // Comic Shelf service worker: app shell + vendored pdf.js cached for offline use.
 // Comics themselves live in IndexedDB and are never fetched over the network.
-const VERSION = 'cr-v45';
+const VERSION = 'cr-v46';
 const CORE = ['./', './index.html', './manifest.webmanifest', './vendor/pdf.min.mjs', './vendor/pdf.worker.min.mjs',
   './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg', './icons/favicon-32.png', './icons/favicon-16.png', './icons/icon-maskable-512.png',
   './fonts/Bangers.woff2', './fonts/Bungee.woff2', './fonts/LuckiestGuy.woff2', './fonts/BlackOpsOne.woff2', './fonts/Creepster.woff2', './fonts/CinzelDecorative.woff2', './fonts/Orbitron.woff2', './fonts/PermanentMarker.woff2'];

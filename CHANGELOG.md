@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v46 — 2026-10-20
+
+- **Whole covers on the Home carousel.** The covers were being cut off at the top (under the header) and at the bottom (at the shelf) on iPad. They now always show in full, fitted to their real shape with nothing cropped, and still sit right on the spine shelf, clear of the header. The carousel size is worked out from the space available, so this holds on iPad landscape (including the 11-inch 1180×820), iPad portrait and iPhone.
+- Continue Reading is more compact in landscape (smaller covers with the title, page and progress bar), so the carousel, shelf and Continue Reading all fit on the screen without scrolling.
+- New suite `test/e2e_v46.py` (checks every carousel cover's full image is visible and not clipped, at 5 sizes).
+
 ## cr-v45 — 2026-10-19
 
 - **Also on sale this month**, at the bottom of the end-of-issue page (both the “Next” card and the End page): a compact row of the other comics in your library with the same cover month and year as the issue you just finished, using the Timeline dates (set by you, looked up, built-in list, metadata, file name). A year-only date shows “Also on sale around 1987” with that year’s issues. Hidden when the issue has no usable date or nothing else is from that month. Covers open the issue; when more than fit, a “+N more” tile opens the full grid page (back returns to the reader).
