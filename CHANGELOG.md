@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v48 — 2026-10-20
+
+- **Bigger Home carousel covers.** The carousel now grows into any spare height (portrait iPads had an empty band of about 80px under the shelf), so the shelf moves down and sits a normal section gap above Continue Reading. Covers stay whole, clear of the header, tilted, and level on the shelf; Home still fits without scrolling.
+- New suite `test/e2e_v48.py` (also 834x1194 and 768x1024).
+
 ## cr-v47 — 2026-10-20
 
 - **Home carousel covers now stand on the shelf in a line.** The side covers are turned and pushed back around their middle, and the 3D view was centred above the shelf, so the further a cover was pushed back the higher its bottom corners floated. The covers now pivot on their bottom edge and the 3D view is centred on the shelf line, so every cover's bottom-left (and bottom-right) corner sits level on the top of the shelf. The tilt, depth and overlap look the same, and covers stay whole.
