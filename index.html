@@ -591,6 +591,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* shelf stays snug under the carousel (v34 rule); on tall screens the Continue Reading covers grow to use the height instead of leaving a band */
 #homeScroll.norows>.rows>.cont{--rw:clamp(112px,calc((100vh - 820px)*.42 + 112px),230px)}
 .scoph{padding:10px var(--padx) 4px}.scoph h2{margin:0;font-size:22px;font-weight:700}.scoph small{color:var(--mut);font-size:13px}
+
+/* v45 also on sale (grid page) */
+.salenote{color:var(--mut);font-size:13px;margin:10px 0 0;line-height:1.35}
+.salegrid{margin-top:12px}
 </style>
 </head>
 <body>
@@ -655,7 +659,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=44',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=45',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="creator" class="hidden" aria-label="Creator"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="crClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -2067,7 +2071,7 @@ function buildViews(){ const v=[], vh=[]; setSeq(); const S=R.seq;
       else { v.push([i]); vh.push(null); } } }
   else for(const i of S) v.push([i]);
   // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
-  const E=R.n, real=S.map(i=>R.aspects[i]); R.next=nextIssue(R.comic); R.endBtn=null;
+  const E=R.n, real=S.map(i=>R.aspects[i]); R.next=nextIssue(R.comic); R.endBtn=null; R.saleHits=null;
   R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
   v.push([E]); if(R.half) vh.push(null);   // end card is its own page: no blank slot beside or after it
   R.views=v; R.vh=R.half?vh:[]; }
@@ -2163,7 +2167,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.views=[]; if(d) d.destroy().catch(()=>{});
+function closeReader(){ if(typeof PAGE_RET==='function'){ const f=PAGE_RET; PAGE_RET=null; setTimeout(f,0); } saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
   readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
@@ -2453,8 +2457,25 @@ async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.
     const px=cr.x*big.width, py=cr.y*big.height, pw=cr.w*big.width, ph=cr.h*big.height, out=document.createElement('canvas'); out.width=Math.round(pw); out.height=Math.round(ph);
     out.getContext('2d',{alpha:false}).drawImage(big,px,py,pw,ph,0,0,out.width,out.height); freeCanvas(big); nextImgs.set(key,out); return out; } finally { doc.destroy().catch(()=>{}); } }
 const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
-async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
-  const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
+// v45: "Also on sale this month" strip at the bottom of the card: up to as many covers as fit, "+N more" opens the full grid page. Hit areas in R.saleHits.
+const loadImg=u=>new Promise(r=>{ if(!u) return r(null); const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src=u; });
+async function drawSale(x,W,H,k,F){ R.saleHits=[]; const c=R.comic, s=c&&onSale(c); if(!s||s.near||!s.L.length) return 0;
+  const pad=Math.round(16*k), th=Math.round(Math.min(Math.max(H*.15,84*k),150*k)), tw=Math.round(th/1.5), gap=Math.round(10*k), headH=Math.round(30*k), sH=headH+th+pad+Math.round(8*k)+Math.round((parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab'))||0)*k);
+  const fit=Math.max(1,Math.floor((W-pad*2+gap)/(tw+gap))), more=s.L.length>fit, show=s.L.slice(0,more?fit-1:fit), n=show.length+(more?1:0), rowW=n*tw+(n-1)*gap, x0=pad, y0=H-pad-Math.round((parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab'))||0)*k)-th, hy=y0-Math.round(12*k);
+  x.strokeStyle='rgba(255,255,255,.10)'; x.lineWidth=k; x.beginPath(); x.moveTo(pad,y0-headH-Math.round(6*k)); x.lineTo(W-pad,y0-headH-Math.round(6*k)); x.stroke();
+  x.textAlign='left'; x.textBaseline='alphabetic'; x.font=`600 ${Math.round(15*k)}px ${F}`; x.fillStyle='#ececec';
+  const head=s.k.mode==='year'?`Also on sale around ${s.k.y}`:'Also on sale this month', sub=`${s.k.mode==='year'?'':s.k.label+' · '}${s.L.length}`;
+  x.font=`500 ${Math.round(13*k)}px ${F}`; const sw=x.measureText(sub).width; x.textAlign='right'; x.fillStyle='#8e8e93'; x.fillText(sub,W-pad,hy); x.textAlign='left'; x.font=`600 ${Math.round(15*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,head,W-pad*2-sw-Math.round(12*k)),pad,hy); x.textAlign='center';
+  const imgs=await Promise.all(show.map(o=>loadImg(cover(o.c))));
+  show.forEach((o,i)=>{ const cx=x0+i*(tw+gap), im=imgs[i]; x.fillStyle='#1a1a1a'; x.fillRect(cx,y0,tw,th);
+    if(im){ const a=im.width/im.height, A=tw/th; let sw=im.width, sh=im.height, sx=0, sy=0; if(a>A){ sw=im.height*A; sx=(im.width-sw)/2; } else { sh=im.width/A; sy=(im.height-sh)/2; } x.drawImage(im,sx,sy,sw,sh,cx,y0,tw,th); }
+    R.saleHits.push({id:o.c.id,x:cx/W,y:y0/H,w:tw/W,h:th/H}); });
+  if(more){ const cx=x0+show.length*(tw+gap); x.fillStyle='#1c1c1e'; x.fillRect(cx,y0,tw,th); x.font=`600 ${Math.round(17*k)}px ${F}`; x.fillStyle='#e5e5ea'; x.textBaseline='middle'; x.fillText(`+${s.L.length-show.length}`,cx+tw/2,y0+th/2-Math.round(8*k)); x.font=`500 ${Math.round(12*k)}px ${F}`; x.fillStyle='#8e8e93'; x.fillText('more',cx+tw/2,y0+th/2+Math.round(12*k)); x.textBaseline='alphabetic';
+    R.saleHits.push({more:true,x:cx/W,y:y0/H,w:tw/W,h:th/H}); }
+  return sH; }
+async function drawEndCard(w,h){ const W=Math.round(w*DPR), H0=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H0;
+  const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H0); /* facing page in 2-up; seamless black when the card fills the screen */ const F=UIF(), n=R.next;
+  const H=H0-await drawSale(x,W,H0,k,F); x.textAlign='center'; x.textBaseline='alphabetic';
   if(n){ const pad=Math.round(Math.max(16,h*.03)*k), gap=Math.round(18*k);
     const no=issueNo(n.title), qn=activeQueue(), label=qn?n.title:`${n.series}${no!==Infinity?' #'+no:''}`;
     const capH=Math.round(108*k), mw=Math.round(W*.62), mh=Math.min(Math.round(H*.62), H-capH-gap-pad*2);
@@ -2474,10 +2495,17 @@ async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR),
     x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; { const qe=activeQueue(); x.fillText(fitText(x,qe?`Last comic in “${qe.name}”`:R.comic.series?`No later issue of ${R.comic.series} in your library`:`${R.n} pages`,W*.9),W/2,cy+Math.round(26*k)); }
     const bw=Math.round(168*k), bh=Math.round(40*k), bx=(W-bw)/2, by=cy+Math.round(56*k); x.strokeStyle='rgba(255,255,255,.28)'; x.lineWidth=k; x.beginPath(); x.roundRect(bx+.5*k,by+.5*k,bw-k,bh-k,bh/2); x.stroke();
     x.font=`500 ${Math.round(15*k)}px ${F}`; x.fillStyle='#e6e6e6'; x.textBaseline='middle'; x.fillText('Back to Library',W/2,by+bh/2);
-    R.endBtn={x:bx/W,y:by/H,w:bw/W,h:bh/H}; }
+    R.endBtn={x:bx/W,y:by/H0,w:bw/W,h:bh/H0}; }
   return c; }
 function fitText(x,t,max){ if(x.measureText(t).width<=max) return t; while(t.length>1&&x.measureText(t+'\u2026').width>max) t=t.slice(0,-1); return t+'\u2026'; }
-function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`); if(!d) return false; const cv=d.querySelector('canvas'); if(!cv) return false;
+function saleTap(pt){ if(!R.saleHits||!R.saleHits.length||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`), cv=d&&d.querySelector('canvas'); if(!cv) return false;
+  const r=cv.getBoundingClientRect(), sr=stage.getBoundingClientRect(), px=pt.x+sr.left-r.left, py=pt.y+sr.top-r.top;
+  const hit=R.saleHits.find(b=>px>=b.x*r.width-4&&px<=(b.x+b.w)*r.width+4&&py>=b.y*r.height-4&&py<=(b.y+b.h)*r.height+4); if(!hit) return false;
+  if(hit.more){ openSale(R.comic.id); return true; } openOther(hit.id); return true; }
+// open another issue from the end card (at its saved page)
+function openOther(id){ const n=comics.find(c=>c.id===id); if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
+  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,queue:null}); }
+function endTap(pt){ if(saleTap(pt)) return true; if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`); if(!d) return false; const cv=d.querySelector('canvas'); if(!cv) return false;
   const r=cv.getBoundingClientRect(), sr=stage.getBoundingClientRect(), b=R.endBtn, px=pt.x+sr.left-r.left, py=pt.y+sr.top-r.top;
   if(px>=b.x*r.width-8&&px<=(b.x+b.w)*r.width+8&&py>=b.y*r.height-8&&py<=(b.y+b.h)*r.height+8){ $('#rBack').click(); return true; } return false; }
 function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
@@ -2668,20 +2696,41 @@ const CRP={on:false,name:''};
 function openCreator(name){ name=crNorm(name); const mw=document.querySelector('.mwrap'); if(mw){ const x=mw.querySelector('[data-r=cancel],[data-r=done]'); if(x) x.click(); else mw.remove(); } const G=creatorIssues(name), n=G.reduce((s,g)=>s+g.items.length,0);
   const roles=[...new Set(G.flatMap(g=>g.items.flatMap(x=>x.roles)))].join(' · ');
   const yrs=G.flatMap(g=>g.items.filter(x=>x.d).map(x=>x.d.y)), span=yrs.length?(Math.min(...yrs)===Math.max(...yrs)?String(yrs[0]):`${Math.min(...yrs)}–${Math.max(...yrs)}`):'';
-  const el=$('#creator'); $('#crName').textContent=name; $('#crSub').textContent=[roles,`${n} issue${n===1?'':'s'}`,span].filter(Boolean).join(' · ');
+  const el=$('#creator'); el.setAttribute('aria-label','Creator'); CRP.sale=null; $('#crName').textContent=name; $('#crSub').textContent=[roles,`${n} issue${n===1?'':'s'}`,span].filter(Boolean).join(' · ');
   $('#crBody').innerHTML=G.map(g=>`<section class="crg"><h3>${esc(g.series)}<small>${g.items.length}</small></h3><div class="crgrid">${g.items.map(x=>`<button class="crc" data-id="${x.c.id}" aria-label="${esc(x.c.title)}${x.d?', '+esc(fmtDate(x.d)):''}">${coverBox(x.c)}<span class="tt">${esc(x.c.title)}</span><span class="td">${x.d?esc(fmtDate(x.d)):'Unknown date'}${x.roles.length===1&&roles.includes('·')?' · '+x.roles[0]:''}</span></button>`).join('')}</div></section>`).join('')||'<p class="qempty">No issues by this creator in your library.</p>';
   $('#crBody').scrollTop=0; el.classList.remove('hidden'); CRP.on=true; CRP.name=name; }
-function closeCreator(){ $('#creator').classList.add('hidden'); CRP.on=false; }
-$('#crClose').addEventListener('click',closeCreator);
-$('#crBody').addEventListener('click',e=>{ const b=e.target.closest('.crc'); if(!b) return; closeCreator(); openReader(b.dataset.id); });
+function closeCreator(){ $('#creator').classList.add('hidden'); CRP.on=false; CRP.sale=null; }
+$('#crClose').addEventListener('click',()=>{ if(performance.now()-(CRP.t0||0)>=450) closeCreator(); });
+$('#crBody').addEventListener('click',e=>{ const b=e.target.closest('.crc'); if(!b) return; if(performance.now()-(CRP.t0||0)<450) return; /* the tap that opened the page (from the reader canvas) must not land on a cover */ const sale=CRP.sale, name=CRP.name; closeCreator(); PAGE_RET=sale?()=>openSale(sale):name?()=>openCreator(name):null; openReader(b.dataset.id); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&CRP.on&&!document.querySelector('.mwrap')) closeCreator(); });
 // any tappable name anywhere (info sheet, reader info) opens the creator page
 document.addEventListener('click',e=>{ const b=e.target.closest('.crn[data-creator]'); if(!b) return; e.preventDefault(); e.stopPropagation(); openCreator(b.dataset.creator); },true);
 // reader: Issue Info (More menu)
 function readerInfo(){ const c=R.comic; if(!c) return; const d=dateOf(c);
   modal(`<div class="mh"><h3>Issue Info</h3></div><div class="mb"><div class="rinfo"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${d?esc(fmtDate(d)):'Unknown date'}</span></div></div>${creditsHTML(c)||'<p class="fhint">No creator credits for this issue.</p>'}</div><div class="mf"><button class="btn" data-r="done" id="riDone">Done</button></div>`,null,'rinfom'); }
+/* ================= v45: "Also on sale this month" — bottom of the end-of-issue / up-next page: other comics in your library with the same cover month (Timeline dates) =================
+   Exact month: dates set by you, looked up, built-in list, metadata or file name. An ≈ estimate is labelled "around <Mon Year>";
+   a year-only date matches the whole year ("around 1987"). No usable date or no other issue: no section. "+N more" opens the full grid page (#creator). */
+function saleKey(c){ const d=dateOf(c); if(!d||!d.y) return null; const est=d.src==='lookup';
+  if(!d.m) return {mode:'year',y:d.y,label:`around ${d.y}`,est:true};
+  return {mode:'month',y:d.y,m:d.m,ym:ymOf(d),label:`${est?'around ':''}${MONTHS[d.m-1].slice(0,3)} ${d.y}`,est}; }
+function onSale(c){ const k=saleKey(c); if(!k) return null; const others=comics.filter(x=>x.id!==c.id).map(x=>({c:x,d:dateOf(x)})).filter(x=>x.d&&x.d.y);
+  const hit=k.mode==='year'? x=>x.d.y===k.y : x=>x.d.y===k.y&&x.d.m===k.m;
+  let L=others.filter(hit), near=null;
+  if(!L.length&&others.length){
+    if(k.mode==='year'){ const ys=[...new Set(others.map(x=>x.d.y))].sort((a,b)=>Math.abs(a-k.y)-Math.abs(b-k.y)||a-b); near={y:ys[0],label:String(ys[0])}; L=others.filter(x=>x.d.y===near.y); }
+    else { const md=others.filter(x=>x.d.m); if(md.length){ const ym=md.map(x=>ymOf(x.d)).sort((a,b)=>Math.abs(a-k.ym)-Math.abs(b-k.ym)||a-b)[0]; near={ym,label:ymLabel(ym)}; L=md.filter(x=>ymOf(x.d)===ym); } } }
+  L.sort((a,b)=>(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)); return {k,L,near,exact:near?0:L.length}; }
+var PAGE_RET=null;   // reopen this page when you come back from an issue opened on it
+function openSale(id){ const c=comics.find(x=>x.id===id); if(!c) return; const s=onSale(c); if(!s) return;
+  const mw=document.querySelector('.mwrap'); if(mw){ const x=mw.querySelector('[data-r=cancel],[data-r=done]'); if(x) x.click(); else mw.remove(); }
+  $('#creator').setAttribute('aria-label','Also on sale'); $('#crName').textContent=`Also on sale · ${s.k.label}`;
+  $('#crSub').textContent=`${s.exact} other issue${s.exact===1?'':'s'} in your library${s.k.est?' · dates are approximate':''}`;
+  const note=s.near?`<p class="salenote" id="saleNote">Nothing else in your library from ${esc(s.k.label.replace(/^around /,''))}. Showing ${esc(s.near.label)}, the nearest ${s.k.mode==='year'?'year':'month'} with comics.</p>`:'';
+  $('#crBody').innerHTML=note+(s.L.length?`<div class="crgrid salegrid">${s.L.map(x=>`<button class="crc" data-id="${x.c.id}" data-ret="sale:${c.id}" aria-label="${esc(x.c.title)}, ${esc(fmtDate(x.d))}">${coverBox(x.c)}<span class="tt">${esc(x.c.title)}</span><span class="td">${esc(fmtDate(x.d))}</span></button>`).join('')}</div>`:'<p class="qempty">No other dated comics in your library yet.</p>');
+  $('#crBody').scrollTop=0; $('#creator').classList.remove('hidden'); CRP.on=true; CRP.name=''; CRP.sale=id; CRP.t0=performance.now(); }
 /* ================= boot ================= */
-window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},qs:{create:newQueue,seeAll},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
+window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},qs:{create:newQueue,seeAll},sale:{of:onSale,key:saleKey,open:openSale},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   const m=location.hash.match(/^#\/read\/(.+)$/);

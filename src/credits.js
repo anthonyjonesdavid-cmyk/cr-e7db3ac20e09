@@ -20,12 +20,12 @@ const CRP={on:false,name:''};
 function openCreator(name){ name=crNorm(name); const mw=document.querySelector('.mwrap'); if(mw){ const x=mw.querySelector('[data-r=cancel],[data-r=done]'); if(x) x.click(); else mw.remove(); } const G=creatorIssues(name), n=G.reduce((s,g)=>s+g.items.length,0);
   const roles=[...new Set(G.flatMap(g=>g.items.flatMap(x=>x.roles)))].join(' · ');
   const yrs=G.flatMap(g=>g.items.filter(x=>x.d).map(x=>x.d.y)), span=yrs.length?(Math.min(...yrs)===Math.max(...yrs)?String(yrs[0]):`${Math.min(...yrs)}–${Math.max(...yrs)}`):'';
-  const el=$('#creator'); $('#crName').textContent=name; $('#crSub').textContent=[roles,`${n} issue${n===1?'':'s'}`,span].filter(Boolean).join(' · ');
+  const el=$('#creator'); el.setAttribute('aria-label','Creator'); CRP.sale=null; $('#crName').textContent=name; $('#crSub').textContent=[roles,`${n} issue${n===1?'':'s'}`,span].filter(Boolean).join(' · ');
   $('#crBody').innerHTML=G.map(g=>`<section class="crg"><h3>${esc(g.series)}<small>${g.items.length}</small></h3><div class="crgrid">${g.items.map(x=>`<button class="crc" data-id="${x.c.id}" aria-label="${esc(x.c.title)}${x.d?', '+esc(fmtDate(x.d)):''}">${coverBox(x.c)}<span class="tt">${esc(x.c.title)}</span><span class="td">${x.d?esc(fmtDate(x.d)):'Unknown date'}${x.roles.length===1&&roles.includes('·')?' · '+x.roles[0]:''}</span></button>`).join('')}</div></section>`).join('')||'<p class="qempty">No issues by this creator in your library.</p>';
   $('#crBody').scrollTop=0; el.classList.remove('hidden'); CRP.on=true; CRP.name=name; }
-function closeCreator(){ $('#creator').classList.add('hidden'); CRP.on=false; }
-$('#crClose').addEventListener('click',closeCreator);
-$('#crBody').addEventListener('click',e=>{ const b=e.target.closest('.crc'); if(!b) return; closeCreator(); openReader(b.dataset.id); });
+function closeCreator(){ $('#creator').classList.add('hidden'); CRP.on=false; CRP.sale=null; }
+$('#crClose').addEventListener('click',()=>{ if(performance.now()-(CRP.t0||0)>=450) closeCreator(); });
+$('#crBody').addEventListener('click',e=>{ const b=e.target.closest('.crc'); if(!b) return; if(performance.now()-(CRP.t0||0)<450) return; /* the tap that opened the page (from the reader canvas) must not land on a cover */ const sale=CRP.sale, name=CRP.name; closeCreator(); PAGE_RET=sale?()=>openSale(sale):name?()=>openCreator(name):null; openReader(b.dataset.id); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&CRP.on&&!document.querySelector('.mwrap')) closeCreator(); });
 // any tappable name anywhere (info sheet, reader info) opens the creator page
 document.addEventListener('click',e=>{ const b=e.target.closest('.crn[data-creator]'); if(!b) return; e.preventDefault(); e.stopPropagation(); openCreator(b.dataset.creator); },true);

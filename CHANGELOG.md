@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v45 — 2026-10-19
+
+- **Also on sale this month**, at the bottom of the end-of-issue page (both the “Next” card and the End page): a compact row of the other comics in your library with the same cover month and year as the issue you just finished, using the Timeline dates (set by you, looked up, built-in list, metadata, file name). A year-only date shows “Also on sale around 1987” with that year’s issues. Hidden when the issue has no usable date or nothing else is from that month. Covers open the issue; when more than fit, a “+N more” tile opens the full grid page (back returns to the reader).
+- Coming back from an issue opened on a creator page now returns to that page.
+- New suite `test/e2e_v45.py`.
+
 ## cr-v44 — 2026-10-18
 
 - Home is now the carousel, the shelf and Continue Reading. The category rows (series and reading lists) are hidden behind **Settings › Show category rows on Home** (off by default; turn it on to bring them back exactly as before, including your arranged order).

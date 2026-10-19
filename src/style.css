@@ -570,3 +570,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* shelf stays snug under the carousel (v34 rule); on tall screens the Continue Reading covers grow to use the height instead of leaving a band */
 #homeScroll.norows>.rows>.cont{--rw:clamp(112px,calc((100vh - 820px)*.42 + 112px),230px)}
 .scoph{padding:10px var(--padx) 4px}.scoph h2{margin:0;font-size:22px;font-weight:700}.scoph small{color:var(--mut);font-size:13px}
+
+/* v45 also on sale (grid page) */
+.salenote{color:var(--mut);font-size:13px;margin:10px 0 0;line-height:1.35}
+.salegrid{margin-top:12px}

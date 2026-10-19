@@ -69,7 +69,7 @@ function buildViews(){ const v=[], vh=[]; setSeq(); const S=R.seq;
       else { v.push([i]); vh.push(null); } } }
   else for(const i of S) v.push([i]);
   // end of comic: one more "page" (index R.n) = next issue card, or an End page. Spreads: on the right of the last page, or after the last spread
-  const E=R.n, real=S.map(i=>R.aspects[i]); R.next=nextIssue(R.comic); R.endBtn=null;
+  const E=R.n, real=S.map(i=>R.aspects[i]); R.next=nextIssue(R.comic); R.endBtn=null; R.saleHits=null;
   R.aspects[E]=(R.fold&&!R.half)?Math.max(...real,1.3):R.half?Math.min(...real.map(a=>a>WIDE?a/2:a)):(R.comic.pageAspect||Math.min(...real)||0.66);
   v.push([E]); if(R.half) vh.push(null);   // end card is its own page: no blank slot beside or after it
   R.views=v; R.vh=R.half?vh:[]; }
@@ -165,7 +165,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   clearTimeout(R.uiT); R.uiT=setTimeout(()=>{ if(R.comic===c&&!scrubbing) readerEl.classList.remove('ui'); },1800);   // chrome slides away so the art fills the screen
 }
 
-function closeReader(){ saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.views=[]; if(d) d.destroy().catch(()=>{});
+function closeReader(){ if(typeof PAGE_RET==='function'){ const f=PAGE_RET; PAGE_RET=null; setTimeout(f,0); } saveNow(); cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } R.gen++; dropJobs(()=>true); const d=R.doc; R.doc=null; R.comic=null; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.views=[]; if(d) d.destroy().catch(()=>{});
   freeHi(); cacheClear(); R.thumbs.forEach(u=>URL.revokeObjectURL(u)); R.thumbs.clear(); zoomer.replaceChildren(); R.viewEl=null; $('#pages').classList.add('hidden');
   readerEl.classList.add('hidden'); $('#shelf').classList.remove('hidden'); renderShelf(); kickBlack(3000); }
 $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); else { try{history.replaceState(null,'',location.pathname+location.search)}catch(e){} closeReader(); } };
@@ -455,8 +455,25 @@ async function nextCover(n,mw,mh){ const key=`${n.id}|${mw}|${mh}`; if(nextImgs.
     const px=cr.x*big.width, py=cr.y*big.height, pw=cr.w*big.width, ph=cr.h*big.height, out=document.createElement('canvas'); out.width=Math.round(pw); out.height=Math.round(ph);
     out.getContext('2d',{alpha:false}).drawImage(big,px,py,pw,ph,0,0,out.width,out.height); freeCanvas(big); nextImgs.set(key,out); return out; } finally { doc.destroy().catch(()=>{}); } }
 const UIF=()=>getComputedStyle(document.body).fontFamily||'-apple-system,system-ui,sans-serif';
-async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H;
-  const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H); /* facing page in 2-up; seamless black when the card fills the screen */ x.textAlign='center'; x.textBaseline='alphabetic'; const F=UIF(), n=R.next;
+// v45: "Also on sale this month" strip at the bottom of the card: up to as many covers as fit, "+N more" opens the full grid page. Hit areas in R.saleHits.
+const loadImg=u=>new Promise(r=>{ if(!u) return r(null); const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src=u; });
+async function drawSale(x,W,H,k,F){ R.saleHits=[]; const c=R.comic, s=c&&onSale(c); if(!s||s.near||!s.L.length) return 0;
+  const pad=Math.round(16*k), th=Math.round(Math.min(Math.max(H*.15,84*k),150*k)), tw=Math.round(th/1.5), gap=Math.round(10*k), headH=Math.round(30*k), sH=headH+th+pad+Math.round(8*k)+Math.round((parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab'))||0)*k);
+  const fit=Math.max(1,Math.floor((W-pad*2+gap)/(tw+gap))), more=s.L.length>fit, show=s.L.slice(0,more?fit-1:fit), n=show.length+(more?1:0), rowW=n*tw+(n-1)*gap, x0=pad, y0=H-pad-Math.round((parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab'))||0)*k)-th, hy=y0-Math.round(12*k);
+  x.strokeStyle='rgba(255,255,255,.10)'; x.lineWidth=k; x.beginPath(); x.moveTo(pad,y0-headH-Math.round(6*k)); x.lineTo(W-pad,y0-headH-Math.round(6*k)); x.stroke();
+  x.textAlign='left'; x.textBaseline='alphabetic'; x.font=`600 ${Math.round(15*k)}px ${F}`; x.fillStyle='#ececec';
+  const head=s.k.mode==='year'?`Also on sale around ${s.k.y}`:'Also on sale this month', sub=`${s.k.mode==='year'?'':s.k.label+' · '}${s.L.length}`;
+  x.font=`500 ${Math.round(13*k)}px ${F}`; const sw=x.measureText(sub).width; x.textAlign='right'; x.fillStyle='#8e8e93'; x.fillText(sub,W-pad,hy); x.textAlign='left'; x.font=`600 ${Math.round(15*k)}px ${F}`; x.fillStyle='#ececec'; x.fillText(fitText(x,head,W-pad*2-sw-Math.round(12*k)),pad,hy); x.textAlign='center';
+  const imgs=await Promise.all(show.map(o=>loadImg(cover(o.c))));
+  show.forEach((o,i)=>{ const cx=x0+i*(tw+gap), im=imgs[i]; x.fillStyle='#1a1a1a'; x.fillRect(cx,y0,tw,th);
+    if(im){ const a=im.width/im.height, A=tw/th; let sw=im.width, sh=im.height, sx=0, sy=0; if(a>A){ sw=im.height*A; sx=(im.width-sw)/2; } else { sh=im.width/A; sy=(im.height-sh)/2; } x.drawImage(im,sx,sy,sw,sh,cx,y0,tw,th); }
+    R.saleHits.push({id:o.c.id,x:cx/W,y:y0/H,w:tw/W,h:th/H}); });
+  if(more){ const cx=x0+show.length*(tw+gap); x.fillStyle='#1c1c1e'; x.fillRect(cx,y0,tw,th); x.font=`600 ${Math.round(17*k)}px ${F}`; x.fillStyle='#e5e5ea'; x.textBaseline='middle'; x.fillText(`+${s.L.length-show.length}`,cx+tw/2,y0+th/2-Math.round(8*k)); x.font=`500 ${Math.round(12*k)}px ${F}`; x.fillStyle='#8e8e93'; x.fillText('more',cx+tw/2,y0+th/2+Math.round(12*k)); x.textBaseline='alphabetic';
+    R.saleHits.push({more:true,x:cx/W,y:y0/H,w:tw/W,h:th/H}); }
+  return sH; }
+async function drawEndCard(w,h){ const W=Math.round(w*DPR), H0=Math.round(h*DPR), k=DPR, c=document.createElement('canvas'); c.width=W; c.height=H0;
+  const x=c.getContext('2d',{alpha:false}); x.fillStyle=R.spread?'#0b0b0b':'#000'; x.fillRect(0,0,W,H0); /* facing page in 2-up; seamless black when the card fills the screen */ const F=UIF(), n=R.next;
+  const H=H0-await drawSale(x,W,H0,k,F); x.textAlign='center'; x.textBaseline='alphabetic';
   if(n){ const pad=Math.round(Math.max(16,h*.03)*k), gap=Math.round(18*k);
     const no=issueNo(n.title), qn=activeQueue(), label=qn?n.title:`${n.series}${no!==Infinity?' #'+no:''}`;
     const capH=Math.round(108*k), mw=Math.round(W*.62), mh=Math.min(Math.round(H*.62), H-capH-gap-pad*2);
@@ -476,10 +493,17 @@ async function drawEndCard(w,h){ const W=Math.round(w*DPR), H=Math.round(h*DPR),
     x.font=`400 ${Math.round(13*k)}px ${F}`; x.fillStyle='#6f6f6f'; { const qe=activeQueue(); x.fillText(fitText(x,qe?`Last comic in “${qe.name}”`:R.comic.series?`No later issue of ${R.comic.series} in your library`:`${R.n} pages`,W*.9),W/2,cy+Math.round(26*k)); }
     const bw=Math.round(168*k), bh=Math.round(40*k), bx=(W-bw)/2, by=cy+Math.round(56*k); x.strokeStyle='rgba(255,255,255,.28)'; x.lineWidth=k; x.beginPath(); x.roundRect(bx+.5*k,by+.5*k,bw-k,bh-k,bh/2); x.stroke();
     x.font=`500 ${Math.round(15*k)}px ${F}`; x.fillStyle='#e6e6e6'; x.textBaseline='middle'; x.fillText('Back to Library',W/2,by+bh/2);
-    R.endBtn={x:bx/W,y:by/H,w:bw/W,h:bh/H}; }
+    R.endBtn={x:bx/W,y:by/H0,w:bw/W,h:bh/H0}; }
   return c; }
 function fitText(x,t,max){ if(x.measureText(t).width<=max) return t; while(t.length>1&&x.measureText(t+'\u2026').width>max) t=t.slice(0,-1); return t+'\u2026'; }
-function endTap(pt){ if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`); if(!d) return false; const cv=d.querySelector('canvas'); if(!cv) return false;
+function saleTap(pt){ if(!R.saleHits||!R.saleHits.length||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`), cv=d&&d.querySelector('canvas'); if(!cv) return false;
+  const r=cv.getBoundingClientRect(), sr=stage.getBoundingClientRect(), px=pt.x+sr.left-r.left, py=pt.y+sr.top-r.top;
+  const hit=R.saleHits.find(b=>px>=b.x*r.width-4&&px<=(b.x+b.w)*r.width+4&&py>=b.y*r.height-4&&py<=(b.y+b.h)*r.height+4); if(!hit) return false;
+  if(hit.more){ openSale(R.comic.id); return true; } openOther(hit.id); return true; }
+// open another issue from the end card (at its saved page)
+function openOther(id){ const n=comics.find(c=>c.id===id); if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
+  try{ history.replaceState({r:n.id},'','#/read/'+n.id); }catch(e){} openReader(n.id,{push:false,queue:null}); }
+function endTap(pt){ if(saleTap(pt)) return true; if(R.next||!R.endBtn||!R.viewEl) return false; const d=R.viewEl.querySelector(`.pg[data-p="${R.n}"]`); if(!d) return false; const cv=d.querySelector('canvas'); if(!cv) return false;
   const r=cv.getBoundingClientRect(), sr=stage.getBoundingClientRect(), b=R.endBtn, px=pt.x+sr.left-r.left, py=pt.y+sr.top-r.top;
   if(px>=b.x*r.width-8&&px<=(b.x+b.w)*r.width+8&&py>=b.y*r.height-8&&py<=(b.y+b.h)*r.height+8){ $('#rBack').click(); return true; } return false; }
 function openNext(){ const n=R.next; if(!n) return; saveNow(); cancelFlipNow(); dropJobs(()=>true); const d=R.doc; R.doc=null; if(d) d.destroy().catch(()=>{}); freeHi(); cacheClear();
