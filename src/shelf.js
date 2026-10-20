@@ -5,6 +5,7 @@ let comics=[]; const coverURL=new Map();
 try{ localStorage.removeItem('cr.tab'); }catch(e){}
 const ui={tab:'home', sort:store.get('sort','recent'), filter:'all', series:null, q:''};
 const IC={
+  pin:'<svg class="i" viewBox="0 0 24 24"><path d="M9 3h6l-1 6 4 4H6l4-4zM12 13v8"/></svg>',
   chev:'<svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
   check:'<svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   play:'<svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>',
@@ -109,16 +110,20 @@ function rowHTML(title,list,kind,series){ if(!list.length) return ''; const see=
    in-progress issues, most recently read first; when a series' latest-read issue is finished, its next unread issue joins too.
    Remove from Continue Reading only hides it (progress untouched) until you read it again. */
 const contHid=()=>store.get('contHide',{})||{};
+// v49 pins: store 'contPin' = ids in pin order; pinned issues lead the row (even when finished) until unpinned
+const contPins=()=>(store.get('contPin',[])||[]).filter(id=>comics.some(c=>c.id===id)), isPinned=id=>(store.get('contPin',[])||[]).includes(id);
+function contPin(id,on){ let P=(store.get('contPin',[])||[]).filter(x=>x!==id); if(on) P.push(id); store.set('contPin',P); renderShelf(); toast(on?'Pinned to Continue Reading':'Unpinned'); }
 function contList(){ const H=contHid(), hidden=c=>H[c.id]!=null&&(c.lastRead||0)<=H[c.id], out=[], seen=new Set();
   const cand=[]; comics.filter(inProg).forEach(c=>cand.push({c,t:c.lastRead||0}));
   const by=new Map(); comics.forEach(c=>{ const s=(c.series||'').trim(); if(s){ if(!by.has(s)) by.set(s,[]); by.get(s).push(c); } });
   for(const L of by.values()){ const cur=L.filter(c=>c.lastRead).sort((a,b)=>b.lastRead-a.lastRead)[0]; if(!cur||!isDone(cur)) continue;
     const ord=L.slice().sort(byIssue), nx=ord.slice(ord.indexOf(cur)+1).find(isUnread); if(nx) cand.push({c:nx,t:cur.lastRead,next:true}); }
+  contPins().forEach(id=>{ const c=comics.find(x=>x.id===id); seen.add(id); out.push({c,pin:true}); });
   cand.sort((a,b)=>b.t-a.t).forEach(x=>{ if(!seen.has(x.c.id)&&!hidden(x.c)){ seen.add(x.c.id); out.push(x); } }); return out; }
 const pageOf=c=>{ const sk=skipList(c), n=Math.max(1,(c.pages||1)-sk.length), p=(c.page||0)+1-sk.filter(q=>q<(c.page||0)).length; return [Math.min(Math.max(1,p),n),n]; };
 function contRowHTML(){ const L=contList(); if(!L.length) return '';
   return `<section class="row cont" id="contRow"><div class="row-top"><div class="row-h"><h2>Continue Reading</h2><span class="n">${L.length}</span></div></div>
-  <div class="row-s">${L.map(({c,next})=>{ const [p,n]=pageOf(c); return `<button class="rc" data-act="open" data-id="${c.id}" data-cont="1" aria-label="${next?'Next: ':'Continue '}${esc(c.title)}, page ${p} of ${n}">${coverBox(c)}<div class="t">${esc(c.title)}</div><div class="s">${next?'Next · ':''}p. ${p} of ${n}</div></button>`; }).join('')}</div></section>`; }
+  <div class="row-s">${L.map(({c,next,pin})=>{ const [p,n]=pageOf(c); return `<button class="rc${pin?' pinned':''}" data-act="open" data-id="${c.id}" data-cont="1" aria-label="${pin?'Pinned: ':''}${next?'Next: ':'Continue '}${esc(c.title)}, page ${p} of ${n}"><span class="cvw">${coverBox(c)}${pin?'<span class="pinb" aria-hidden="true">'+IC.pin+'</span>':''}</span><div class="t">${esc(c.title)}</div><div class="s">${next?'Next · ':''}p. ${p} of ${n}</div></button>`; }).join('')}</div></section>`; }
 async function contHide(id){ const c=comics.find(x=>x.id===id); if(!c) return; const H=contHid(); H[id]=c.lastRead||0; store.set('contHide',H); renderShelf(); toast('Removed from Continue Reading'); }
 /* ---------- reading lists (queues): named reading orders mixing any series; a comic opened from one continues in its order ---------- */
 let queues=[];
@@ -461,10 +466,11 @@ async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) r
     <button class="act" data-r="edit" id="aEdit">${IC.edit}Edit Title &amp; Series</button>
     <button class="act" data-r="date" id="aDate">${IC.cal}Release Date<small class="actv">${esc(fmtDate(dateOf(c)))}</small></button>
     <button class="act" data-r="toggle" id="aToggle">${isDone(c)?IC.undo+'Mark as Unread':IC.done+'Mark as Finished'}</button>
-    ${o.cont?`<button class="act" data-r="conthide" id="aContHide">${IC.undo}Remove from Continue Reading</button>`:''}
+    <button class="act" data-r="pin" id="aPin">${IC.pin}${isPinned(c.id)?'Unpin from Continue Reading':'Pin to Continue Reading'}</button>
+    ${o.cont&&!isPinned(c.id)?`<button class="act" data-r="conthide" id="aContHide">${IC.undo}Remove from Continue Reading</button>`:''}
     <button class="act red" data-r="delete" id="aDelete">${IC.trash}Delete from Device</button></div>
     <button class="cancel" data-r="cancel">Cancel</button>`,null,'sheet');
-  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id); else if(r==='conthide') contHide(id);
+  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id); else if(r==='conthide') contHide(id); else if(r==='pin') contPin(id,!isPinned(id));
   else if(r==='toggle'){ if(isDone(c)){ c.progress=0; c.page=0; c.lastRead=0; } else { c.progress=1; } await dbPut(c); renderShelf(); } }
 async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   const series=[...new Set(comics.map(x=>x.series).filter(Boolean))].sort();

@@ -588,3 +588,8 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 #cf{perspective-origin:50% 100%}
 #cf .cf-item{transform-origin:50% 100%}
 #cf .cf-item img{object-position:50% 100%}
+
+/* v49 pinned Continue Reading */
+.rc .cvw{position:relative;display:block}
+.rc .pinb{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:11px;background:rgba(0,0,0,.72);display:grid;place-items:center;pointer-events:none}
+.rc .pinb .i{width:13px;height:13px;stroke:#fff;fill:#fff}

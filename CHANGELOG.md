@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v49 — 2026-10-20
+
+- **Pin to Continue Reading.** Long-press a cover (on Home or in the Library) and choose **Pin to Continue Reading** to keep it at the front of the Continue Reading row, with a small pin badge. Pinned issues come first in the order you pinned them and stay there even after you finish them, until you choose **Unpin**. Everything else follows, most recently read first. Pins are saved with your other settings on this device.
+- New suite `test/e2e_v49.py`.
+
 ## cr-v48 — 2026-10-20
 
 - **Bigger Home carousel covers.** The carousel now grows into any spare height (portrait iPads had an empty band of about 80px under the shelf), so the shelf moves down and sits a normal section gap above Continue Reading. Covers stay whole, clear of the header, tilted, and level on the shelf; Home still fits without scrolling.
