@@ -9,8 +9,8 @@ res=[]; errors=[]
 def ok(name,cond,extra=''):
     res.append(bool(cond)); print(('PASS' if cond else 'FAIL'),f'[{ENG}]',name,str(extra)[:300] if not cond else '',flush=True)
 ROW="""(()=>{ const r=document.querySelector('#contRow'); if(!r) return null; const prev=r.previousElementSibling, next=r.nextElementSibling;
-  return {ids:[...r.querySelectorAll('.rc')].map(b=>b.dataset.id),sub:[...r.querySelectorAll('.rc .s')].map(s=>s.textContent),bars:[...r.querySelectorAll('.rc .pl')].map(p=>!p.classList.contains('none')),
-    prev:prev&&prev.className,next:next&&next.className,h:r.querySelector('h2').textContent,sz:[...r.querySelectorAll('.rc')].map(b=>{const q=b.getBoundingClientRect(); return [q.width,q.height]})}; })()"""
+  return {ids:[...r.querySelectorAll('.rc')].map(b=>b.dataset.id),sub:[...r.querySelectorAll('.rc .s')].map(s=>s.textContent),al:[...r.querySelectorAll('.rc')].map(b=>b.getAttribute('aria-label')),bars:[...r.querySelectorAll('.rc .pl')].map(p=>!p.classList.contains('none')),
+    prev:prev&&prev.className,next:next&&next.className,h:r.getAttribute('aria-label')||(r.querySelector('h2')||{}).textContent,sz:[...r.querySelectorAll('.rc')].map(b=>{const q=b.getBoundingClientRect(); return [q.width,q.height]})}; })()"""
 SETUP="""async()=>{ const C=__cr.comics, f=t=>C.find(c=>c.title===t), now=Date.now();
   const A=f('Nightfall 02'), B=f('Ember Road 01'), I1=f('Iron Tide 01'), I2=f('Iron Tide 02'), H=f('The Hollow 01');
   Object.assign(A,{page:11,progress:11/(A.pages-1),lastRead:now-1000}); Object.assign(B,{page:2,progress:2/(B.pages-1),lastRead:now-5000});
@@ -31,7 +31,7 @@ with sync_playwright() as p:
         x=pg.evaluate(SETUP); r=pg.evaluate(ROW)
         ok(f'{lab}: row right below the spine shelf, above the series rows',r and (r['prev'] or '')=='volshelf' and (r['next'] or '').startswith('row') and r['h']=='Continue Reading',json.dumps(r))
         ok(f'{lab}: in-progress most recently read first, plus the next unread issue of a series whose current issue is finished',r['ids']==[x['I2'],x['A'],x['B'],x['H2']],json.dumps([r['ids'],x]))
-        ok(f"{lab}: 'p. N of M' under each cover, thin progress bar on started issues",r['sub']==[f"Next · p. 1 of {x['pi']}",f"p. 12 of {x['pa']}",f"p. 3 of {x['pb']}",f"Next · p. 1 of {x['ph']}"] and r['bars']==[False,True,True,False],json.dumps(r))
+        ok(f"{lab}: (v50) no page subtitle under covers, page kept in the label; thin progress bar on started issues",r['sub']==[] and f"page 12 of {x['pa']}" in r['al'][1] and r['bars']==[False,True,True,False],json.dumps(r))
         ok(f'{lab}: covers are big tap targets (>=40px)',all(s[0]>=40 and s[1]>=40 for s in r['sz']),r['sz'])
         if lab in ('ipad-portrait','iphone-390'):
             pg.evaluate("document.querySelector('#contRow').scrollIntoView({block:'center'})"); pg.wait_for_timeout(400); pg.screenshot(path=f'{SH}/{ENG}-v43-home-{lab}.png')

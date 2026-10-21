@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v50 — 2026-10-21
+
+- **Cleaner Continue Reading.** The “Continue Reading” heading, the count and the “p. N of M” line under each cover are gone (the row is still there, and VoiceOver still reads the page). Titles, progress bars and pins stay.
+- Continue Reading covers are 25% smaller, and the Home carousel covers grow into the freed height (still whole, tilted, and level on the shelf).
+- New suite `test/e2e_v50.py`.
+
 ## cr-v49 — 2026-10-20
 
 - **Pin to Continue Reading.** Long-press a cover (on Home or in the Library) and choose **Pin to Continue Reading** to keep it at the front of the Continue Reading row, with a small pin badge. Pinned issues come first in the order you pinned them and stay there even after you finish them, until you choose **Unpin**. Everything else follows, most recently read first. Pins are saved with your other settings on this device.

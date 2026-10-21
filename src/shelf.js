@@ -106,7 +106,7 @@ function rowHTML(title,list,kind,series){ if(!list.length) return ''; const see=
   const more=`<button class="row-more" data-act="smenu" data-kind="${kind}"${series!=null?` data-series="${esc(series)}"`:''} aria-label="Options for ${esc(title)}">${IC.more}</button>`;
   return `<section class="row"><div class="row-top"><button class="row-h" ${see}><h2>${esc(title)}</h2><span class="n">${list.length}</span>${IC.chev}</button>${more}</div>
   <div class="row-s">${list.slice(0,20).map(c=>`<button class="rc" data-act="open" data-id="${c.id}" aria-label="${esc(c.title)}">${coverBox(c)}<div class="t">${esc(c.title)}</div></button>`).join('')}<button class="seeall" ${see}>${IC.grid}See all</button></div></section>`; }
-/* ---------- Continue Reading row (v43; replaces the v1 single "Continue reading" card, removed in v7): directly under the spine shelf ----------
+/* ---------- Continue Reading row (v43; v50: no heading/count/page subtitle, page stays in the aria-label; replaces the v1 single "Continue reading" card, removed in v7): directly under the spine shelf ----------
    in-progress issues, most recently read first; when a series' latest-read issue is finished, its next unread issue joins too.
    Remove from Continue Reading only hides it (progress untouched) until you read it again. */
 const contHid=()=>store.get('contHide',{})||{};
@@ -122,8 +122,8 @@ function contList(){ const H=contHid(), hidden=c=>H[c.id]!=null&&(c.lastRead||0)
   cand.sort((a,b)=>b.t-a.t).forEach(x=>{ if(!seen.has(x.c.id)&&!hidden(x.c)){ seen.add(x.c.id); out.push(x); } }); return out; }
 const pageOf=c=>{ const sk=skipList(c), n=Math.max(1,(c.pages||1)-sk.length), p=(c.page||0)+1-sk.filter(q=>q<(c.page||0)).length; return [Math.min(Math.max(1,p),n),n]; };
 function contRowHTML(){ const L=contList(); if(!L.length) return '';
-  return `<section class="row cont" id="contRow"><div class="row-top"><div class="row-h"><h2>Continue Reading</h2><span class="n">${L.length}</span></div></div>
-  <div class="row-s">${L.map(({c,next,pin})=>{ const [p,n]=pageOf(c); return `<button class="rc${pin?' pinned':''}" data-act="open" data-id="${c.id}" data-cont="1" aria-label="${pin?'Pinned: ':''}${next?'Next: ':'Continue '}${esc(c.title)}, page ${p} of ${n}"><span class="cvw">${coverBox(c)}${pin?'<span class="pinb" aria-hidden="true">'+IC.pin+'</span>':''}</span><div class="t">${esc(c.title)}</div><div class="s">${next?'Next · ':''}p. ${p} of ${n}</div></button>`; }).join('')}</div></section>`; }
+  return `<section class="row cont" id="contRow" aria-label="Continue Reading">
+  <div class="row-s">${L.map(({c,next,pin})=>{ const [p,n]=pageOf(c); return `<button class="rc${pin?' pinned':''}" data-act="open" data-id="${c.id}" data-cont="1" aria-label="${pin?'Pinned: ':''}${next?'Next: ':'Continue '}${esc(c.title)}, page ${p} of ${n}"><span class="cvw">${coverBox(c)}${pin?'<span class="pinb" aria-hidden="true">'+IC.pin+'</span>':''}</span><div class="t">${esc(c.title)}</div></button>`; }).join('')}</div></section>`; }
 async function contHide(id){ const c=comics.find(x=>x.id===id); if(!c) return; const H=contHid(); H[id]=c.lastRead||0; store.set('contHide',H); renderShelf(); toast('Removed from Continue Reading'); }
 /* ---------- reading lists (queues): named reading orders mixing any series; a comic opened from one continues in its order ---------- */
 let queues=[];
@@ -323,7 +323,7 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
     if(this.el.id==='cf'){ const hs=$('#homeScroll'), sh=hs&&hs.querySelector('.volshelf'), cr=hs&&hs.classList.contains('norows')&&hs.querySelector('#contRow');
       if(hs&&hs.clientHeight){ const px=(e,k)=>parseFloat(getComputedStyle(e)[k])||0, crH=cr?cr.offsetHeight+px(cr,'marginTop')+px(cr,'marginBottom')+px(cr.parentElement,'paddingBottom'):0;
         const avail=hs.clientHeight-(sh?sh.offsetHeight:0)-crH-6-10-2;
-        const fitW=Math.min(Math.floor(avail/1.5),Math.round(vw*(vw<600?.5:.42))); if(fitW!==this.cw){ this.cw=Math.max(110,fitW); this.sp=this.cw*.8;
+        const fitW=Math.min(Math.floor(avail/1.5),Math.round(vw*(vw<600?.5:.46))); if(fitW!==this.cw){ this.cw=Math.max(110,fitW); this.sp=this.cw*.8;
           { const cw=this.cw, T=7, P=1100, z=cw*.55+(T-1)*cw*.2, need=(vw/2)*(P+z)/P; this.gap=clamp((need-cw*.8)/(T-1),cw*.12,cw*.5);
             this.win=CF_WIN; for(let k=2;k<=CF_WIN;k++){ const f=P/(P+cw*.55+(k-1)*cw*.2); if((cw*.8+(k-1)*this.gap-cw*.32)*f>vw/2){ this.win=k; break; } } } } } }
     this.el.style.setProperty('--cw',this.cw+'px'); this.layout(); },

@@ -593,3 +593,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .rc .cvw{position:relative;display:block}
 .rc .pinb{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:11px;background:rgba(0,0,0,.72);display:grid;place-items:center;pointer-events:none}
 .rc .pinb .i{width:13px;height:13px;stroke:#fff;fill:#fff}
+
+/* v50 Continue Reading: no heading, thumbnails 25% smaller (the carousel grows into the freed height) */
+#contRow .rc{width:calc(var(--rw)*.75)}
+#homeScroll .rows>#contRow{margin-top:14px}
