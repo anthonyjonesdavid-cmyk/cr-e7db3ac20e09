@@ -578,16 +578,11 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* v46: whole carousel covers on Home — the hero never shrinks (it was squeezed by the v44 flex layout and clipped the covers), the cover sits flush on the shelf
    (no reflection band), covers keep their aspect (contain, no crop), Continue Reading is compact in landscape, the shelf is a bit lower on short screens */
 #homeScroll .hero{flex:none}
-#cf{height:calc(var(--cw)*1.5 + 6px)}
-#cf .cf-item img{object-fit:contain;-webkit-box-reflect:none}
 @media (orientation:landscape){#homeScroll.norows>.rows>.cont{--rw:clamp(80px,11vh,124px)}}
 @media (min-width:601px) and (max-height:900px){.volshelf{--bh:180px}}
 #homeScroll .rows>.volshelf:first-child{margin-top:0}
 
-/* v47: covers pivot on a common baseline (the shelf top); perspective origin on that line keeps every bottom corner on it */
-#cf{perspective-origin:50% 100%}
-#cf .cf-item{transform-origin:50% 100%}
-#cf .cf-item img{object-position:50% 100%}
+/* v47 baseline overrides removed in v51: Home uses the same CoverFlow style as the series pages (reflection, centred perspective) */
 
 /* v49 pinned Continue Reading */
 .rc .cvw{position:relative;display:block}

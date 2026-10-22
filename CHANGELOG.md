@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v51 — 2026-10-22
+
+- **Home carousel matches the series pages again.** Home now uses the same CoverFlow as the series carousels in Library (it already shared the code; v46–v47 had added Home-only overrides). That means the classic look from v45 and earlier: a front-facing centre cover, side covers turned inward and tightly overlapping, and the glossy reflection fading underneath. The v46 "fit to the shelf" and v47 "pivot on the shelf line" overrides are gone. Home still shows every issue in release order, oldest first, looping, and the carousel is still sized so Home fits without scrolling with the spine shelf and Continue Reading.
+- Suites v46–v50 updated for the reflection band (covers stay whole above the shelf, side covers tilted) instead of the old flush and level-corner rules. New suite `test/e2e_v51.py` (Home and series carousels share the same style).
+
 ## cr-v50 — 2026-10-21
 
 - **Cleaner Continue Reading.** The “Continue Reading” heading, the count and the “p. N of M” line under each cover are gone (the row is still there, and VoiceOver still reads the page). Titles, progress bars and pins stay.

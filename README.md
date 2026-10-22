@@ -53,6 +53,7 @@ python3 test/e2e_v47.py webkit               # v47: Home carousel covers' bottom
 python3 test/e2e_v48.py webkit               # v48: carousel fills spare height, shelf-to-Continue Reading gap normal; 4 sizes + 1180, 834, 768
 python3 test/e2e_v49.py webkit               # v49: pin to Continue Reading (order, badge, stays when finished, unpin), 4 sizes + 768x1024
 python3 test/e2e_v50.py webkit               # v50: Continue Reading without heading/count/page line, 25% smaller thumbnails, bigger carousel; 4 sizes + 1180, 834, 768
+python3 test/e2e_v51.py webkit               # v51: Home carousel has the same CoverFlow style as the series carousels; Home fits; 4 sizes
 python3 test/e2e_v29.py webkit               # two-page spreads: landscape full screen, portrait fit + in-view Rotate, pinch, turns, panels; 4 sizes (fixtures: test/gen_spreads.py)
 python3 test/e2e_v30.py webkit               # shelf of volumes on Home + v31 spine fonts/full names/contrast sweep + v35 book spines (rounded, cylindrical shading, accent bands, no count/vol line, glow titles ≥7:1, shrink-to-fit, 50–90px, 4–6px gaps, 220ms tip-out) (grouping, colours + contrast, IDB cache, tap/slide, reduced motion), 4 sizes
 python3 test/e2e_v32.py webkit               # page sharpness: canvas backing >= CSS x DPR after turns/rotation, iOS caps (iPad UA), 4 sizes

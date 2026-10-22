@@ -322,8 +322,9 @@ const makeCF=()=>({items:[],pos:0,el:null,cw:240,sp:180,raf:0,shown:-1,
     // v46/v48 Home: covers grow or shrink to the space left; the whole cover must fit between the header and the spine shelf (flush on it), with Continue Reading below when the rows are off
     if(this.el.id==='cf'){ const hs=$('#homeScroll'), sh=hs&&hs.querySelector('.volshelf'), cr=hs&&hs.classList.contains('norows')&&hs.querySelector('#contRow');
       if(hs&&hs.clientHeight){ const px=(e,k)=>parseFloat(getComputedStyle(e)[k])||0, crH=cr?cr.offsetHeight+px(cr,'marginTop')+px(cr,'marginBottom')+px(cr.parentElement,'paddingBottom'):0;
-        const avail=hs.clientHeight-(sh?sh.offsetHeight:0)-crH-6-10-2;
-        const fitW=Math.min(Math.floor(avail/1.5),Math.round(vw*(vw<600?.5:.46))); if(fitW!==this.cw){ this.cw=Math.max(110,fitW); this.sp=this.cw*.8;
+        const avail=hs.clientHeight-(sh?sh.offsetHeight:0)-crH-4-10-2;
+        // v51: same .cf box as the series carousels (cover + reflection band = 1.66 x width)
+        const fitW=Math.min(Math.floor(avail/1.66),Math.round(vw*(vw<600?.5:.46))); if(fitW!==this.cw){ this.cw=Math.max(110,fitW); this.sp=this.cw*.8;
           { const cw=this.cw, T=7, P=1100, z=cw*.55+(T-1)*cw*.2, need=(vw/2)*(P+z)/P; this.gap=clamp((need-cw*.8)/(T-1),cw*.12,cw*.5);
             this.win=CF_WIN; for(let k=2;k<=CF_WIN;k++){ const f=P/(P+cw*.55+(k-1)*cw*.2); if((cw*.8+(k-1)*this.gap-cw*.32)*f>vw/2){ this.win=k; break; } } } } } }
     this.el.style.setProperty('--cw',this.cw+'px'); this.layout(); },

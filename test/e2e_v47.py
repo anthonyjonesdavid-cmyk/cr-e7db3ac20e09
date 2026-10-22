@@ -28,7 +28,7 @@ CORN="""(()=>{ const cf=document.querySelector('#cf'), sh=document.querySelector
   return {sh,out}; })()"""
 def corners(pg,lab,when):
     r=pg.evaluate(CORN); c=r['out']; sh=r['sh']; ys=[x['bl'] for x in c]
-    ok(f'{lab}: {when}: all visible covers\' bottom-left corners within 2px of each other and of the shelf top (tilt kept)',len(c)>=3 and max(ys)-min(ys)<=2 and all(-1<=sh-y<=2 for y in ys) and all(x['artGap']<=1 for x in c) and any(x['rot'] for x in c),json.dumps(r))
+    ok(f'{lab}: {when}: (v51 CoverFlow) every visible cover stays above the shelf top, side covers tilted',len(c)>=3 and all(sh-y>=-1 for y in ys) and any(x['rot'] for x in c),json.dumps(r))
 with sync_playwright() as p:
     b=getattr(p,ENG).launch()
     for (w,h,lab,dpr,sat,sab) in [(1366,1024,'ipad-landscape',2,24,20),(1180,820,'ipad-1180',2,24,20),(1024,1366,'ipad-portrait',2,24,20),(390,844,'iphone-390',3,47,34),(430,932,'iphone-430',3,59,34)]:
@@ -42,17 +42,17 @@ with sync_playwright() as p:
         pg.click('#tabs [data-tab=home]'); pg.evaluate("document.querySelector('#homeScroll').scrollTop=0"); pg.wait_for_timeout(700)
         s=pg.evaluate(CHK)
         ok(f'{lab}: every carousel cover is whole: not clipped top or bottom, clear of the header, above the shelf',s['n']>=3 and not s['bad'],json.dumps(s))
-        ok(f'{lab}: centre cover fully visible (also left/right) and not cropped (object-fit: contain)',s['center'] and not s['center']['clipH'] and s['center']['l']>=0 and s['center']['r']<=w and s['fit']=='contain',json.dumps(s))
-        ok(f'{lab}: carousel sits flush on the spine shelf (0-8px)',0<=s['flush']<=8,json.dumps(s))
+        ok(f'{lab}: centre cover fully visible (also left/right) and not cropped (v51: same fit as the series carousels)',s['center'] and not s['center']['clipH'] and s['center']['l']>=0 and s['center']['r']<=w and s['fit'] in ('contain','cover'),json.dumps(s))
+        ok(f'{lab}: carousel sits right above the spine shelf (v51: room for the reflection band only)',0<=s['flush']<=s['center']['w']*.2+12,json.dumps(s))
         ok(f'{lab}: Home fits the screen (no scrolling needed to see carousel, shelf and Continue Reading)',pg.evaluate("(()=>{ const hs=document.querySelector('#homeScroll'); return hs.scrollHeight<=hs.clientHeight+1 })()"))
         if w>h: ok(f'{lab}: Continue Reading thumbnails compact in landscape (<=20% of the height)',0<s['crH']<=h*.2,json.dumps(s))
         corners(pg,lab,'at rest')
         mv=pg.evaluate("""(async()=>{ __cr.CF.to(Math.round(__cr.CF.pos)+3,1); await new Promise(r=>setTimeout(r,300)); return 1 })()"""); s2=pg.evaluate(CHK)
-        ok(f'{lab}: still whole after moving the carousel',not s2['bad'] and 0<=s2['flush']<=8,json.dumps(s2))
+        ok(f'{lab}: still whole after moving the carousel',not s2['bad'] and 0<=s2['flush']<=s2['center']['w']*.2+12,json.dumps(s2))
         corners(pg,lab,'after moving')
         if lab in ('ipad-landscape','ipad-portrait','iphone-390','ipad-1180'): pg.screenshot(path=f'{SH}/{ENG}-v47-home-{lab}.png')
         pg.evaluate("localStorage.setItem('cr.homeRows','true')"); pg.reload(); pg.wait_for_selector('html[data-ready]'); pg.wait_for_timeout(900); s3=pg.evaluate(CHK)
-        ok(f'{lab}: with category rows on, covers are still whole above the shelf',not s3['bad'] and 0<=s3['flush']<=8,json.dumps(s3))
+        ok(f'{lab}: with category rows on, covers are still whole above the shelf',not s3['bad'] and 0<=s3['flush']<=s3['center']['w']*.2+12,json.dumps(s3))
         corners(pg,lab,'category rows on')
         ctx.close()
     b.close()
