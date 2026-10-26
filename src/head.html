@@ -18,3 +18,29 @@
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 <link rel="modulepreload" href="vendor/pdf.min.mjs">
+<script>
+/* v52 startup safety net (plain script, runs even if the app module fails to load): never a silent blank screen.
+   Shows an error panel with Reload; "Reset app files" clears only the service worker + its file cache, never the comics (IndexedDB). */
+(function(){
+  var shown=false, errs=[];
+  function show(title,detail){ if(shown||document.documentElement.dataset.ready==='1'&&title!=='crash') return; shown=true;
+    var go=function(){ var d=document.getElementById('crCrash'); if(!d){ d=document.createElement('div'); d.id='crCrash'; document.body.appendChild(d); }
+      d.setAttribute('style','position:fixed;inset:0;z-index:2147483647;background:#000;color:#fff;font:16px -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 24px) 24px 24px;text-align:center;gap:14px');
+      d.innerHTML='<h2 style="margin:0;font-size:22px">Comic Shelf didn\u2019t start</h2><p style="margin:0;max-width:440px;color:#bbb">Your comics are safe on this device. Tap Reload to try again.</p>'+
+        '<button id="crReload" style="min-height:44px;padding:0 28px;border-radius:22px;border:0;background:#fff;color:#000;font-size:17px;font-weight:600">Reload</button>'+
+        '<button id="crReset" style="min-height:40px;padding:0 20px;border-radius:20px;border:1px solid #555;background:none;color:#ddd;font-size:15px">Reset app files (keeps comics)</button>'+
+        '<pre style="max-width:90vw;white-space:pre-wrap;color:#777;font-size:12px;margin:8px 0 0">'+String(detail||'').replace(/[<&]/g,function(c){return c==='<'?'&lt;':'&amp;';}).slice(0,600)+'</pre>';
+      document.getElementById('crReload').onclick=function(){ location.reload(); };
+      document.getElementById('crReset').onclick=function(){ var p=[]; try{ if(navigator.serviceWorker) p.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); })); }catch(e){}
+        try{ if(window.caches) p.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); })); }catch(e){}
+        Promise.all(p).catch(function(){}).then(function(){ location.replace(location.pathname+'?r='+Date.now()); }); };
+    };
+    if(document.body) go(); else addEventListener('DOMContentLoaded',go);
+  }
+  window.__crFail=function(e){ show('crash',(e&&(e.stack||e.message))||e); };
+  addEventListener('error',function(e){ var t=e.target; if(t&&t!==window){ if(t.tagName!=='SCRIPT') return; errs.push('Failed to load '+(t.src||'app script')); if(document.documentElement.dataset.ready!=='1') show('load',errs.join('\n')); return; }
+    errs.push((e.message||'Error')+(e.filename?' @'+e.filename.split('/').pop()+':'+e.lineno:'')); if(document.documentElement.dataset.ready!=='1') show('err',errs.join('\n')); },true);
+  addEventListener('unhandledrejection',function(e){ var r=e.reason; errs.push('Unhandled: '+((r&&(r.stack||r.message))||r)); });
+  setTimeout(function(){ if(document.documentElement.dataset.ready!=='1') show('slow','Startup took longer than 12 seconds.\n'+errs.join('\n')); },12000);
+})();
+</script>

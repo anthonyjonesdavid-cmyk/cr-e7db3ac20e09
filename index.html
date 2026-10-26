@@ -18,6 +18,32 @@
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 <link rel="modulepreload" href="vendor/pdf.min.mjs">
+<script>
+/* v52 startup safety net (plain script, runs even if the app module fails to load): never a silent blank screen.
+   Shows an error panel with Reload; "Reset app files" clears only the service worker + its file cache, never the comics (IndexedDB). */
+(function(){
+  var shown=false, errs=[];
+  function show(title,detail){ if(shown||document.documentElement.dataset.ready==='1'&&title!=='crash') return; shown=true;
+    var go=function(){ var d=document.getElementById('crCrash'); if(!d){ d=document.createElement('div'); d.id='crCrash'; document.body.appendChild(d); }
+      d.setAttribute('style','position:fixed;inset:0;z-index:2147483647;background:#000;color:#fff;font:16px -apple-system,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 24px) 24px 24px;text-align:center;gap:14px');
+      d.innerHTML='<h2 style="margin:0;font-size:22px">Comic Shelf didn\u2019t start</h2><p style="margin:0;max-width:440px;color:#bbb">Your comics are safe on this device. Tap Reload to try again.</p>'+
+        '<button id="crReload" style="min-height:44px;padding:0 28px;border-radius:22px;border:0;background:#fff;color:#000;font-size:17px;font-weight:600">Reload</button>'+
+        '<button id="crReset" style="min-height:40px;padding:0 20px;border-radius:20px;border:1px solid #555;background:none;color:#ddd;font-size:15px">Reset app files (keeps comics)</button>'+
+        '<pre style="max-width:90vw;white-space:pre-wrap;color:#777;font-size:12px;margin:8px 0 0">'+String(detail||'').replace(/[<&]/g,function(c){return c==='<'?'&lt;':'&amp;';}).slice(0,600)+'</pre>';
+      document.getElementById('crReload').onclick=function(){ location.reload(); };
+      document.getElementById('crReset').onclick=function(){ var p=[]; try{ if(navigator.serviceWorker) p.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })); })); }catch(e){}
+        try{ if(window.caches) p.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); })); }catch(e){}
+        Promise.all(p).catch(function(){}).then(function(){ location.replace(location.pathname+'?r='+Date.now()); }); };
+    };
+    if(document.body) go(); else addEventListener('DOMContentLoaded',go);
+  }
+  window.__crFail=function(e){ show('crash',(e&&(e.stack||e.message))||e); };
+  addEventListener('error',function(e){ var t=e.target; if(t&&t!==window){ if(t.tagName!=='SCRIPT') return; errs.push('Failed to load '+(t.src||'app script')); if(document.documentElement.dataset.ready!=='1') show('load',errs.join('\n')); return; }
+    errs.push((e.message||'Error')+(e.filename?' @'+e.filename.split('/').pop()+':'+e.lineno:'')); if(document.documentElement.dataset.ready!=='1') show('err',errs.join('\n')); },true);
+  addEventListener('unhandledrejection',function(e){ var r=e.reason; errs.push('Unhandled: '+((r&&(r.stack||r.message))||r)); });
+  setTimeout(function(){ if(document.documentElement.dataset.ready!=='1') show('slow','Startup took longer than 12 seconds.\n'+errs.join('\n')); },12000);
+})();
+</script>
 <style>
 :root{
   --bg:#000; --bar:#000; --el:#1c1c1e; --el2:#2c2c2e; --el3:#3a3a3c; --sep:#262628;
@@ -677,7 +703,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=51',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=52',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="creator" class="hidden" aria-label="Creator"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="crClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -2766,12 +2792,14 @@ function openSale(id){ const c=comics.find(x=>x.id===id); if(!c) return; const s
 window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},qs:{create:newQueue,seeAll},sale:{of:onSale,key:saleKey,open:openSale},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
+  try{
   const m=location.hash.match(/^#\/read\/(.+)$/);
   if(m&&comics.find(c=>c.id===m[1])){ try{ history.replaceState(null,'',location.pathname+location.search); history.pushState({r:m[1]},'','#/read/'+m[1]); }catch(e){} openReader(m[1],{push:false}); }
   else if(location.hash){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }   // stale / unknown hash: plain Home
   launchHome();
+  }catch(e){ console.error(e); try{ launchHome(); }catch(e2){ (window.__crFail||console.error)(e2); return; } }
   document.documentElement.dataset.ready='1';
-})();
+})().catch(e=>(window.__crFail||console.error)(e));
 </script>
 </body>
 </html>

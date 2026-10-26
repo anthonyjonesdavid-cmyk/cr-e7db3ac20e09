@@ -1,6 +1,6 @@
 // Comic Shelf service worker: app shell + vendored pdf.js cached for offline use.
 // Comics themselves live in IndexedDB and are never fetched over the network.
-const VERSION = 'cr-v51';
+const VERSION = 'cr-v52';
 const CORE = ['./', './index.html', './manifest.webmanifest', './vendor/pdf.min.mjs', './vendor/pdf.worker.min.mjs',
   './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon.svg', './icons/favicon-32.png', './icons/favicon-16.png', './icons/icon-maskable-512.png',
   './fonts/Bangers.woff2', './fonts/Bungee.woff2', './fonts/LuckiestGuy.woff2', './fonts/BlackOpsOne.woff2', './fonts/Creepster.woff2', './fonts/CinzelDecorative.woff2', './fonts/Orbitron.woff2', './fonts/PermanentMarker.woff2'];
@@ -13,8 +13,15 @@ self.addEventListener('fetch', e => {
   if (url.origin !== location.origin || /(^|\.)(google|googleapis|gstatic|googleusercontent)\.com$/.test(url.hostname)) return;
   if (req.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/')) {
     // network-first for the page so updates arrive; cached copy when offline
-    e.respondWith(fetch(req, {cache:'no-store'}).then(r => { if (r.ok) { const cp = r.clone(); caches.open(VERSION).then(c => c.put('./index.html', cp)); } return r; })
-      .catch(() => caches.match('./index.html', { ignoreSearch: true })));
+    // v52: fresh page first, but never hang on a slow network: after 6s (or on error/non-OK) fall back to the saved copy
+    const net = fetch(req, {cache:'no-store'}).then(r => { if (r.ok) { const cp = r.clone(); caches.open(VERSION).then(c => c.put('./index.html', cp)); } return r; });
+    const saved = () => caches.match('./index.html', { ignoreSearch: true });
+    e.respondWith(new Promise(res => {
+      let done = false; const fin = r => { if (!done && r) { done = true; res(r); } };
+      const t = setTimeout(() => saved().then(fin), 6000);
+      net.then(r => { if (r.ok) { clearTimeout(t); fin(r); } else saved().then(c => fin(c || r)); })
+         .catch(() => saved().then(c => fin(c || Response.error())));
+    }));
     return;
   }
   // cache-first for vendored assets (pdf.js, font, cmaps, icons), filled on demand
