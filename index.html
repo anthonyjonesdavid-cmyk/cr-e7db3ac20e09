@@ -661,6 +661,39 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .ntg ul{margin:0;padding-left:18px}.ntg li{font-size:14.5px;line-height:1.45;color:#e5e5ea;margin:0 0 6px}
 .ntsrc{font-size:11px;color:#0a84ff;text-decoration:none;white-space:nowrap;margin-left:2px;padding:2px 0}
 .ntfoot{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap}.ntfoot .pillbtn{min-height:40px;padding:0 16px}
+/* ---- Animate page ---- */
+@media (max-width:560px){#rAnim .w{display:none}}
+.anmodal{width:min(560px,100%)}
+.anplan{display:flex;flex-direction:column;gap:8px}
+.anscore{display:flex;gap:8px;align-items:flex-start;margin:0 0 4px;font-size:13.5px;color:#cfd2d8}
+.anscore svg.i{width:18px;height:18px;flex:none;margin-top:1px}
+.anrow{display:flex;gap:10px;align-items:center;background:var(--el2);border-radius:10px;padding:8px}
+.anrow img{width:64px;height:64px;object-fit:cover;border-radius:6px;flex:none;background:#000}
+.anrow b{display:block;font-size:14px;line-height:1.25}
+.anrow span{display:block;font-size:12.5px;color:#aeb3bb;margin-top:2px}
+.anrow small{display:block;font-size:12px;color:#8d929b;margin-top:2px}
+#anim{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column;color:#fff}
+.anbar{background:#111;padding-top:env(safe-area-inset-top);flex:none}
+.anbar{display:flex;align-items:center;gap:6px;padding-left:max(6px,env(safe-area-inset-left));padding-right:max(6px,env(safe-area-inset-right));min-height:44px;box-sizing:content-box;height:48px}
+.antitle{flex:1;min-width:0;text-align:center}.antitle b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.antitle small{font-size:12px;color:#9aa0a8}
+.anbar .icbtn{color:#fff}
+.anstage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;background:#000}
+.anstage video{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;background:#000}
+.anwait{position:absolute;inset:0;background:#000 center/contain no-repeat;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18px}
+.anwait span{background:#000c;border-radius:20px;padding:9px 14px;font-size:14px;display:flex;align-items:center;gap:8px;max-width:86%;text-align:center}
+.anwait .spin{width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:anspin .9s linear infinite;flex:none}
+@keyframes anspin{to{transform:rotate(360deg)}}
+.annotes{flex:none;background:#111;padding:10px max(14px,env(safe-area-inset-left)) 6px;font-size:13px;color:#c9ccd2;max-height:26vh;overflow:auto}
+.annotes b{display:block;color:#fff;font-size:14.5px;margin-bottom:4px}
+.annote{margin-top:3px}.annote span{color:#8d929b;margin-right:6px;font-weight:600}
+.anstrip{flex:none;background:#111;display:flex;gap:8px;overflow-x:auto;padding:8px max(12px,env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom))}
+.anchip{position:relative;flex:none;width:56px;height:56px;border-radius:8px;overflow:hidden;background:#222;border:2px solid transparent;padding:0}
+.anchip.on{border-color:#fff}
+.anchip img{width:100%;height:100%;object-fit:cover;opacity:.45}
+.anchip[data-st=ready] img{opacity:1}
+.anchip i{position:absolute;left:4px;top:2px;font-style:normal;font-size:12px;font-weight:700;text-shadow:0 1px 2px #000}
+.anchip[data-st=fail] em{position:absolute;inset:0;background:#7a1d1d99}
+.anchip[data-st=make] em{position:absolute;right:4px;bottom:4px;width:10px;height:10px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:anspin .9s linear infinite}
 </style>
 </head>
 <body>
@@ -711,6 +744,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <div class="rtitle" id="rTitle"></div>
     <button class="rbtn" id="rRtl" aria-pressed="false" title="Right-to-left (manga)"><svg class="i" viewBox="0 0 24 24"><path d="M20 7H5m0 0 4-4M5 7l4 4M4 17h15m0 0-4-4m4 4-4 4"/></svg>RTL</button>
     <button class="rbtn" id="rSpread" title="Single page or two-page spread in landscape"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg><span id="rSpreadTxt">2-up</span></button>
+    <button class="rbtn" id="rAnim" aria-label="Animate page" title="Animate this page with Grok Imagine"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span class="w">Animate</span></button>
     <button class="rbtn" id="rMore" title="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
     <button class="rbtn" id="rGrid" title="All pages" aria-label="All pages"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
   </div></div>
@@ -725,7 +759,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=54',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=55',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -1650,6 +1684,8 @@ async function openSettings(){
       <div class="frow"><button class="btn ghost" data-r="lookup" id="sLookup">Look Up Release Dates…</button></div></div>
     <div class="sgrp"><b>Series</b><span>${seriesCounts().length} series. Combine series that came from separate folders (e.g. issue ranges) into one.</span>
       <div class="frow"><button class="btn ghost" data-r="merge" id="sMerge">Merge Series…</button><button class="btn ghost" data-r="arrange" id="sArrange">Arrange Categories…</button></div></div>
+    <div class="sgrp"><b>Animate page</b><span>${store.get('animPass','')?'Passcode saved on this device.':'Set a passcode so only your devices can use your xAI credits.'} Daily limit $10.</span>
+      <div class="frow"><button class="btn ghost" data-r="animpass" id="sAnimPass">${store.get('animPass','')?'Change Passcode…':'Set Passcode…'}</button></div></div>
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
@@ -1658,7 +1694,7 @@ async function openSettings(){
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
     const rs=w.querySelector('#sFolderReset'); if(rs) rs.onclick=()=>{ Drive.setFolder(null); rs.remove(); cur(); toast('Using the default Drive folder'); }; });
-  if(r==='lookup'){ lookupAll(); return; }
+  if(r==='lookup'){ lookupAll(); return; } if(r==='animpass'){ Anim.passSheet(); return; }
   if(r==='merge'){ mergeSeries(); return; } if(r==='arrange'){ arrangeRows(); return; }
   if(r==='persist'){ try{ const ok=await navigator.storage.persist(); toast(ok?'Storage marked persistent':'The browser declined for now. It often allows it in the Home Screen app.'); }catch(e){ toast('Not supported here'); } } }
 
@@ -2918,6 +2954,106 @@ function openSale(id){ const c=comics.find(x=>x.id===id); if(!c) return; const s
   const note=s.near?`<p class="salenote" id="saleNote">Nothing else in your library from ${esc(s.k.label.replace(/^around /,''))}. Showing ${esc(s.near.label)}, the nearest ${s.k.mode==='year'?'year':'month'} with comics.</p>`:'';
   $('#crBody').innerHTML=note+(s.L.length?`<div class="crgrid salegrid">${s.L.map(x=>`<button class="crc" data-id="${x.c.id}" data-ret="sale:${c.id}" aria-label="${esc(x.c.title)}, ${esc(fmtDate(x.d))}">${coverBox(x.c)}<span class="tt">${esc(x.c.title)}</span><span class="td">${esc(fmtDate(x.d))}</span></button>`).join('')}</div>`:'<p class="qempty">No other dated comics in your library yet.</p>');
   $('#crBody').scrollTop=0; $('#creator').classList.remove('hidden'); CRP.on=true; CRP.name=''; CRP.sale=id; CRP.t0=performance.now(); }
+/* ---------- Animate page (Grok Imagine): plan panels with Grok vision, make one clip per panel, play them in order ---------- */
+const Anim=(()=>{
+  const API='https://cr-animate.djapps.workers.dev', PRICE={sec:0.03,img:0.01};
+  const pass=()=>store.get('animPass','');
+  const call=async(path,body)=>{ const r=await fetch(API+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','x-pass':pass()},body:body?JSON.stringify(body):undefined}); let j={}; try{ j=await r.json(); }catch(e){} if(!r.ok){ const e=new Error(j.error||('Server error '+r.status)); e.j=j; e.status=r.status; throw e; } return j; };
+  // clip + plan cache: its own IndexedDB so it never touches the comics database version
+  let dbp; const adb=()=>dbp||(dbp=new Promise((res,rej)=>{ const r=indexedDB.open('cr-anim',1); r.onupgradeneeded=()=>{ r.result.createObjectStore('clips'); r.result.createObjectStore('plans'); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }));
+  const idb=async(st,mode,fn)=>{ const d=await adb(); return new Promise((res,rej)=>{ const t=d.transaction(st,mode); const q=fn(t.objectStore(st)); t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); }); };
+  const get=(st,k)=>idb(st,'readonly',s=>s.get(k)), put=(st,k,v)=>idb(st,'readwrite',s=>s.put(v,k));
+  const money=v=>'$'+(Math.round(v*100)/100).toFixed(2);
+  const costOf=pl=>pl.panels.reduce((a,q)=>a+q.seconds*PRICE.sec+PRICE.img,0);
+
+  async function passSheet(msg){ let st={configured:true}; try{ st=await call('/status'); }catch(e){ toast('Can’t reach the Animate server. Are you online?'); return false; }
+    const set=!st.configured;
+    const {r,vals}=await modal(`<div class="mh"><h3>Animate passcode</h3></div><div class="mb">
+      <p class="confirm-msg">${msg?esc(msg)+' ':''}${set?'Choose a passcode for Animate page. Only devices with this passcode can spend your xAI credits.':'Enter your Animate passcode for this device.'}</p>
+      ${!set&&pass()?'<label class="fld"><span>Current passcode (to change it)</span><input id="aOld" type="password" autocomplete="off"></label>':''}
+      <label class="fld"><span>${set?'New passcode (6+ characters)':'Passcode'}</span><input id="aPass" type="password" autocomplete="off" autocapitalize="off" enterkeyhint="done"></label>
+      <p class="fhint">Daily limit: ${money(st.cap||10)}. Used today: ${money(st.spent||0)}.</p></div>
+      <div class="mf"><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="ok">${set?'Set Passcode':'Save'}</button></div>`,
+      w=>{ setTimeout(()=>w.querySelector('#aPass').focus(),50); w._vals=()=>({p:w.querySelector('#aPass').value.trim(),old:w.querySelector('#aOld')?.value.trim()||''}); });
+    if(r!=='ok'||!vals.p) return false;
+    try{ if(set||vals.old){ await call('/setup',{pass:vals.p,old:vals.old}); } store.set('animPass',vals.p); await call('/check'); toast(set?'Passcode set':'Passcode saved on this device'); return true; }
+    catch(e){ if(e.status===401) store.set('animPass',''); toast(e.message); return false; } }
+
+  async function pageImage(i){ const pg=await R.doc.getPage(i+1); const c=await renderToCanvas(pg,1500,2200,1,3.4e6); pg.cleanup(); return c; }
+  function crop(cv,box){ let [x,y,w,h]=box; const pad=0; x=Math.max(0,x-pad); y=Math.max(0,y-pad); w=Math.min(1-x,w+pad*2); h=Math.min(1-y,h+pad*2);
+    const sx=x*cv.width, sy=y*cv.height, sw=Math.max(8,w*cv.width), sh=Math.max(8,h*cv.height), k=Math.min(2.5,Math.max(1,720/Math.min(sw,sh)));
+    const c=document.createElement('canvas'); c.width=Math.round(sw*k); c.height=Math.round(sh*k); const g=c.getContext('2d',{alpha:false}); g.imageSmoothingQuality='high'; g.drawImage(cv,sx,sy,sw,sh,0,0,c.width,c.height); return c; }
+
+  async function start(){ const c=R.comic; if(!c||!R.doc) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length){ toast('Pick a comic page to animate'); return; }
+    const page=ps[0], key=c.id+':'+page; const cached=await get('plans',key).catch(()=>null);
+    if(cached&&cached.done){ const {r}=await modal(`<div class="mh"><h3>Animated page</h3></div><div class="mb"><p class="confirm-msg">Page ${ordOf(page)+1} already has ${cached.panels.length} clips saved on this iPad.</p></div><div class="mf"><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn ghost" data-r="redo">Make New (${money(costOf(cached))})</button><button class="btn" data-r="play">Play</button></div>`);
+      if(r==='play') return player(c,page,cached); if(r!=='redo') return; }
+    if(!pass()&&!await passSheet()) return;
+    toast('Grok is reading the page…',{sticky:true}); let res, cv;
+    try{ cv=await pageImage(page); res=await call('/plan',{image:cv.toDataURL('image/jpeg',.85),title:c.title,rtl:!!R.rtl}); hideToast(); }
+    catch(e){ hideToast(); toast(e.message); if(e.status===401) passSheet(e.message); return; }
+    const pl=res.plan; if(!pl.panels.length){ toast('Grok didn’t find any panels on this page'); return; }
+    pl.panels.forEach(q=>{ q.thumb=crop(cv,q.box).toDataURL('image/jpeg',.88); });
+    const total=costOf(pl), left=(res.cap||10)-(res.spent||0);
+    const {r}=await modal(`<div class="mh"><h3>Animate page ${ordOf(page)+1}</h3><p class="dlsub">${esc(pl.mood)}</p></div><div class="mb anplan">
+      <p class="anscore">${IC_NOTE}${esc(pl.score)}</p>
+      ${pl.panels.map((q,k)=>`<div class="anrow"><img src="${q.thumb}" alt=""><div><b>${k+1}. ${esc(q.what)}</b><span>${esc(q.camera)} · ${q.seconds}s</span><small>${esc(q.sound)}</small></div></div>`).join('')}
+      <p class="fhint">${pl.panels.length} clips · ${pl.panels.reduce((a,q)=>a+q.seconds,0)}s of 720p video · about ${money(total)} of xAI credit. Used today: ${money(res.spent||0)} of ${money(res.cap||10)}.</p></div>
+      <div class="mf"><button class="btn ghost" data-r="cancel">Cancel</button><button class="btn" data-r="go" ${total>left?'disabled':''}>${total>left?'Over today’s limit':'Animate · '+money(total)}</button></div>`,null,'anmodal');
+    if(r!=='go') return;
+    pl.page=page; pl.at=Date.now(); await put('plans',key,pl).catch(()=>{});
+    player(c,page,pl,cv); }
+
+  let P2=null;
+  function player(c,page,pl,cv){ close(); const el=document.createElement('div'); el.id='anim'; el.innerHTML=`<header class="anbar"><button class="icbtn" id="anClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button><div class="antitle"><b>${esc(c.title)}</b><small>Page ${ordOf(page)+1} · ${pl.panels.length} panels</small></div><button class="rbtn" id="anSave" aria-label="Save clip"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>Save</button></header>
+      <div class="anstage"><video id="anVid" playsinline controls preload="auto"></video><div class="anwait" id="anWait"></div></div>
+      <div class="annotes" id="anNotes"></div><div class="anstrip" id="anStrip">${pl.panels.map((q,k)=>`<button class="anchip" data-k="${k}"><img src="${q.thumb}" alt=""><i>${k+1}</i><em></em></button>`).join('')}</div>`;
+    document.body.appendChild(el); const S={el,c,page,pl,cv,cur:-1,urls:[],state:pl.panels.map(()=>'wait'),err:[],gen:{}}; P2=S;
+    const vid=el.querySelector('#anVid');
+    el.querySelector('#anClose').onclick=close;
+    el.querySelector('#anStrip').onclick=e=>{ const b=e.target.closest('.anchip'); if(b) show(+b.dataset.k,true); };
+    el.querySelector('#anSave').onclick=()=>save(S);
+    vid.onended=()=>{ const n=S.cur+1; if(n<pl.panels.length) show(n,true); };
+    S.show=show; function show(k,play){ S.cur=k; const q=pl.panels[k];
+      el.querySelectorAll('.anchip').forEach((b,i)=>b.classList.toggle('on',i===k));
+      el.querySelector('#anNotes').innerHTML=`<b>${k+1}. ${esc(q.what)}</b><div class="annote"><span>Camera</span>${esc(q.camera)}</div><div class="annote"><span>Music &amp; sound</span>${esc(q.sound)}</div><div class="annote"><span>Pacing</span>${esc(q.pacing)}</div>`;
+      const w=el.querySelector('#anWait'), st=S.state[k];
+      if(st==='ready'){ w.classList.add('hidden'); vid.classList.remove('hidden'); if(vid.dataset.k!==String(k)){ vid.src=S.urls[k]; vid.dataset.k=k; } if(play) vid.play().catch(()=>{}); }
+      else { vid.pause(); vid.classList.add('hidden'); w.classList.remove('hidden'); w.style.backgroundImage=`url(${q.thumb})`; w.innerHTML=`<span>${st==='fail'?esc(S.err[k]||'This panel couldn’t be animated'):st==='make'?'<i class="spin"></i>Animating panel…':'<i class="spin"></i>Waiting its turn…'}</span>`; } }
+    function mark(k,st,err){ S.state[k]=st; if(err) S.err[k]=err; const b=el.querySelectorAll('.anchip')[k]; if(b){ b.dataset.st=st; } if(S.cur===k) show(k,st==='ready'&&(vid.paused||vid.ended)); else if(st==='ready'&&S.cur>=0&&S.state[S.cur]!=='ready'&&k===S.cur+1) {} }
+    S.mark=mark; show(0,false); run(S); }
+
+  async function run(S){ const {c,page,pl}=S, base=c.id+':'+page; let next=0, live=true; S.stop=()=>{ live=false; };
+    // cached clips first
+    for(let k=0;k<pl.panels.length;k++){ const b=await get('clips',base+':'+k).catch(()=>null); if(b&&b.blob){ S.urls[k]=URL.createObjectURL(b.blob); S.mark(k,'ready'); } }
+    if(S.state[0]==='ready') S.show(0,true);
+    const todo=pl.panels.map((q,k)=>k).filter(k=>S.state[k]!=='ready'); if(!todo.length){ pl.done=true; return; }
+    if(!S.cv) S.cv=await pageImage(page);
+    const one=async k=>{ const q=pl.panels[k]; S.mark(k,'make');
+      try{ const img=crop(S.cv,q.box).toDataURL('image/jpeg',.9);
+        const prompt=`${q.prompt} Camera: ${q.camera}. Sound: ${q.sound}. Pacing: ${q.pacing}. Keep the original comic book art style, inks and colors.`;
+        const {id}=await call('/clip',{image:img,prompt,seconds:q.seconds});
+        for(let i=0;i<120&&live;i++){ await new Promise(r=>setTimeout(r,5000)); const s=await call('/clip/'+id).catch(()=>({status:'pending'}));
+          if(s.status==='done'&&s.url){ const r=await fetch(API+'/video?u='+encodeURIComponent(s.url),{headers:{'x-pass':pass()}}); if(!r.ok) throw new Error('Couldn’t download the clip');
+            const blob=await r.blob(); await put('clips',base+':'+k,{blob,at:Date.now()}).catch(()=>{}); S.urls[k]=URL.createObjectURL(blob); S.mark(k,'ready'); if(S.cur===k||S.state.slice(0,k).every(x=>x==='fail')) S.show(k,true); return; }
+          if(s.status==='failed'||s.status==='expired') throw new Error(s.moderated?'Grok Imagine declined this panel (content rules)':(s.error||'Grok Imagine couldn’t make this clip'));
+          if(s.moderated) throw new Error('Grok Imagine declined this panel (content rules)'); }
+        if(live) throw new Error('Timed out waiting for this clip'); }
+      catch(e){ if(!live) return; const msg=e.j&&e.j.refused?'Grok Imagine declined this panel: '+e.message:e.message; S.mark(k,'fail',msg); if(e.j&&e.j.cap){ live=false; toast(e.message); } } };
+    // 3 at a time, in reading order
+    const lanes=[0,1,2].map(async(l)=>{ await new Promise(r=>setTimeout(r,l*1500)); while(live&&next<todo.length){ await one(todo[next++]); } }); await Promise.all(lanes);
+    if(S.state.every(s=>s!=='wait'&&s!=='make')){ pl.done=S.state.every(s=>s==='ready'); await put('plans',base,{...pl,done:pl.done}).catch(()=>{}); const f=S.state.filter(s=>s==='fail').length; if(P2===S) toast(f?`${pl.panels.length-f} of ${pl.panels.length} panels animated`:'All panels animated'); } }
+
+  async function save(S){ const k=S.cur; if(S.state[k]!=='ready'){ toast('This clip isn’t ready yet'); return; }
+    const blob=await (await fetch(S.urls[k])).blob(), name=`${(S.c.title||'comic').replace(/[^\w\- ]+/g,'').trim()} p${ordOf(S.page)+1} panel ${k+1}.mp4`;
+    const f=new File([blob],name,{type:'video/mp4'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){ try{ await navigator.share({files:[f]}); }catch(e){} return; }
+    const a=document.createElement('a'); a.href=S.urls[k]; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+  function close(){ if(!P2) return; P2.stop&&P2.stop(); P2.urls.forEach(u=>u&&URL.revokeObjectURL(u)); P2.el.remove(); P2=null; }
+  const IC_NOTE='<svg class="i" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>';
+  return {start,passSheet,close,isOpen:()=>!!P2};
+})();
+$('#rAnim').onclick=e=>{ e.stopPropagation(); Anim.start(); };
 /* ================= boot ================= */
 window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},qs:{create:newQueue,seeAll},sale:{of:onSale,key:saleKey,open:openSale},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS,all:allCreators,openList:openCreators,closeList:closeCreators,meta:pdfCredits,about:{open:openAbout,close:closeAbout,of:notesOf,lookup:lookupNotes,AB,data:()=>NOTES}},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
 (async()=>{ try{ await loadLibrary(); }catch(e){ console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }

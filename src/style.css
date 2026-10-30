@@ -614,3 +614,36 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .ntg ul{margin:0;padding-left:18px}.ntg li{font-size:14.5px;line-height:1.45;color:#e5e5ea;margin:0 0 6px}
 .ntsrc{font-size:11px;color:#0a84ff;text-decoration:none;white-space:nowrap;margin-left:2px;padding:2px 0}
 .ntfoot{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap}.ntfoot .pillbtn{min-height:40px;padding:0 16px}
+/* ---- Animate page ---- */
+@media (max-width:560px){#rAnim .w{display:none}}
+.anmodal{width:min(560px,100%)}
+.anplan{display:flex;flex-direction:column;gap:8px}
+.anscore{display:flex;gap:8px;align-items:flex-start;margin:0 0 4px;font-size:13.5px;color:#cfd2d8}
+.anscore svg.i{width:18px;height:18px;flex:none;margin-top:1px}
+.anrow{display:flex;gap:10px;align-items:center;background:var(--el2);border-radius:10px;padding:8px}
+.anrow img{width:64px;height:64px;object-fit:cover;border-radius:6px;flex:none;background:#000}
+.anrow b{display:block;font-size:14px;line-height:1.25}
+.anrow span{display:block;font-size:12.5px;color:#aeb3bb;margin-top:2px}
+.anrow small{display:block;font-size:12px;color:#8d929b;margin-top:2px}
+#anim{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column;color:#fff}
+.anbar{background:#111;padding-top:env(safe-area-inset-top);flex:none}
+.anbar{display:flex;align-items:center;gap:6px;padding-left:max(6px,env(safe-area-inset-left));padding-right:max(6px,env(safe-area-inset-right));min-height:44px;box-sizing:content-box;height:48px}
+.antitle{flex:1;min-width:0;text-align:center}.antitle b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.antitle small{font-size:12px;color:#9aa0a8}
+.anbar .icbtn{color:#fff}
+.anstage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;background:#000}
+.anstage video{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;background:#000}
+.anwait{position:absolute;inset:0;background:#000 center/contain no-repeat;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18px}
+.anwait span{background:#000c;border-radius:20px;padding:9px 14px;font-size:14px;display:flex;align-items:center;gap:8px;max-width:86%;text-align:center}
+.anwait .spin{width:16px;height:16px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:anspin .9s linear infinite;flex:none}
+@keyframes anspin{to{transform:rotate(360deg)}}
+.annotes{flex:none;background:#111;padding:10px max(14px,env(safe-area-inset-left)) 6px;font-size:13px;color:#c9ccd2;max-height:26vh;overflow:auto}
+.annotes b{display:block;color:#fff;font-size:14.5px;margin-bottom:4px}
+.annote{margin-top:3px}.annote span{color:#8d929b;margin-right:6px;font-weight:600}
+.anstrip{flex:none;background:#111;display:flex;gap:8px;overflow-x:auto;padding:8px max(12px,env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom))}
+.anchip{position:relative;flex:none;width:56px;height:56px;border-radius:8px;overflow:hidden;background:#222;border:2px solid transparent;padding:0}
+.anchip.on{border-color:#fff}
+.anchip img{width:100%;height:100%;object-fit:cover;opacity:.45}
+.anchip[data-st=ready] img{opacity:1}
+.anchip i{position:absolute;left:4px;top:2px;font-style:normal;font-size:12px;font-weight:700;text-shadow:0 1px 2px #000}
+.anchip[data-st=fail] em{position:absolute;inset:0;background:#7a1d1d99}
+.anchip[data-st=make] em{position:absolute;right:4px;bottom:4px;width:10px;height:10px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:anspin .9s linear infinite}

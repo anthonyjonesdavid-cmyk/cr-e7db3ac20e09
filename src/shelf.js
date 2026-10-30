@@ -590,6 +590,8 @@ async function openSettings(){
       <div class="frow"><button class="btn ghost" data-r="lookup" id="sLookup">Look Up Release Dates…</button></div></div>
     <div class="sgrp"><b>Series</b><span>${seriesCounts().length} series. Combine series that came from separate folders (e.g. issue ranges) into one.</span>
       <div class="frow"><button class="btn ghost" data-r="merge" id="sMerge">Merge Series…</button><button class="btn ghost" data-r="arrange" id="sArrange">Arrange Categories…</button></div></div>
+    <div class="sgrp"><b>Animate page</b><span>${store.get('animPass','')?'Passcode saved on this device.':'Set a passcode so only your devices can use your xAI credits.'} Daily limit $10.</span>
+      <div class="frow"><button class="btn ghost" data-r="animpass" id="sAnimPass">${store.get('animPass','')?'Change Passcode…':'Set Passcode…'}</button></div></div>
     <div class="note"><b>Private and offline.</b> Comics are copied into this app's on-device storage (IndexedDB). Nothing is uploaded.</div>
     <div class="note"><b>Home Screen app:</b> on iPad, the Home Screen app has its own storage, separate from Safari's. Add this page to your Home Screen (Share → Add to Home Screen), open it from there, and import your comics inside the Home Screen app.${standalone?'<br><b>✓ You are in the Home Screen app.</b>':'<br>You are currently in the browser.'}</div>
     ${persisted?'':'<button class="btn ghost" id="sPersist" data-r="persist">Request Persistent Storage</button>'}
@@ -598,7 +600,7 @@ async function openSettings(){
     w.querySelector('#sFolderSave').onclick=()=>{ const f=Drive.parseFolderLink(w.querySelector('#sFolder').value); if(!f){ toast("That doesn't look like a Google Drive folder link"); return; }
       Drive.setFolder({...f,name:'Custom folder'}); w.querySelector('#sFolder').value=''; cur(); toast('Drive folder saved'); };
     const rs=w.querySelector('#sFolderReset'); if(rs) rs.onclick=()=>{ Drive.setFolder(null); rs.remove(); cur(); toast('Using the default Drive folder'); }; });
-  if(r==='lookup'){ lookupAll(); return; }
+  if(r==='lookup'){ lookupAll(); return; } if(r==='animpass'){ Anim.passSheet(); return; }
   if(r==='merge'){ mergeSeries(); return; } if(r==='arrange'){ arrangeRows(); return; }
   if(r==='persist'){ try{ const ok=await navigator.storage.persist(); toast(ok?'Storage marked persistent':'The browser declined for now. It often allows it in the Home Screen app.'); }catch(e){ toast('Not supported here'); } } }
 

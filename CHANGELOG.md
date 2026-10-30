@@ -1,5 +1,14 @@
 # Comic Shelf: change log
 
+## cr-v55 — 2026-10-29
+
+- **Animate page (Grok Imagine).** A new **Animate** button in the reader's top bar sends the page you're on to Grok. Grok (grok-4.3, vision) finds each panel and writes a cinematic plan for it: what happens, a motion prompt, the camera move, music and sound, pacing, and a 5–8 s length. The sheet shows every panel with its notes, the total length and the estimated cost, and today's spend against the $10 daily limit; nothing is made until you tap **Animate · $X.XX**.
+- Each panel is cropped from the page and animated with grok-imagine-video-1.5-lite at 720p ($0.03/s + $0.01 per panel), three at a time. The player plays the clips in reading order with each panel's camera / music / pacing notes, a strip to jump between panels, and **Save** (share sheet, or download). Clips are kept on this device (IndexedDB `cr-anim`), so re-opening Animate on that page offers **Play** for free, or **Make New**.
+- If Grok Imagine declines a panel (content rules) or a clip fails, that panel says so and the others still play; failed clips are not charged against the daily limit.
+- **Passcode.** Settings › Animate page › Set Passcode. The server (Cloudflare Worker `cr-animate.djapps.workers.dev`) keeps the xAI key and only the passcode's salted hash; requests without the passcode are refused, 20 wrong tries locks it for the day, and spending stops at $10 a day (America/Chicago).
+- On a two-page spread, Animate uses the left page.
+- Server source in `server/worker.js`. New suite `test/e2e_v55.py` (mocked server at 4 sizes; `REAL=1` runs one real 2-panel test).
+
 ## cr-v54 — 2026-10-29
 
 - **Creators list.** A Creators button in the Library bar (next to Sort) opens every writer, artist and cover artist on your shelf, with their roles and issue counts. Search by name and sort A–Z (by last name) or by Most issues. A row opens that creator's page.
