@@ -157,7 +157,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   hideToast(); readerEl.classList.remove('hidden'); readerEl.classList.add('ui'); $('#shelf').classList.add('hidden'); $('#rTitle').textContent=c.title; zoomer.replaceChildren(); R.viewEl=null;
   let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); }catch(err){ console.warn(err); toast('Could not open this comic: '+(err.message||err)); closeReader(); return; }
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
-  R.doc=doc; if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
+  R.doc=doc; if(c.creditsV!==1){ c.creditsV=1; pdfCredits(doc).then(m=>{ c.metaCredits=m; dbPut(c); }).catch(()=>{}); } if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
   R.rot=null; if(!R.fold) try{ await scanAspects(doc,c); }catch(e){ console.warn('page shapes',e); } if(R.comic!==c) return;
   R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1); renderView();

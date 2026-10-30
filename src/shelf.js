@@ -199,7 +199,7 @@ function renderSeriesHero(){ const sh=$('#seriesHero'); if(!sh) return;
   const L=seriesHeroList(ui.series), sig=ui.series+'|'+L.map(c=>c.id+'.'+(c.coverV||'')).join(',');
   if(sh.dataset.sig===sig) return; sh.dataset.sig=sig; SCF.stop();
   if(!L.length){ sh.innerHTML=''; SCF.el=null; SCF.items=[]; return; }
-  sh.innerHTML=`<div class="hero shero"><div class="cf" id="scf" aria-label="${esc(ui.series)}">${cfItemsHTML(L)}</div></div>`; SCF.mount($('#scf'),L); }
+  sh.innerHTML=`<div class="hero shero"><div class="cf" id="scf" aria-label="${esc(ui.series)}">${cfItemsHTML(L)}</div></div>${typeof seriesCreatorsHTML==='function'?seriesCreatorsHTML(L):''}`; SCF.mount($('#scf'),L); }
 // v44: category rows (series + reading lists) under Continue Reading are behind this Settings toggle, off by default. Turn it on to bring them back.
 const homeRows=()=>!!store.get('homeRows',false);
 function renderHome(){
@@ -463,6 +463,7 @@ async function confirmBox(title,msg,ok='Delete'){ return (await modal(`<div clas
 async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) return; document.querySelector('.mwrap')?.remove();
   const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>${creditsHTML(c)?`<div class="crwrap">${creditsHTML(c)}</div>`:''}
     <button class="act" data-r="read" id="aRead">${IC.book}${c.lastRead&&!isDone(c)?'Continue Reading':'Read'}</button>
+    <button class="act" data-r="about" id="aAbout">${IC.book}About this issue</button>
     <button class="act" data-r="queue" id="aQueue">${IC.list}Add to Reading List…</button>
     <button class="act" data-r="edit" id="aEdit">${IC.edit}Edit Title &amp; Series</button>
     <button class="act" data-r="date" id="aDate">${IC.cal}Release Date<small class="actv">${esc(fmtDate(dateOf(c)))}</small></button>
@@ -471,7 +472,7 @@ async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) r
     ${o.cont&&!isPinned(c.id)?`<button class="act" data-r="conthide" id="aContHide">${IC.undo}Remove from Continue Reading</button>`:''}
     <button class="act red" data-r="delete" id="aDelete">${IC.trash}Delete from Device</button></div>
     <button class="cancel" data-r="cancel">Cancel</button>`,null,'sheet');
-  if(r==='read') openReader(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id); else if(r==='conthide') contHide(id); else if(r==='pin') contPin(id,!isPinned(id));
+  if(r==='read') openReader(id); else if(r==='about') openAbout(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id); else if(r==='conthide') contHide(id); else if(r==='pin') contPin(id,!isPinned(id));
   else if(r==='toggle'){ if(isDone(c)){ c.progress=0; c.page=0; c.lastRead=0; } else { c.progress=1; } await dbPut(c); renderShelf(); } }
 async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   const series=[...new Set(comics.map(x=>x.series).filter(Boolean))].sort();

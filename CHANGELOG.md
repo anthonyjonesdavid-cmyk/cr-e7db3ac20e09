@@ -1,5 +1,14 @@
 # Comic Shelf: change log
 
+## cr-v54 — 2026-10-29
+
+- **Creators list.** A Creators button in the Library bar (next to Sort) opens every writer, artist and cover artist on your shelf, with their roles and issue counts. Search by name and sort A–Z (by last name) or by Most issues. A row opens that creator's page.
+- **Creator pages show roles.** Each cover is labeled Writer, Artist or Cover (or a mix), and the info sheet and the reader's Issue Info show a Cover row when known. A series page lists its main writers, artists and cover artists as tappable names under the carousel.
+- **Credits from the file's own metadata.** On import, and the first time an older issue is opened, the app reads ComicInfo.xml (Writer, Penciller, CoverArtist) or the PDF's Author. These only fill roles the built-in list has no names for and never replace them. Cover artists come only from this metadata.
+- **About this issue** (info sheet › About this issue, or the reader's Issue Info). It shows noteworthy facts (first appearances, deaths, key notes) and anything the creators said, plus what was happening in the U.S. and the world in the issue's cover month. Every item links its source (Marvel Database / DC Database / Image Comics Database / Wikipedia). Nothing is guessed: no source, no line. The built-in data (`src/notes-data.js`, made by `tools/gen_notes.py`) covers 776 of 778 issues. **Look up / Refresh** fetches the wiki page for new issues and saves it on this device.
+- Left-edge swipe back on the Creators list, creator pages and About.
+- New suites `test/e2e_v54.py`, `test/e2e_v54b.py`.
+
 ## cr-v51 — 2026-10-22
 
 - **Home carousel matches the series pages again.** Home now uses the same CoverFlow as the series carousels in Library (it already shared the code; v46–v47 had added Home-only overrides). That means the classic look from v45 and earlier: a front-facing centre cover, side covers turned inward and tightly overlapping, and the glossy reflection fading underneath. The v46 "fit to the shelf" and v47 "pivot on the shelf line" overrides are gone. Home still shows every issue in release order, oldest first, looping, and the carousel is still sized so Home fits without scrolling with the spine shelf and Continue Reading.

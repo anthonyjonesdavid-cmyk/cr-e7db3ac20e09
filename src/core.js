@@ -130,7 +130,14 @@ async function coverMeta(doc,mode='auto'){
   let aspect=vp.width/vp.height;
   if(cv.wide&&doc.numPages>1){ try{ const p2=await doc.getPage(2); const v2=p2.getViewport({scale:1}); aspect=v2.width/v2.height; p2.cleanup(); }catch(e){} }
   let metaDate=null; try{ metaDate=await pdfDate(doc); }catch(e){}
-  return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect,metaDate,dateV:DATE_V}; }
+  let metaCredits=null; try{ metaCredits=await pdfCredits(doc); }catch(e){}
+  return {cover:cv.cover,coverCrop:cv.crop,coverMode:mode,coverV:COVER_V,aspect,metaDate,dateV:DATE_V,metaCredits,creditsV:1}; }
+// v54: creators from the file's own metadata (ComicInfo.xml Writer / Penciller / CoverArtist; else the PDF Author as writer). Only fills roles the built-in list lacks.
+async function pdfCredits(doc){ const sp=v=>String(v||'').split(/[,;]|\s&\s|\sand\s/).map(x=>x.trim()).filter(x=>x&&x.length<60);
+  try{ const at=await doc.getAttachments(); if(at) for(const k in at){ const a=at[k]; if(/comicinfo\.xml$/i.test(a.filename||k)){ const x=new TextDecoder().decode(a.content), g=t=>{ const m=x.match(new RegExp('<'+t+'>([^<]*)</'+t+'>','i')); return m?sp(m[1].replace(/&amp;/g,'&')):[]; };
+    const r={writer:g('Writer'),artist:g('Penciller'),cover:g('CoverArtist')}; if(r.writer.length||r.artist.length||r.cover.length) return r; } } }catch(e){}
+  try{ const md=await doc.getMetadata(); const au=md&&md.info&&md.info.Author; const w=sp(au).filter(n=>/^[A-Z][\w.'-]+(\s+[A-Z][\w.'-]+)+$/.test(n)); if(w.length) return {writer:w,artist:[],cover:[]}; }catch(e){}
+  return null; }
 
 /* ================= release dates (Timeline) =================
    Order of trust: manual (set by David) > embedded metadata (ComicInfo.xml attached to the PDF, XMP prism:coverDate /

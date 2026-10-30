@@ -19,7 +19,7 @@
   <main id="library" class="tabview hidden">
     <div class="libbar">
       <div class="lrow"><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search your library" autocomplete="off" enterkeyhint="search"></label>
-        <button class="sortbtn" id="sortBtn" aria-haspopup="menu"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg><span id="sortLbl">Recent</span></button></div>
+        <button class="sortbtn" id="sortBtn" aria-haspopup="menu"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg><span id="sortLbl">Recent</span></button><button class="sortbtn crlbtn" id="crlBtn" aria-label="Creators"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.2a5 5 0 0 1 5.5 5"/></svg><span class="w">Creators</span></button></div>
       <div class="chips" id="chips"></div>
     </div>
     <div class="scrollv" id="libScroll"><div id="seriesHero"></div><div class="lgrid" id="libGrid"></div></div>
@@ -60,8 +60,16 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=53',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=54',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
+  <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
+    <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <div class="rkt"><h2 id="abName"></h2><small id="abSub"></small></div><span></span></div></header><div class="scrollv" id="abBody"></div></section>
+  <section id="creators" class="hidden" aria-label="Creators"><header class="rkbar"><div class="tb-row rk-row">
+    <button class="icbtn" id="crlClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+    <div class="rkt"><h2>Creators</h2><small id="crlSub"></small></div><span></span></div>
+    <div class="crlbar"><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="crlQ" type="search" placeholder="Search creators" autocomplete="off"></label>
+    <div class="crlsort" id="crlSort"><button data-s="name" class="on">A–Z</button><button data-s="count">Most issues</button></div></div></header><div class="scrollv" id="crlList"></div></section>
   <section id="creator" class="hidden" aria-label="Creator"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="crClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="rkt"><h2 id="crName"></h2><small id="crSub"></small></div><span></span></div></header><div class="scrollv" id="crBody"></div></section>

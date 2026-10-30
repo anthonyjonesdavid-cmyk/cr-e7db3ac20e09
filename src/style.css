@@ -592,3 +592,25 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* v50 Continue Reading: no heading, thumbnails 25% smaller (the carousel grows into the freed height) */
 #contRow .rc{width:calc(var(--rw)*.75)}
 #homeScroll .rows>#contRow{margin-top:14px}
+
+/* v54: Creators list, roles on creator covers, series creators */
+.crlbtn{height:40px;min-width:40px}
+@media (max-width:560px){.crlbtn .w{display:none}.crlbtn{padding:0 10px}}
+#creators{position:fixed;inset:0;z-index:59;background:#000;display:flex;flex-direction:column}#creators.hidden{display:none}
+.crlbar{display:flex;gap:8px;align-items:center;padding:0 0 10px}.crlbar .search{flex:1;min-width:0}
+.crlsort{flex:none;display:flex;background:var(--el);border-radius:10px;padding:2px}.crlsort button{height:36px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:600;color:var(--mut)}.crlsort button.on{background:var(--el3);color:#fff}
+#crlList{padding:0 var(--padr) calc(var(--sab) + 16px) var(--padx)}
+.crlr{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:6px 2px;border-bottom:.5px solid var(--sep);text-align:left;background:#000;-webkit-tap-highlight-color:transparent}
+.crlr:active{background:#000;opacity:.6}
+.crln{flex:1;min-width:0;font-size:16px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crln small{display:block;font-size:12px;font-weight:500;color:var(--mut)}
+.crlc{flex:none;color:var(--mut);font-size:14px;font-variant-numeric:tabular-nums}.crlr .i{flex:none;width:16px;height:16px;color:var(--el3)}
+.crc .tr{font-size:10.5px;color:#ff9f0a;font-weight:600}
+.scred{margin:4px var(--padr) 6px var(--padx)}
+
+/* v54: About this issue */
+#about{position:fixed;inset:0;z-index:58;background:#000;display:flex;flex-direction:column}#about.hidden{display:none}
+#abBody{padding:12px var(--padr) calc(var(--sab) + 20px) var(--padx)}#abBody .rinfo{display:flex;gap:14px;align-items:flex-start}#abBody .rinfo img{width:96px;border-radius:4px;flex:none}
+.ntg{margin-top:16px;max-width:760px}.ntg h3{margin:0 0 6px;font-size:15px}.ntg h4{margin:10px 0 4px;font-size:12.5px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.ntg ul{margin:0;padding-left:18px}.ntg li{font-size:14.5px;line-height:1.45;color:#e5e5ea;margin:0 0 6px}
+.ntsrc{font-size:11px;color:#0a84ff;text-decoration:none;white-space:nowrap;margin-left:2px;padding:2px 0}
+.ntfoot{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap}.ntfoot .pillbtn{min-height:40px;padding:0 16px}
