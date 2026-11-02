@@ -651,6 +651,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* v56 launch panorama */
 #splash{position:fixed;inset:0;z-index:2147483000;background:#000;overflow:hidden;transition:opacity .4s ease;cursor:pointer}
 #splash.out{opacity:0;pointer-events:none}
+#splash.fly{background:transparent;pointer-events:none;transition:background-color .35s ease}
+#splash.fly .spvig{opacity:0;transition:opacity .35s ease}
+#splash.fly .sprow{animation-play-state:paused}
 #splash .spin{transform:rotate(-4deg) scale(1.12);transform-origin:50% 40%}
 #splash .sprow{display:flex;width:max-content;animation:spdrift 80s linear infinite;will-change:transform}
 #splash .sprow img,#splash .sprow i{display:block;flex:none;border-radius:4px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,.6)}

@@ -699,6 +699,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* v56 launch panorama */
 #splash{position:fixed;inset:0;z-index:2147483000;background:#000;overflow:hidden;transition:opacity .4s ease;cursor:pointer}
 #splash.out{opacity:0;pointer-events:none}
+#splash.fly{background:transparent;pointer-events:none;transition:background-color .35s ease}
+#splash.fly .spvig{opacity:0;transition:opacity .35s ease}
+#splash.fly .sprow{animation-play-state:paused}
 #splash .spin{transform:rotate(-4deg) scale(1.12);transform-origin:50% 40%}
 #splash .sprow{display:flex;width:max-content;animation:spdrift 80s linear infinite;will-change:transform}
 #splash .sprow img,#splash .sprow i{display:block;flex:none;border-radius:4px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,.6)}
@@ -711,7 +714,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 </style>
 </head>
 <body>
-<!-- v57 launch panorama: drifting rows of covers. Tiles draw instantly, then fill from the IndexedDB snapshot ('cr-splash'), or straight from the library's covers if no snapshot exists yet -->
+<!-- v58: panorama stays ~5s from launch (tap dismisses early), then covers fly out from center (plain fade if reduced motion). v57 launch panorama: drifting rows of covers. Tiles draw instantly, then fill from the IndexedDB snapshot ('cr-splash'), or straight from the library's covers if no snapshot exists yet -->
 <div id="splash" aria-hidden="true"></div>
 <script>
 (function(){ var el=document.getElementById('splash');
@@ -739,8 +742,17 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
       s.onsuccess=function(){ var d=s.result; try{ var g=d.transaction('k').objectStore('k').get('thumbs');
           g.onsuccess=function(){ d.close(); var a=g.result||[]; if(a.length) fill(blobs(a)); else fromLibrary(); }; g.onerror=function(){ d.close(); fromLibrary(); };
         }catch(x){ d.close(); fromLibrary(); } }; s.onerror=fromLibrary; }catch(e){ fromLibrary(); } }
-  window.__crSplashHide=function(now){ if(gone) return; gone=true; var wait=now?0:Math.max(0,600-performance.now());
-    setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },450); },wait); };
+  var hideT=0, out=false;
+  window.__crSplashHide=function(now){ if(out||(gone&&!now)) return; gone=true; clearTimeout(hideT); var wait=now?0:Math.max(0,5000-performance.now());
+    hideT=setTimeout(function(){ if(out) return; out=true; fly(); },wait); };
+  function fly(){ var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(rm){ el.classList.add('out'); setTimeout(function(){ el.remove(); },450); return; }
+    var cx=innerWidth/2, cy=innerHeight/2, tiles=el.querySelectorAll('.sprow img,.sprow i'), D=Math.hypot(innerWidth,innerHeight);
+    Array.prototype.forEach.call(tiles,function(t){ var r=t.getBoundingClientRect(); if(r.right<0||r.left>innerWidth||r.bottom<0||r.top>innerHeight){ t.style.visibility='hidden'; return; }
+      var dx=r.left+r.width/2-cx, dy=r.top+r.height/2-cy, d=Math.hypot(dx,dy)||1, k=D/d;
+      t.style.transition='transform .7s cubic-bezier(.5,0,.75,0) '+Math.round(Math.random()*180)+'ms';
+      t.style.transform='translate3d('+(dx*k).toFixed(0)+'px,'+(dy*k).toFixed(0)+'px,0) rotate('+((Math.random()-.5)*60).toFixed(0)+'deg)'; });
+    el.classList.add('fly'); setTimeout(function(){ el.remove(); },950); }
   el.addEventListener('pointerdown',function(){ window.__crSplashHide(true); });
   setTimeout(function(){ window.__crSplashHide(true); },15000);   // never trap the screen
 })();

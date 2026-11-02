@@ -1,5 +1,9 @@
 # Comic Shelf: change log
 
+## cr-v58 — 2026-11-02
+
+- **Opening cover panorama now stays up about 5 seconds** from launch (was ~0.6 s), then the covers fly out in every direction from screen center (staggered, slight rotation, ~0.7 s, transforms only) revealing Home; plain fade with reduced motion. Home still loads underneath; tapping the panorama skips straight to the fly-out (also fixes tap-to-skip being ignored once Home had loaded). Cover snapshot saving unchanged from v57.
+
 ## cr-v57 — 2026-11-02
 
 - **Launch panorama now shows your covers on the iPad.** Root cause: the cover snapshot was only written 5 s after launch (into `localStorage`), and a Home Screen app on iPad is usually closed or suspended by iOS before that timer fires, so the snapshot was never saved and every launch showed empty tiles.
