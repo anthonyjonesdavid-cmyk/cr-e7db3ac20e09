@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v56 — 2026-11-02
+
+- **Faster launch, no blank screen.** Root cause: the service worker fetched the whole 822 KB page from the network on every launch (network-first, up to a 6 s wait) before anything ran, and Home only drew after the full library (all covers) was read from IndexedDB. The page is now served **cache-first** from the service worker and refreshed in the background (a new version still takes over via the existing update reload).
+- **Cover panorama while loading.** Rows of random covers from your own shelf drift sideways on a dark background the instant the app opens, then fade into Home as soon as it's ready (shown at least 0.6 s; tap to dismiss). It uses ~30 small thumbnails saved on this device after each launch (`localStorage` `cr-splash-v1`); the very first launch shows a dark skeleton instead.
+- Black page background set inline in `<head>`, so iOS never flashes white. Off-screen Home row covers lazy-load.
+- Measured in WebKit (778-issue library, 150 ms / 12 Mbps network): first visible content 217–395 ms → ~50 ms; Home with covers on a cached launch 2.2–3.5 s → 1.4–1.6 s.
+
 ## cr-v55 — 2026-10-29
 
 - **Animate page (Grok Imagine).** A new **Animate** button in the reader's top bar sends the page you're on to Grok. Grok (grok-4.3, vision) finds each panel and writes a cinematic plan for it: what happens, a motion prompt, the camera move, music and sound, pacing, and a 5–8 s length. The sheet shows every panel with its notes, the total length and the estimated cost, and today's spend against the $10 daily limit; nothing is made until you tap **Animate · $X.XX**.

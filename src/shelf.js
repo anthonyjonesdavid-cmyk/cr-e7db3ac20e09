@@ -156,7 +156,7 @@ async function addToQueue(id){ const c=comics.find(x=>x.id===id); if(!c) return;
   renderShelf(); if(added.length) toast(`Added to ${added.map(n=>'“'+n+'”').join(', ')}`); }
 // edit a list: rename, drag ≡ to reorder, remove comics, delete the list
 async function editQueue(qid){ const q=queues.find(x=>x.id===qid); if(!q) return; document.querySelector('.mwrap')?.remove();
-  const li=c=>`<li class="arr qi" data-id="${c.id}"><span class="ah" aria-hidden="true">${IC.grip}</span><img src="${cover(c)}" alt=""><span class="at"><b>${esc(c.title)}</b><small>${c.series?esc(c.series)+' · ':''}${isDone(c)?'Finished':inProg(c)?pctOf(c)+'%':'Unread'}</small></span>
+  const li=c=>`<li class="arr qi" data-id="${c.id}"><span class="ah" aria-hidden="true">${IC.grip}</span><img src="${cover(c)}" alt="" loading="lazy" decoding="async"><span class="at"><b>${esc(c.title)}</b><small>${c.series?esc(c.series)+' · ':''}${isDone(c)?'Finished':inProg(c)?pctOf(c)+'%':'Unread'}</small></span>
     <button class="qx" aria-label="Remove ${esc(c.title)}">${IC.x}</button></li>`;
   const {r,vals}=await modal(`<div class="mh"><h3>Reading List</h3><label class="fld" style="margin-top:8px"><input type="text" id="qeName" value="${esc(q.name)}" maxlength="80" autocomplete="off" aria-label="Name"></label>
     <p class="dlsub" id="qeSub"></p></div>
@@ -461,7 +461,7 @@ function modal(html,onOpen,cls){ return new Promise(res=>{ const w=document.crea
   onOpen&&onOpen(w,close); }); }
 async function confirmBox(title,msg,ok='Delete'){ return (await modal(`<div class="mh"><h3>${esc(title)}</h3></div><div class="mb"><p class="confirm-msg">${esc(msg)}</p></div><div class="mf"><button class="btn ghost" data-r="no">Cancel</button><button class="btn red" data-r="yes" id="confirmOk">${esc(ok)}</button></div>`)).r==='yes'; }
 async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) return; document.querySelector('.mwrap')?.remove();
-  const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt=""><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>${creditsHTML(c)?`<div class="crwrap">${creditsHTML(c)}</div>`:''}
+  const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt="" loading="lazy" decoding="async"><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>${creditsHTML(c)?`<div class="crwrap">${creditsHTML(c)}</div>`:''}
     <button class="act" data-r="read" id="aRead">${IC.book}${c.lastRead&&!isDone(c)?'Continue Reading':'Read'}</button>
     <button class="act" data-r="about" id="aAbout">${IC.book}About this issue</button>
     <button class="act" data-r="queue" id="aQueue">${IC.list}Add to Reading List…</button>

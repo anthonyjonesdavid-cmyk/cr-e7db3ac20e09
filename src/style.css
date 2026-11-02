@@ -647,3 +647,16 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .anchip i{position:absolute;left:4px;top:2px;font-style:normal;font-size:12px;font-weight:700;text-shadow:0 1px 2px #000}
 .anchip[data-st=fail] em{position:absolute;inset:0;background:#7a1d1d99}
 .anchip[data-st=make] em{position:absolute;right:4px;bottom:4px;width:10px;height:10px;border:2px solid #fff6;border-top-color:#fff;border-radius:50%;animation:anspin .9s linear infinite}
+
+/* v56 launch panorama */
+#splash{position:fixed;inset:0;z-index:2147483000;background:#000;overflow:hidden;transition:opacity .4s ease;cursor:pointer}
+#splash.out{opacity:0;pointer-events:none}
+#splash .spin{transform:rotate(-4deg) scale(1.12);transform-origin:50% 40%}
+#splash .sprow{display:flex;width:max-content;animation:spdrift 80s linear infinite;will-change:transform}
+#splash .sprow img,#splash .sprow i{display:block;flex:none;border-radius:4px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+#splash .sprow img{opacity:.78}
+#splash .sprow i{background:#1c1c1e}
+#splash .sprow.sk{animation:none}
+#splash .spvig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 30%,rgba(0,0,0,.75) 100%)}
+@keyframes spdrift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){#splash .sprow{animation:none}}
