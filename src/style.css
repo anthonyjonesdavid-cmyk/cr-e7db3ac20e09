@@ -656,7 +656,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 #splash .sprow img,#splash .sprow i{display:block;flex:none;border-radius:4px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,.6)}
 #splash .sprow img{opacity:.78}
 #splash .sprow i{background:#1c1c1e}
-#splash .sprow.sk{animation:none}
+
 #splash .spvig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 30%,rgba(0,0,0,.75) 100%)}
 @keyframes spdrift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){#splash .sprow{animation:none}}

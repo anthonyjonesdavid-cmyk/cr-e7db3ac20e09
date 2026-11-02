@@ -1,16 +1,33 @@
 <body>
-<!-- v56 launch panorama: drifting rows of random covers from the last session (localStorage snapshot), shown instantly while the app loads; plain dark skeleton on first launch -->
+<!-- v57 launch panorama: drifting rows of covers. Tiles draw instantly, then fill from the IndexedDB snapshot ('cr-splash'), or straight from the library's covers if no snapshot exists yet -->
 <div id="splash" aria-hidden="true"></div>
 <script>
-(function(){ var el=document.getElementById('splash'), th=[]; try{ th=JSON.parse(localStorage.getItem('cr-splash-v1')||'[]')||[]; }catch(e){}
+(function(){ var el=document.getElementById('splash');
   var W=innerWidth, H=innerHeight, tw=W<700?84:118, thh=Math.round(tw*1.52), gap=Math.round(tw*.12), rows=Math.ceil(H/(thh+gap))+1, per=Math.ceil(W/(tw+gap))+2, html='';
-  for(var r=0;r<rows;r++){ var t='', seq=[];
-    for(var i=0;i<per;i++) seq.push(th.length?th[Math.floor(Math.random()*th.length)]:'');
-    seq=seq.concat(seq);
-    for(var j=0;j<seq.length;j++) t+=seq[j]?'<img alt="" style="width:'+tw+'px;height:'+thh+'px;margin-right:'+gap+'px" src="'+seq[j]+'">':'<i style="width:'+tw+'px;height:'+thh+'px;margin-right:'+gap+'px"></i>';
-    html+='<div class="sprow'+(th.length?'':' sk')+'" style="margin-bottom:'+gap+'px;animation-duration:'+(70+r*13%30)+'s;animation-direction:'+(r%2?'reverse':'normal')+'">'+t+'</div>'; }
+  for(var r=0;r<rows;r++){ var t='';
+    for(var j=0;j<per*2;j++) t+='<i data-k="'+(j%per)+'" style="width:'+tw+'px;height:'+thh+'px;margin-right:'+gap+'px"></i>';
+    html+='<div class="sprow" style="margin-bottom:'+gap+'px;animation-duration:'+(70+r*13%30)+'s;animation-direction:'+(r%2?'reverse':'normal')+'">'+t+'</div>'; }
   el.innerHTML='<div class="spin" style="margin-top:'+(-Math.round(thh*.35))+'px">'+html+'</div><div class="spvig"></div>';
-  var gone=false; window.__crSplashHide=function(now){ if(gone) return; gone=true; var wait=now?0:Math.max(0,600-performance.now());
+  var gone=false, filled=false;
+  function fill(urls){ if(gone||filled||!urls.length) return; filled=true;
+    var rs=el.querySelectorAll('.sprow');
+    for(var r=0;r<rs.length;r++){ var pick=[]; for(var i=0;i<per;i++) pick.push(urls[Math.floor(Math.random()*urls.length)]);
+      var ts=rs[r].children; for(var j=0;j<ts.length;j++){ var im=document.createElement('img'); im.alt=''; im.style.cssText=ts[j].style.cssText; im.src=pick[+ts[j].dataset.k]; rs[r].replaceChild(im,ts[j]); } }
+    el.classList.add('has'); }
+  function blobs(a){ var u=[]; for(var i=0;i<a.length;i++){ var b=a[i]; if(!b) continue; if(!(b instanceof Blob)) b=new Blob([b],{type:'image/jpeg'}); u.push(URL.createObjectURL(b)); } return u; }
+  function fromLibrary(){ try{ var q=indexedDB.open('comic-reader');
+      q.onupgradeneeded=function(e){ try{ e.target.transaction.abort(); }catch(x){} };   // no library yet: never create it here
+      q.onsuccess=function(){ var d=q.result; try{ if(!d.objectStoreNames.contains('comics')){ d.close(); return; }
+          var out=[], cur=d.transaction('comics').objectStore('comics').openCursor();
+          cur.onsuccess=function(){ var c=cur.result; if(c&&out.length<30){ if(c.value&&c.value.cover) out.push(c.value.cover); c.continue(); } else { d.close(); fill(blobs(out)); } };
+        }catch(x){ d.close(); } }; q.onerror=function(){}; }catch(x){} }
+  try{ var old=JSON.parse(localStorage.getItem('cr-splash-v1')||'[]')||[]; if(old.length) fill(old); }catch(e){}
+  if(!filled){ try{ var s=indexedDB.open('cr-splash',1);
+      s.onupgradeneeded=function(){ s.result.createObjectStore('k'); };
+      s.onsuccess=function(){ var d=s.result; try{ var g=d.transaction('k').objectStore('k').get('thumbs');
+          g.onsuccess=function(){ d.close(); var a=g.result||[]; if(a.length) fill(blobs(a)); else fromLibrary(); }; g.onerror=function(){ d.close(); fromLibrary(); };
+        }catch(x){ d.close(); fromLibrary(); } }; s.onerror=fromLibrary; }catch(e){ fromLibrary(); } }
+  window.__crSplashHide=function(now){ if(gone) return; gone=true; var wait=now?0:Math.max(0,600-performance.now());
     setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },450); },wait); };
   el.addEventListener('pointerdown',function(){ window.__crSplashHide(true); });
   setTimeout(function(){ window.__crSplashHide(true); },15000);   // never trap the screen

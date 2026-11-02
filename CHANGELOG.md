@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v57 — 2026-11-02
+
+- **Launch panorama now shows your covers on the iPad.** Root cause: the cover snapshot was only written 5 s after launch (into `localStorage`), and a Home Screen app on iPad is usually closed or suspended by iOS before that timer fires, so the snapshot was never saved and every launch showed empty tiles.
+- The snapshot is now saved ~1 s after Home is up, and again when the app is hidden or closed (`visibilitychange` / `pagehide`). Thumbnails are 120x182 JPEGs (quality 0.6) stored as ArrayBuffers in a separate IndexedDB database (`cr-splash`), not `localStorage` and not Blobs (Blobs in IndexedDB proved unreliable in WebKit). Decoding falls back from `createImageBitmap` to `<img>`.
+- If no snapshot exists yet, the panorama reads the first 30 covers straight from the library in IndexedDB, so even the first launch after updating shows real covers. The old `cr-splash-v1` entry is still read once and then removed.
+- Tested in WebKit at 1366x1024: no snapshot -> library covers; open, close after 2 s -> next launch shows the saved snapshot.
+
 ## cr-v56 — 2026-11-02
 
 - **Faster launch, no blank screen.** Root cause: the service worker fetched the whole 822 KB page from the network on every launch (network-first, up to a 6 s wait) before anything ran, and Home only drew after the full library (all covers) was read from IndexedDB. The page is now served **cache-first** from the service worker and refreshed in the background (a new version still takes over via the existing update reload).

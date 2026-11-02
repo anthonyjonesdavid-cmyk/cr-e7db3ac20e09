@@ -704,25 +704,42 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 #splash .sprow img,#splash .sprow i{display:block;flex:none;border-radius:4px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,.6)}
 #splash .sprow img{opacity:.78}
 #splash .sprow i{background:#1c1c1e}
-#splash .sprow.sk{animation:none}
+
 #splash .spvig{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 30%,rgba(0,0,0,.75) 100%)}
 @keyframes spdrift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){#splash .sprow{animation:none}}
 </style>
 </head>
 <body>
-<!-- v56 launch panorama: drifting rows of random covers from the last session (localStorage snapshot), shown instantly while the app loads; plain dark skeleton on first launch -->
+<!-- v57 launch panorama: drifting rows of covers. Tiles draw instantly, then fill from the IndexedDB snapshot ('cr-splash'), or straight from the library's covers if no snapshot exists yet -->
 <div id="splash" aria-hidden="true"></div>
 <script>
-(function(){ var el=document.getElementById('splash'), th=[]; try{ th=JSON.parse(localStorage.getItem('cr-splash-v1')||'[]')||[]; }catch(e){}
+(function(){ var el=document.getElementById('splash');
   var W=innerWidth, H=innerHeight, tw=W<700?84:118, thh=Math.round(tw*1.52), gap=Math.round(tw*.12), rows=Math.ceil(H/(thh+gap))+1, per=Math.ceil(W/(tw+gap))+2, html='';
-  for(var r=0;r<rows;r++){ var t='', seq=[];
-    for(var i=0;i<per;i++) seq.push(th.length?th[Math.floor(Math.random()*th.length)]:'');
-    seq=seq.concat(seq);
-    for(var j=0;j<seq.length;j++) t+=seq[j]?'<img alt="" style="width:'+tw+'px;height:'+thh+'px;margin-right:'+gap+'px" src="'+seq[j]+'">':'<i style="width:'+tw+'px;height:'+thh+'px;margin-right:'+gap+'px"></i>';
-    html+='<div class="sprow'+(th.length?'':' sk')+'" style="margin-bottom:'+gap+'px;animation-duration:'+(70+r*13%30)+'s;animation-direction:'+(r%2?'reverse':'normal')+'">'+t+'</div>'; }
+  for(var r=0;r<rows;r++){ var t='';
+    for(var j=0;j<per*2;j++) t+='<i data-k="'+(j%per)+'" style="width:'+tw+'px;height:'+thh+'px;margin-right:'+gap+'px"></i>';
+    html+='<div class="sprow" style="margin-bottom:'+gap+'px;animation-duration:'+(70+r*13%30)+'s;animation-direction:'+(r%2?'reverse':'normal')+'">'+t+'</div>'; }
   el.innerHTML='<div class="spin" style="margin-top:'+(-Math.round(thh*.35))+'px">'+html+'</div><div class="spvig"></div>';
-  var gone=false; window.__crSplashHide=function(now){ if(gone) return; gone=true; var wait=now?0:Math.max(0,600-performance.now());
+  var gone=false, filled=false;
+  function fill(urls){ if(gone||filled||!urls.length) return; filled=true;
+    var rs=el.querySelectorAll('.sprow');
+    for(var r=0;r<rs.length;r++){ var pick=[]; for(var i=0;i<per;i++) pick.push(urls[Math.floor(Math.random()*urls.length)]);
+      var ts=rs[r].children; for(var j=0;j<ts.length;j++){ var im=document.createElement('img'); im.alt=''; im.style.cssText=ts[j].style.cssText; im.src=pick[+ts[j].dataset.k]; rs[r].replaceChild(im,ts[j]); } }
+    el.classList.add('has'); }
+  function blobs(a){ var u=[]; for(var i=0;i<a.length;i++){ var b=a[i]; if(!b) continue; if(!(b instanceof Blob)) b=new Blob([b],{type:'image/jpeg'}); u.push(URL.createObjectURL(b)); } return u; }
+  function fromLibrary(){ try{ var q=indexedDB.open('comic-reader');
+      q.onupgradeneeded=function(e){ try{ e.target.transaction.abort(); }catch(x){} };   // no library yet: never create it here
+      q.onsuccess=function(){ var d=q.result; try{ if(!d.objectStoreNames.contains('comics')){ d.close(); return; }
+          var out=[], cur=d.transaction('comics').objectStore('comics').openCursor();
+          cur.onsuccess=function(){ var c=cur.result; if(c&&out.length<30){ if(c.value&&c.value.cover) out.push(c.value.cover); c.continue(); } else { d.close(); fill(blobs(out)); } };
+        }catch(x){ d.close(); } }; q.onerror=function(){}; }catch(x){} }
+  try{ var old=JSON.parse(localStorage.getItem('cr-splash-v1')||'[]')||[]; if(old.length) fill(old); }catch(e){}
+  if(!filled){ try{ var s=indexedDB.open('cr-splash',1);
+      s.onupgradeneeded=function(){ s.result.createObjectStore('k'); };
+      s.onsuccess=function(){ var d=s.result; try{ var g=d.transaction('k').objectStore('k').get('thumbs');
+          g.onsuccess=function(){ d.close(); var a=g.result||[]; if(a.length) fill(blobs(a)); else fromLibrary(); }; g.onerror=function(){ d.close(); fromLibrary(); };
+        }catch(x){ d.close(); fromLibrary(); } }; s.onerror=fromLibrary; }catch(e){ fromLibrary(); } }
+  window.__crSplashHide=function(now){ if(gone) return; gone=true; var wait=now?0:Math.max(0,600-performance.now());
     setTimeout(function(){ el.classList.add('out'); setTimeout(function(){ el.remove(); },450); },wait); };
   el.addEventListener('pointerdown',function(){ window.__crSplashHide(true); });
   setTimeout(function(){ window.__crSplashHide(true); },15000);   // never trap the screen
@@ -3087,14 +3104,28 @@ const Anim=(()=>{
 $('#rAnim').onclick=e=>{ e.stopPropagation(); Anim.start(); };
 /* ================= boot ================= */
 window.__cr={wake:Wake,bin:{BIN,open:openBin,close:closeBin,to:binTo,dig:binDig},night:{NIGHT,set:setNight,on:nightOn,start:startAuto},rain:Rain,srcRes:pageSourceRes,black:{scan:scanBlack,stats:pageBlackStats,blackStats,async statsOfUrl(u){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1); out.push(await pageBlackStats(pg)); pg.cleanup(); } } finally{ await doc.destroy(); } return out; }},drive:Drive,issueNo,isRangeName,rack:{RK,open:openRack,close:closeRack,items:rackItems,center:rackCenter},online:{onlineDate,volHints,lookupAll,eligible:lkEligible,lookupDate},vols:{lift:liftAccent,bodyOf,titleInk,sample:spineSample,ink:spineInk,inks:spineInks,style:spineStyle,name:spineName,FONTS:SPINE_FONTS,contrast,hexRGB,width:spineW,info:volInfo,dominant:dominantColor},qs:{create:newQueue,seeAll},sale:{of:onSale,key:saleKey,open:openSale},credits:{sheet:actionSheet,hero:heroList,heroStart,of:creditsOf,issues:creatorIssues,open:openCreator,close:closeCreator,norm:crNorm,CRP,data:CREDITS,all:allCreators,openList:openCreators,closeList:closeCreators,meta:pdfCredits,about:{open:openAbout,close:closeAbout,of:notesOf,lookup:lookupNotes,AB,data:()=>NOTES}},dates:{of:dateOf,embed:EMBED_DATES,emb:embDate,weekDate,render:()=>renderShelf(),fromName:dateFromName,lookup:lookupDate,pdfDate,comicInfo:comicInfoDate,TL,open:openTimeline,close:closeTimeline,set:setDate,ov:()=>dateOv,backfill:backfillDates},series:{move:applySeries,rename:renameSeries,merge:mergeSeries,counts:seriesCounts,override:withSeriesOverride,ov:seriesOv,SEL},rows:{keys:rowKeys,prefs:rowPrefs,arrange:arrangeRows},cov:{makeCover,openPdf,IDBSource},R,Z,get flip(){return flip},get animating(){return animating},cache:()=>({n:cache.size,px:cachePx,budget:CACHE_BUDGET}),panels:{P,detect:detectPanels,thirds:panelThirds,enter:enterPanels,exit:exitPanels,step:stepPanel,units:unitsOfView,list:panelList,async detectUrl(u,rtl=false){ const b=await (await fetch(u)).blob(); const doc=await openPdf(new FileSource(b)); const out=[]; try{ for(let i=0;i<doc.numPages;i++){ const pg=await doc.getPage(i+1), vp=pg.getViewport({scale:1}), wide=vp.width>vp.height*1.15; const cv=await renderToCanvas(pg,wide?760:380,560,1,wide?420000:220000); pg.cleanup(); out.push(wide?{L:panelsOfCanvas(cv,'L',rtl),R:panelsOfCanvas(cv,'R',rtl)}:panelsOfCanvas(cv,'',rtl)); freeCanvas(cv); } } finally{ await doc.destroy(); } return out; }},CF,SCF,go,jumpTo,toggleUI,scheduleHi,get comics(){return comics},get queues(){return queues},kickBlack};
-// v56: snapshot ~30 small random cover thumbnails for the next launch's panorama (idle, never blocks startup)
-async function saveSplash(){ try{ const pool=comics.filter(c=>c.cover); if(!pool.length){ localStorage.removeItem('cr-splash-v1'); return; }
+// v57 (thumbs stored as ArrayBuffers, not Blobs: Blobs in IndexedDB are unreliable in WebKit)
+// v57: snapshot ~30 small random cover thumbnails (JPEG Blobs in IndexedDB 'cr-splash') for the next launch's panorama.
+// Saved ~1 s after Home is up, and again when the app is hidden/closed (iOS often suspends a Home Screen app well before 5 s).
+let splashBusy=false, splashSaved=0;
+function splashDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('cr-splash',1); r.onupgradeneeded=()=>{ r.result.createObjectStore('k'); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+const toJpeg=cv=>new Promise(r=>{ try{ cv.toBlob(b=>r(b),'image/jpeg',.6); }catch(e){ r(null); } });
+function decode(blob){ if(window.createImageBitmap) return createImageBitmap(blob).catch(()=>imgOf(blob)); return imgOf(blob); }
+function imgOf(blob){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(blob), im=new Image(); im.onload=()=>{ res(im); setTimeout(()=>URL.revokeObjectURL(u),0); }; im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error('img')); }; im.src=u; }); }
+async function saveSplash(){ if(splashBusy||Date.now()-splashSaved<60000) return; splashBusy=true;
+  try{ const pool=comics.filter(c=>c.cover); if(!pool.length) return;
   for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
   const out=[], cv=document.createElement('canvas'); cv.width=120; cv.height=182; const g=cv.getContext('2d');
-  for(const c of pool.slice(0,30)){ try{ const bm=await createImageBitmap(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'}));
-      const s=Math.max(120/bm.width,182/bm.height); g.fillStyle='#000'; g.fillRect(0,0,120,182); g.drawImage(bm,(120-bm.width*s)/2,(182-bm.height*s)/2,bm.width*s,bm.height*s); bm.close&&bm.close();
-      out.push(cv.toDataURL('image/jpeg',.6)); }catch(e){} await new Promise(r=>setTimeout(r,0)); }
-  localStorage.setItem('cr-splash-v1',JSON.stringify(out)); }catch(e){} }
+  for(const c of pool.slice(0,30)){ try{ const bm=await decode(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); const w=bm.width, h=bm.height;
+      const s=Math.max(120/w,182/h); g.fillStyle='#000'; g.fillRect(0,0,120,182); g.drawImage(bm,(120-w*s)/2,(182-h*s)/2,w*s,h*s); bm.close&&bm.close();
+      const jb=await toJpeg(cv); if(jb) out.push(await jb.arrayBuffer()); }catch(e){ console.warn('splash thumb',e); } }
+  if(!out.length) return;
+  const d=await splashDB(); await new Promise((res,rej)=>{ const t=d.transaction('k','readwrite'); t.objectStore('k').put(out,'thumbs'); t.oncomplete=res; t.onerror=t.onabort=()=>rej(t.error); }); d.close();
+  splashSaved=Date.now(); try{ localStorage.removeItem('cr-splash-v1'); }catch(e){} }
+  catch(e){ console.warn('splash save',e); } finally{ splashBusy=false; } }
+addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'&&!splashSaved) saveSplash(); });
+addEventListener('pagehide',()=>{ if(!splashSaved) saveSplash(); });
+window.__crSaveSplash=saveSplash;
 (async()=>{ try{ await loadLibrary(); }catch(e){ window.__crSplashHide&&window.__crSplashHide(true); console.warn(e); $('#homeScroll').innerHTML='<div class="empty"><h2>Storage unavailable</h2><p>On-device storage is unavailable in this browser mode (e.g. Private Browsing).</p></div>'; return; }
   try{ if(comics.length&&navigator.storage&&navigator.storage.persisted&&!(await navigator.storage.persisted())) navigator.storage.persist().catch(()=>{}); }catch(e){}
   try{
@@ -3105,7 +3136,7 @@ async function saveSplash(){ try{ const pool=comics.filter(c=>c.cover); if(!pool
   }catch(e){ console.error(e); try{ launchHome(); }catch(e2){ (window.__crFail||console.error)(e2); return; } }
   document.documentElement.dataset.ready='1';
   if(window.__crSplashHide) requestAnimationFrame(()=>window.__crSplashHide());
-  setTimeout(saveSplash,5000);
+  setTimeout(saveSplash,1000);
 })().catch(e=>(window.__crFail||console.error)(e));
 </script>
 </body>
