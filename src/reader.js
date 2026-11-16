@@ -224,67 +224,80 @@ function startCurl(vdir){
   dropLanding(); const cv=R.views[R.vi], tv=R.views[t], W=stage.clientWidth;
   { const th=halfOf(t), gt=geom(tv,th); visualPages(tv).forEach((p,j)=>{ if(p!=null) requestPage(p,th?gt[j].w*2:gt[j].w,gt[j].h,0).catch(()=>{}); }); }
   const wrap=document.createElement('div'); wrap.className='flip curl';
-  let front,back,under=[],covered=null,frontR,spine,hasBack=true;
+  let front,back,under=[],frontR,spine,hasBack=true,keepView=false;
   const fold=R.fold&&!R.half, single=(cv.length===1||tv.length===1)&&!fold, ch=halfOf(R.vi), th=halfOf(t);
   if(fold){
     const gc=geom(cv)[0], gt=geom(tv)[0], ci=cv[0], ti=tv[0];
-    if(vdir<0){ const uL=halfFace(ci,gc,'L'), uR=halfFace(ti,gt,'R'); place(uL,uL._r); place(uR,uR._r); under=[uR]; covered=uL; wrap.append(uL,uR);
+    if(vdir<0){ const uL=halfFace(ci,gc,'L'), uR=halfFace(ti,gt,'R'); place(uL,uL._r); place(uR,uR._r); under=[uR]; wrap.append(uL,uR);
       front=halfFace(ci,gc,'R','front'); back=halfFace(ti,gt,'L','back'); frontR=front._r; spine=frontR.x;
       uR._s.style.background=grad(90,.6,.04); uL._s.style.background=grad(270,.5,.05); }
-    else { const uL=halfFace(ti,gt,'L'), uR=halfFace(ci,gc,'R'); place(uL,uL._r); place(uR,uR._r); under=[uL]; covered=uR; wrap.append(uL,uR);
+    else { const uL=halfFace(ti,gt,'L'), uR=halfFace(ci,gc,'R'); place(uL,uL._r); place(uR,uR._r); under=[uL]; wrap.append(uL,uR);
       front=halfFace(ci,gc,'L','front'); back=halfFace(ti,gt,'R','back'); frontR=front._r; spine=frontR.x+frontR.w;
       uL._s.style.background=grad(270,.6,.04); uR._s.style.background=grad(90,.5,.05); }
   } else if(!single){
     const g=geom(cv), [cL,cR]=visualPages(cv), [tL,tR]=visualPages(tv);
-    if(vdir<0){ const uL=face(cL,g[0],'r'), uR=face(tR,g[1],'l'); place(uL,g[0]); place(uR,g[1]); under=[uR]; covered=uL; wrap.append(uL,uR);
+    // leave the staying neighbour in the current view (sharp, never a black hole); only the incoming page sits under the curl
+    keepView=true;
+    if(vdir<0){ const uR=face(tR,g[1],'l'); place(uR,g[1]); under=[uR]; wrap.append(uR);
       front=face(cR,g[1],'l','front'); back=face(tL,g[0],'r','back'); frontR=g[1]; spine=g[1].x;
-      uR._s.style.background=grad(90,.6,.04); uL._s.style.background=grad(270,.5,.05); }
-    else { const uL=face(tL,g[0],'r'), uR=face(cR,g[1],'l'); place(uL,g[0]); place(uR,g[1]); under=[uL]; covered=uR; wrap.append(uL,uR);
+      uR._s.style.background=grad(90,.6,.04); }
+    else { const uL=face(tL,g[0],'r'); place(uL,g[0]); under=[uL]; wrap.append(uL);
       front=face(cL,g[0],'r','front'); back=face(tR,g[1],'l','back'); frontR=g[0]; spine=g[0].x+g[0].w;
-      uL._s.style.background=grad(270,.6,.04); uR._s.style.background=grad(90,.5,.05); }
+      uL._s.style.background=grad(270,.6,.04); }
   } else {
     const tV=fwd?cv:tv, sV=fwd?tv:cv, hT=fwd?ch:th, hS=fwd?th:ch;
     const u=vface(sV,hS,''); place(u,u._r); under=[u]; wrap.append(u);
     front=vface(tV,hT,'front'); back=vface(tV,hT,'back'); frontR=front._r; spine=R.rtl?frontR.x+frontR.w:frontR.x;
     hasBack=false; u._s.style.background=grad(R.rtl?270:90,.7,.06);
   }
-  const fw=frontR.w, fh=frontR.h, fromRight=vdir<0, n=Math.max(12,Math.min(24,Math.round(fw/36)));
+  const fw=frontR.w, fh=frontR.h, fromRight=vdir<0, n=Math.max(14,Math.min(22,Math.round(fw/40))), overlap=2;
   [front,back].forEach(el=>{ if(!el) return; el.classList.add('curl-src'); Object.assign(el.style,{position:'absolute',left:frontR.x+'px',top:frontR.y+'px',width:fw+'px',height:fh+'px',pointerEvents:'none',zIndex:'-1',opacity:'0'}); wrap.append(el); });
   const root=document.createElement('div'); root.className='curl-root';
   Object.assign(root.style,{left:frontR.x+'px',top:frontR.y+'px',width:fw+'px',height:fh+'px'});
   const strips=document.createElement('div'); strips.className='curl-strips';
-  for(let i=0;i<n;i++){ const s=document.createElement('div'); s.className='curl-s';
-    s.style.left=(i*fw/n)+'px'; s.style.width=((fw/n)+.5)+'px';
-    const a=document.createElement('div'); a.className='curl-front'; const ca=document.createElement('canvas'); a.appendChild(ca);
-    const b=document.createElement('div'); b.className='curl-back'; const cb=document.createElement('canvas'); b.appendChild(cb);
-    s.append(a,b); strips.appendChild(s); }
+  const edges=[]; for(let i=0;i<=n;i++) edges.push(Math.round(i*fw/n));
+  for(let i=0;i<n;i++){
+    const x0=edges[i], x1=edges[i+1], left=fromRight?x0:Math.max(0,x0-overlap), right=fromRight?Math.min(fw,x1+overlap):x1;
+    const s=document.createElement('div'); s.className='curl-s';
+    Object.assign(s.style,{left:left+'px',width:(right-left)+'px',transformOrigin:fromRight?'0 50%':'100% 50%'});
+    s._x0=x0; s._x1=x1; s._left=left; s._right=right; s._hinge=fromRight?x0:x1;
+    const a=document.createElement('div'); a.className='curl-front';
+    const b=document.createElement('div'); b.className='curl-back';
+    s.append(a,b); strips.appendChild(s);
+  }
   const crease=document.createElement('div'); crease.className='curl-crease';
   const cast=document.createElement('div'); cast.className='curl-cast';
   root.append(strips,crease,cast); wrap.append(root);
   wrap.style.perspective=Math.round(Math.max(1600,W*2.4))+'px'; wrap.style.perspectiveOrigin=`${spine}px 50%`;
-  stage.appendChild(wrap); R.viewEl.style.visibility='hidden';
+  stage.appendChild(wrap);
+  if(keepView){ const pgs=[...R.viewEl.querySelectorAll('.pg')]; const hide=fromRight?pgs[1]:pgs[0]; if(hide) hide.style.visibility='hidden'; }
+  else R.viewEl.style.visibility='hidden';
   const els=[...strips.children];
-  const paint=()=>{ const fr=rasterFace(front,fw,fh), br=hasBack?rasterFace(back,fw,fh):null, dpr=window.devicePixelRatio||1;
-    els.forEach((s,i)=>{ const x0=Math.round(i*fw*dpr/n), x1=Math.round((i+1)*fw*dpr/n), tw=Math.max(1,x1-x0);
-      const fc=s.querySelector('.curl-front canvas'); fc.width=tw; fc.height=fr.height; fc.getContext('2d',{alpha:false}).drawImage(fr,x0,0,tw,fr.height,0,0,tw,fr.height);
-      const bc=s.querySelector('.curl-back canvas'), bx=bc.getContext('2d',{alpha:false}); bc.width=tw; bc.height=fr.height;
-      if(br) bx.drawImage(br,x0,0,tw,br.height,0,0,tw,br.height);
-      else { bx.fillStyle='#f3eee4'; bx.fillRect(0,0,tw,bc.height); bx.globalAlpha=.08; bx.translate(tw,0); bx.scale(-1,1); bx.drawImage(fr,x0,0,tw,fr.height,0,0,tw,fr.height); }
-    }); };
+  const versoOf=fr=>{ const c=document.createElement('canvas'); c.width=fr.width; c.height=fr.height;
+    const x=c.getContext('2d',{alpha:false}); x.fillStyle='#f3eee4'; x.fillRect(0,0,c.width,c.height);
+    x.save(); x.globalAlpha=.1; x.translate(c.width,0); x.scale(-1,1); x.drawImage(fr,0,0); x.restore(); return c; };
+  const applyTex=(face,url,x0)=>{ let im=face.querySelector('img'); if(!im){ im=new Image(); im.alt=''; im.draggable=false; face.appendChild(im); }
+    if(im.getAttribute('src')!==url) im.src=url;
+    Object.assign(im.style,{position:'absolute',left:(-x0)+'px',top:'0',width:fw+'px',height:fh+'px',maxWidth:'none'}); };
+  const paint=()=>{ const fr=rasterFace(front,fw,fh), br=hasBack?rasterFace(back,fw,fh):versoOf(fr);
+    const fu=fr.toDataURL('image/png'), bu=br.toDataURL('image/png');
+    els.forEach(s=>{ applyTex(s.querySelector('.curl-front'),fu,s._left); applyTex(s.querySelector('.curl-back'),bu,s._left); }); };
   paint();
   const mo=new MutationObserver(()=>{ if(flip&&flip.curl) paint(); });
   setTimeout(()=>{ if(flip&&flip.curl) paint(); },40);
   mo.observe(front,{childList:true,subtree:true}); if(back) mo.observe(back,{childList:true,subtree:true});
   const k=single?1.15:1;
   const track=travel=>{ const e=clamp(travel*k/fw,0,2); return (single&&!fwd)?1-Math.acos(clamp(e,-1,1))/Math.PI:Math.acos(clamp(1-e,-1,1))/Math.PI; };
-  flip={vdir,fwd,t,wrap,p:-1,track,curl:true,paint,mode:'curl-'+(fold?'fold':single?(R.half?'half':'single'):'spread'),setP(p){ p=clamp(p,0,1); this.p=p; if(R.viewEl) R.viewEl.style.visibility='hidden';
+  flip={vdir,fwd,t,wrap,p:-1,track,curl:true,paint,mode:'curl-'+(fold?'fold':single?(R.half?'half':'single'):'spread'),setP(p){ p=clamp(p,0,1); this.p=p;
+    if(R.viewEl){ if(keepView){ const pgs=[...R.viewEl.querySelectorAll('.pg')]; const hide=fromRight?pgs[1]:pgs[0]; if(hide) hide.style.visibility='hidden'; }
+      else R.viewEl.style.visibility='hidden'; }
     const prog=(single&&!fwd)?1-p:p, r=Math.max(16,fw*(.17-.05*prog)), maxT=fw+Math.PI*r, travel=prog*maxT;
-    let fx=fromRight?fw-travel:travel, bumpX=fx, bumpZ=0;
-    els.forEach((s,i)=>{ const cx=(i+.5)*fw/n; let x=cx,z=0,rot=0,on=false;
-      if(fromRight){ const d=cx-fx; if(d>0){ const th=d/r; if(th<=Math.PI){ x=fx+r*Math.sin(th); z=r*(1-Math.cos(th)); rot=-th; on=true; if(z>bumpZ){ bumpZ=z; bumpX=x; } } else { x=fx-(d-Math.PI*r); z=1.5; rot=-Math.PI; on=true; } } }
-      else { const d=fx-cx; if(d>0){ const th=d/r; if(th<=Math.PI){ x=fx-r*Math.sin(th); z=r*(1-Math.cos(th)); rot=th; on=true; if(z>bumpZ){ bumpZ=z; bumpX=x; } } else { x=fx+(d-Math.PI*r); z=1.5; rot=Math.PI; on=true; } } }
-      s.style.transform=`translate3d(${(x-cx).toFixed(2)}px,0,${z.toFixed(2)}px) rotateY(${(rot*180/Math.PI).toFixed(2)}deg)`;
-      s.style.zIndex=String(100+Math.round(z*8)+i); s.classList.toggle('on',on);
+    const fx=fromRight?fw-travel:travel; let bumpX=fx, bumpZ=0;
+    els.forEach(s=>{ const hinge=s._hinge; let x=hinge,z=0,rot=0,on=false;
+      if(fromRight){ const d=hinge-fx; if(d>0){ const th=d/r; if(th<=Math.PI){ x=fx+r*Math.sin(th); z=r*(1-Math.cos(th)); rot=-th; on=true; if(z>bumpZ){ bumpZ=z; bumpX=x; } } else { x=fx-(d-Math.PI*r); z=1.2; rot=-Math.PI; on=true; } } }
+      else { const d=fx-hinge; if(d>0){ const th=d/r; if(th<=Math.PI){ x=fx-r*Math.sin(th); z=r*(1-Math.cos(th)); rot=th; on=true; if(z>bumpZ){ bumpZ=z; bumpX=x; } } else { x=fx+(d-Math.PI*r); z=1.2; rot=Math.PI; on=true; } } }
+      s.style.transform=`translate3d(${(x-hinge).toFixed(2)}px,0,${z.toFixed(2)}px) rotateY(${(rot*180/Math.PI).toFixed(2)}deg)`;
+      s.classList.toggle('on',on);
     });
     const lifted=prog>0.02&&prog<0.98;
     crease.style.opacity=lifted?Math.min(.7,.25+Math.sin(prog*Math.PI)*.55):0;
@@ -293,8 +306,7 @@ function startCurl(vdir){
     crease.style.marginLeft=fromRight?'-8px':'-'+(Math.max(24,r*1.1)-8)+'px';
     cast.style.opacity=lifted?Math.min(.55,bumpZ/(r||1)*.5):0;
     cast.style.transform=`translate3d(${bumpX.toFixed(1)}px,0,${Math.max(0,bumpZ)*.4}px)`;
-    under.forEach(u=>u._s.style.opacity=(1-prog)*.85);
-    if(covered) covered._s.style.opacity=prog>.5?Math.sin((prog-.5)*2*Math.PI)*.45:0; }};
+    under.forEach(u=>u._s.style.opacity=(1-prog)*.85); }};
   const _end=()=>{ try{ mo.disconnect(); }catch(e){} };
   const obs=new MutationObserver(()=>{ if(!wrap.isConnected){ _end(); obs.disconnect(); } });
   obs.observe(stage,{childList:true});
@@ -391,7 +403,8 @@ function startFlip(vdir){
 let landing=null;   // overlay kept on screen until the settled view below it has painted
 function dropLanding(){ if(!landing) return; cancelAnimationFrame(landing.raf); clearTimeout(landing.to); landing.wrap.remove(); landing=null; }
 function finishFlip(complete){ if(!flip) return; const f=flip; flip=null;
-  if(!complete){ if(R.viewEl) R.viewEl.style.visibility=''; f.wrap.remove(); return; }
+  if(R.viewEl){ R.viewEl.style.visibility=''; R.viewEl.querySelectorAll('.pg').forEach(el=>{ el.style.visibility=''; }); }
+  if(!complete){ f.wrap.remove(); return; }
   dropLanding(); R.vi=f.t; renderView(); const view=R.viewEl, L=landing={wrap:f.wrap,raf:0,to:0};
   const painted=()=>!view.querySelector('.pg.loading');
   const swap=()=>{ if(landing!==L) return; let n=0; const tick=()=>{ if(landing!==L) return; if(++n<2){ L.raf=requestAnimationFrame(tick); return; } dropLanding(); };   // 2 frames: let WebKit composite the new canvases first

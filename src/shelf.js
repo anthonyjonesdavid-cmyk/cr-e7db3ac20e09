@@ -451,7 +451,11 @@ document.addEventListener('keydown',e=>{ if(R&&R.comic||document.querySelector('
 /* ---------- menus, sheets, modals ---------- */
 function openMenu(anchor,items,cls){ document.querySelector('.menu')?.remove(); const m=document.createElement('div'); m.className='menu'+(cls?' '+cls:''); m.setAttribute('role','menu');
   m.innerHTML=items.map((it,i)=>it.icon?`<button role="menuitem" data-i="${i}"${it.id?` id="${it.id}"`:''}><span>${esc(it.label)}</span>${it.icon}</button>`:`<button role="menuitemradio" aria-checked="${!!it.on}" data-i="${i}">${esc(it.label)}${it.on?IC.check:''}</button>`).join(''); document.body.appendChild(m);
-  const r=anchor.getBoundingClientRect(); m.style.top=(r.bottom+6)+'px'; m.style.left=Math.max(8,Math.min(innerWidth-m.offsetWidth-8,r.right-m.offsetWidth))+'px';
+  const r=anchor.getBoundingClientRect(), mw=m.offsetWidth, mh=m.offsetHeight, pad=8;
+  const sab=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab'))||0;
+  const maxH=innerHeight-2*pad-sab; if(mh>maxH){ m.style.maxHeight=maxH+'px'; m.style.overflowY='auto'; }
+  const H=m.offsetHeight; let top=r.bottom+6; if(top+H>innerHeight-pad-sab) top=r.top-6-H; if(top<pad) top=Math.max(pad, innerHeight-pad-sab-H);
+  m.style.top=top+'px'; m.style.left=Math.max(pad,Math.min(innerWidth-m.offsetWidth-pad,r.right-m.offsetWidth))+'px';
   const close=()=>{ m.remove(); document.removeEventListener('pointerdown',out,true); }; const out=e=>{ if(!m.contains(e.target)) close(); };
   setTimeout(()=>document.addEventListener('pointerdown',out,true),0); m.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b){ close(); items[+b.dataset.i].run(); } }); }
 function modal(html,onOpen,cls){ return new Promise(res=>{ const w=document.createElement('div'); w.className='mwrap'; w.innerHTML=`<div class="modal${cls?' '+cls:''}" role="dialog" aria-modal="true">${html}</div>`; document.body.appendChild(w);

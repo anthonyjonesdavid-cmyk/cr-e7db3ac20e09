@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v60 — 2026-11-15
+
+- **Paper curl on two-up, spreads, folds and half pages.** Landscape and spread turns no longer show vertical strip seams or garbled slices: each curl uses one shared page texture on overlapping, edge-hinged strips (transforms only, still sharp). During a two-up turn the neighbouring page stays visible. Portrait curl and Swipe are unchanged.
+- Home overflow menus (reading-list ••• and others) now stay on screen, flipping above the button when there is not enough room below, so actions like Delete remain tappable.
+- New suite `test/e2e_v60.py`.
+
+
 ## cr-v59 — 2026-11-15
 
 - **Bag-and-board opening.** When you open an issue, its cover slides out of a clear collector's bag (drawn in the app, with a white backing board and a soft glare across the plastic) and then becomes the page you were on, or the first page. About one second, a tap skips it, and it never waits to start loading the comic. **Settings › Bag-and-board opening** is on by default (saved on this device); turn it off, or use Reduce Motion, to skip the animation.
