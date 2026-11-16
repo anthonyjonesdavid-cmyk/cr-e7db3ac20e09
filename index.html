@@ -2553,7 +2553,8 @@ function startCurl(vdir){
     Object.assign(im.style,{position:'absolute',left:(-x0)+'px',top:'0',width:fw+'px',height:fh+'px',maxWidth:'none'}); };
   const paint=()=>{ const fr=rasterFace(front,fw,fh), br=hasBack?rasterFace(back,fw,fh):versoOf(fr);
     const fu=fr.toDataURL('image/png'), bu=br.toDataURL('image/png');
-    els.forEach(s=>{ applyTex(s.querySelector('.curl-front'),fu,s._left); applyTex(s.querySelector('.curl-back'),bu,s._left); }); };
+    // the back face is pre-rotated 180deg, so its texture is mirrored per strip: offset from the strip's RIGHT edge, not its left (using _left tears the incoming page into swapped slices)
+    els.forEach(s=>{ applyTex(s.querySelector('.curl-front'),fu,s._left); applyTex(s.querySelector('.curl-back'),bu,fw-s._right); }); };
   paint();
   const mo=new MutationObserver(()=>{ if(flip&&flip.curl) paint(); });
   setTimeout(()=>{ if(flip&&flip.curl) paint(); },40);
