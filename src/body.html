@@ -99,12 +99,44 @@
   </div></div>
   <button id="pExit" class="pexit hidden" aria-label="Exit panel view, show the full page"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Full Page<span></span></button>
   <button id="rRotate" class="rrot hidden" aria-pressed="false" aria-label="Rotate spread to fill the screen"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Rotate</button>
+  <div id="bagOpen" class="hidden" aria-hidden="true">
+    <div class="bag-stage">
+      <div class="bag-pack">
+        <div class="bag-flap" aria-hidden="true">
+          <svg viewBox="0 0 200 44" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="bagFlapG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8e4f0" stop-opacity=".3"/><stop offset=".5" stop-color="#f2f7fb" stop-opacity=".16"/><stop offset="1" stop-color="#cfdbe8" stop-opacity=".28"/></linearGradient></defs>
+            <path d="M18 44 V14 Q18 4 30 4 H170 Q182 4 182 14 V44" fill="url(#bagFlapG)" stroke="rgba(255,255,255,.48)" stroke-width="1.5"/>
+            <path d="M22 42 H178" stroke="rgba(0,0,0,.16)" stroke-width="1.2" fill="none"/>
+            <ellipse cx="100" cy="16" rx="7" ry="4" fill="none" stroke="rgba(255,255,255,.42)" stroke-width="1.2"/>
+          </svg>
+        </div>
+        <div class="bag-body">
+          <div class="bag-board" aria-hidden="true"></div>
+          <div class="bag-issue"><img alt=""></div>
+          <div class="bag-plastic" aria-hidden="true">
+            <svg viewBox="0 0 200 280" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="bagBodyG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f0f8" stop-opacity=".24"/><stop offset=".5" stop-color="#f5f9fc" stop-opacity=".1"/><stop offset="1" stop-color="#d2deea" stop-opacity=".26"/></linearGradient>
+                <linearGradient id="bagEdgeG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".12" stop-color="#fff" stop-opacity="0"/><stop offset=".88" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".3"/></linearGradient>
+              </defs>
+              <path d="M16 0 H184 Q196 0 196 12 V264 Q196 280 178 280 H22 Q4 280 4 264 V12 Q4 0 16 0 Z" fill="url(#bagBodyG)" stroke="rgba(255,255,255,.5)" stroke-width="1.75"/>
+              <path d="M14 18 V252" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/>
+              <path d="M186 18 V252" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/>
+              <rect x="4" y="0" width="192" height="280" rx="12" fill="url(#bagEdgeG)"/>
+              <path d="M22 268 H178" stroke="rgba(0,0,0,.08)" stroke-width="1" fill="none"/>
+            </svg>
+            <div class="bag-glare"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="pages" class="hidden"><div class="ph"><button class="icbtn" id="pagesClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button><h3>All Pages</h3></div><div id="pgrid"></div></div>
 </section>
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=56',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=59',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>

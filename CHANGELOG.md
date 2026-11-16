@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v59 — 2026-11-15
+
+- **Bag-and-board opening.** When you open an issue, its cover slides out of a clear collector's bag (drawn in the app, with a white backing board and a soft glare across the plastic) and then becomes the page you were on, or the first page. About one second, a tap skips it, and it never waits to start loading the comic. **Settings › Bag-and-board opening** is on by default (saved on this device); turn it off, or use Reduce Motion, to skip the animation.
+- **Page turn style.** Settings has a Swipe / Paper curl choice, saved on this device. Swipe is the current turn and stays the default, unchanged. Paper curl bends the page from the edge like real comic paper, follows your finger, shows a soft shadow and a hint of the page's back, and finishes or snaps back depending on how far you dragged. Edge taps curl too. It works with single pages, two-page spreads, fold comics and half pages, and there is no curl while zoomed in. Reduce Motion falls back to Swipe.
+- New suite `test/e2e_v59.py`.
+
+
 ## cr-v58 — 2026-11-02
 
 - **Opening cover panorama now stays up about 5 seconds** from launch (was ~0.6 s), then the covers fly out in every direction from screen center (staggered, slight rotation, ~0.7 s, transforms only) revealing Home; plain fade with reduced motion. Home still loads underneath; tapping the panorama skips straight to the fly-out (also fixes tap-to-skip being ignored once Home had loaded). Cover snapshot saving unchanged from v57.
