@@ -218,6 +218,29 @@ function rasterFace(el,w,h){
   return c;
 }
 
+
+/* ---- v61 peel geometry (pure; shared by startCurl and the test harness) ----
+   The fold line is the perpendicular bisector of the grab segment G0 -> G: every point of the
+   sheet nearer G0 than G has been carried over the fold. The turned part of the sheet is the
+   mirror image of the turned region across that line, so the flap on screen is the reflection
+   of the region, and its texture must be pre-mirrored the same way (see paint()). */
+function peelGeom(fw,fh,g0,g){
+  const dx=g.x-g0.x, dy=g.y-g0.y, len=Math.hypot(dx,dy);
+  if(len<0.75) return null;
+  const nx=dx/len, ny=dy/len, mx=(g0.x+g.x)/2, my=(g0.y+g.y)/2;
+  const d=p=>(p[0]-mx)*nx+(p[1]-my)*ny;
+  const clip=keepNeg=>{ const poly=[[0,0],[fw,0],[fw,fh],[0,fh]], out=[];
+    for(let i=0;i<4;i++){ const a=poly[i], b=poly[(i+1)%4], da=d(a), db=d(b), ina=keepNeg?da<=0:da>=0, inb=keepNeg?db<=0:db>=0;
+      if(ina) out.push(a);
+      if(ina!==inb){ const t=da/(da-db); out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); } }
+    return out; };
+  // reflection across the fold line as a CSS matrix (transform-origin 0 0): q = (I - 2 n n^T) p + 2 (M.n) n
+  const mn=mx*nx+my*ny;
+  const matrix=[1-2*nx*nx, -2*nx*ny, -2*nx*ny, 1-2*ny*ny, 2*mn*nx, 2*mn*ny];
+  return {nx,ny,mx,my,turned:clip(true),rest:clip(false),matrix};
+}
+const polyCss=poly=>poly.length<3?'polygon(0px 0px,0px 0px,0px 0px)':'polygon('+poly.map(p=>p[0].toFixed(1)+'px '+p[1].toFixed(1)+'px').join(',')+')';
+
 function startCurl(vdir){
   if(rotOn()){ R.rot=null; renderView(); }
   const fwd=R.rtl?vdir>0:vdir<0, t=R.vi+(fwd?1:-1); if(fwd&&t>=R.views.length&&R.next){ openNext(); return false; } if(t<0||t>=R.views.length) return false;
@@ -250,65 +273,71 @@ function startCurl(vdir){
     front=vface(tV,hT,'front'); back=vface(tV,hT,'back'); frontR=front._r; spine=R.rtl?frontR.x+frontR.w:frontR.x;
     hasBack=false; u._s.style.background=grad(R.rtl?270:90,.7,.06);
   }
-  const fw=frontR.w, fh=frontR.h, fromRight=vdir<0, n=Math.max(14,Math.min(22,Math.round(fw/40))), overlap=2;
+  const fw=frontR.w, fh=frontR.h, fromRight=vdir<0;
   [front,back].forEach(el=>{ if(!el) return; el.classList.add('curl-src'); Object.assign(el.style,{position:'absolute',left:frontR.x+'px',top:frontR.y+'px',width:fw+'px',height:fh+'px',pointerEvents:'none',zIndex:'-1',opacity:'0'}); wrap.append(el); });
+  // v61: Apple Books-style peel. The sheet folds along a straight fold line and the turned part lands as
+  // its mirror image (peelGeom). spineX = the sheet's bound edge in root coords; the grab point starts on
+  // the free edge and the fold line is the perpendicular bisector of grab -> current point, so the fold
+  // tilts with the drag height exactly like a real corner/edge peel.
+  const spineX=(fold||!single)?(fromRight?0:fw):(R.rtl?fw:0), freeX=fw-spineX;
   const root=document.createElement('div'); root.className='curl-root';
   Object.assign(root.style,{left:frontR.x+'px',top:frontR.y+'px',width:fw+'px',height:fh+'px'});
-  const strips=document.createElement('div'); strips.className='curl-strips';
-  const edges=[]; for(let i=0;i<=n;i++) edges.push(Math.round(i*fw/n));
-  for(let i=0;i<n;i++){
-    const x0=edges[i], x1=edges[i+1], left=fromRight?x0:Math.max(0,x0-overlap), right=fromRight?Math.min(fw,x1+overlap):x1;
-    const s=document.createElement('div'); s.className='curl-s';
-    Object.assign(s.style,{left:left+'px',width:(right-left)+'px',transformOrigin:fromRight?'0 50%':'100% 50%'});
-    s._x0=x0; s._x1=x1; s._left=left; s._right=right; s._hinge=fromRight?x0:x1;
-    const a=document.createElement('div'); a.className='curl-front';
-    const b=document.createElement('div'); b.className='curl-back';
-    s.append(a,b); strips.appendChild(s);
-  }
-  const crease=document.createElement('div'); crease.className='curl-crease';
-  const cast=document.createElement('div'); cast.className='curl-cast';
-  root.append(strips,crease,cast); wrap.append(root);
-  wrap.style.perspective=Math.round(Math.max(1600,W*2.4))+'px'; wrap.style.perspectiveOrigin=`${spine}px 50%`;
+  const rem=document.createElement('div'); rem.className='curl-rem';
+  const remImg=document.createElement('img'); remImg.alt=''; remImg.draggable=false; rem.append(remImg);
+  const cast=document.createElement('div'); cast.className='curl-cast2';
+  const flap=document.createElement('div'); flap.className='curl-flap';
+  const flapImg=document.createElement('img'); flapImg.alt=''; flapImg.draggable=false;
+  const fshade=document.createElement('div'); fshade.className='curl-fshade';
+  flap.append(flapImg,fshade); root.append(rem,cast,flap); wrap.append(root);
   stage.appendChild(wrap);
   if(keepView){ const pgs=[...R.viewEl.querySelectorAll('.pg')]; const hide=fromRight?pgs[1]:pgs[0]; if(hide) hide.style.visibility='hidden'; }
   else R.viewEl.style.visibility='hidden';
-  const els=[...strips.children];
   const versoOf=fr=>{ const c=document.createElement('canvas'); c.width=fr.width; c.height=fr.height;
     const x=c.getContext('2d',{alpha:false}); x.fillStyle='#f3eee4'; x.fillRect(0,0,c.width,c.height);
     x.save(); x.globalAlpha=.1; x.translate(c.width,0); x.scale(-1,1); x.drawImage(fr,0,0); x.restore(); return c; };
-  const applyTex=(face,url,x0)=>{ let im=face.querySelector('img'); if(!im){ im=new Image(); im.alt=''; im.draggable=false; face.appendChild(im); }
-    if(im.getAttribute('src')!==url) im.src=url;
-    Object.assign(im.style,{position:'absolute',left:(-x0)+'px',top:'0',width:fw+'px',height:fh+'px',maxWidth:'none'}); };
+  const mirrorOf=c=>{ const m=document.createElement('canvas'); m.width=c.width; m.height=c.height;
+    const x=m.getContext('2d',{alpha:false}); x.translate(c.width,0); x.scale(-1,1); x.drawImage(c,0,0); return m; };
+  const setTex=(im,url)=>{ if(im.getAttribute('src')!==url) im.src=url; };
   const paint=()=>{ const fr=rasterFace(front,fw,fh), br=hasBack?rasterFace(back,fw,fh):versoOf(fr);
-    const fu=fr.toDataURL('image/png'), bu=br.toDataURL('image/png');
-    // the back face is pre-rotated 180deg, so its texture is mirrored per strip: offset from the strip's RIGHT edge, not its left (using _left tears the incoming page into swapped slices)
-    els.forEach(s=>{ applyTex(s.querySelector('.curl-front'),fu,s._left); applyTex(s.querySelector('.curl-back'),bu,fw-s._right); }); };
+    setTex(remImg,fr.toDataURL('image/png'));
+    // The flap reaches the screen through a reflection (det -1), so its texture is pre-mirrored: at a full
+    // turn the incoming page then reads correctly in the far slot, and a single page's verso shows its own
+    // content's ghost at the same paper point. (The old strip build reached this same mapping by offsetting
+    // each strip's back texture from its right edge, fw - s._right.)
+    setTex(flapImg,mirrorOf(br).toDataURL('image/png')); };
   paint();
   const mo=new MutationObserver(()=>{ if(flip&&flip.curl) paint(); });
   setTimeout(()=>{ if(flip&&flip.curl) paint(); },40);
   mo.observe(front,{childList:true,subtree:true}); if(back) mo.observe(back,{childList:true,subtree:true});
-  const k=single?1.15:1;
-  const track=travel=>{ const e=clamp(travel*k/fw,0,2); return (single&&!fwd)?1-Math.acos(clamp(e,-1,1))/Math.PI:Math.acos(clamp(1-e,-1,1))/Math.PI; };
+  // live drag point: the grab height locks at the first move; the finger's current height tilts the fold
+  let grabY=null, heldY=null;
+  const onPtr=e=>{ const y=stagePt(e).y-frontR.y; if(grabY===null) grabY=clamp(y,0,fh); heldY=y; };
+  stage.addEventListener('pointermove',onPtr,true);
+  const stripLen=Math.ceil(2*Math.hypot(fw,fh));
+  const track=travel=>{ const prog=clamp(travel/(2*fw),0,1); return (single&&!fwd)?1-prog:prog; };
   flip={vdir,fwd,t,wrap,p:-1,track,curl:true,paint,mode:'curl-'+(fold?'fold':single?(R.half?'half':'single'):'spread'),setP(p){ p=clamp(p,0,1); this.p=p;
     if(R.viewEl){ if(keepView){ const pgs=[...R.viewEl.querySelectorAll('.pg')]; const hide=fromRight?pgs[1]:pgs[0]; if(hide) hide.style.visibility='hidden'; }
       else R.viewEl.style.visibility='hidden'; }
-    const prog=(single&&!fwd)?1-p:p, r=Math.max(16,fw*(.17-.05*prog)), maxT=fw+Math.PI*r, travel=prog*maxT;
-    const fx=fromRight?fw-travel:travel; let bumpX=fx, bumpZ=0;
-    els.forEach(s=>{ const hinge=s._hinge; let x=hinge,z=0,rot=0,on=false;
-      if(fromRight){ const d=hinge-fx; if(d>0){ const th=d/r; if(th<=Math.PI){ x=fx+r*Math.sin(th); z=r*(1-Math.cos(th)); rot=-th; on=true; if(z>bumpZ){ bumpZ=z; bumpX=x; } } else { x=fx-(d-Math.PI*r); z=1.2; rot=-Math.PI; on=true; } } }
-      else { const d=fx-hinge; if(d>0){ const th=d/r; if(th<=Math.PI){ x=fx-r*Math.sin(th); z=r*(1-Math.cos(th)); rot=th; on=true; if(z>bumpZ){ bumpZ=z; bumpX=x; } } else { x=fx+(d-Math.PI*r); z=1.2; rot=Math.PI; on=true; } } }
-      s.style.transform=`translate3d(${(x-hinge).toFixed(2)}px,0,${z.toFixed(2)}px) rotateY(${(rot*180/Math.PI).toFixed(2)}deg)`;
-      s.classList.toggle('on',on);
-    });
-    const lifted=prog>0.02&&prog<0.98;
-    crease.style.opacity=lifted?Math.min(.7,.25+Math.sin(prog*Math.PI)*.55):0;
-    crease.style.transform=`translate3d(${fx.toFixed(1)}px,0,0)`;
-    crease.style.width=Math.max(24,r*1.1)+'px';
-    crease.style.marginLeft=fromRight?'-8px':'-'+(Math.max(24,r*1.1)-8)+'px';
-    cast.style.opacity=lifted?Math.min(.55,bumpZ/(r||1)*.5):0;
-    cast.style.transform=`translate3d(${bumpX.toFixed(1)}px,0,${Math.max(0,bumpZ)*.4}px)`;
+    const prog=(single&&!fwd)?1-p:p;
+    const gy0=grabY!==null?grabY:fh/2, G0={x:freeX,y:gy0}, arcDir=gy0<fh/2?1:-1;
+    const G={x:G0.x+(2*spineX-2*freeX)*prog, y:heldY!==null?clamp(heldY,-fh*.25,fh*1.25):clamp(gy0+Math.sin(prog*Math.PI)*arcDir*fh*.22,-fh*.25,fh*1.25)};
+    const geo=peelGeom(fw,fh,G0,G);
+    if(single) root.style.opacity=prog>.9?String(clamp(1-(prog-.9)/.1,0,1)):'';
+    if(!geo){ rem.style.clipPath=polyCss([[0,0],[fw,0],[fw,fh],[0,fh]]); flap.style.visibility='hidden'; cast.style.opacity='0'; }
+    else {
+      rem.style.clipPath=polyCss(geo.rest);
+      flap.style.visibility='visible';
+      flap.style.clipPath=polyCss(geo.turned);
+      flap.style.transform=`matrix(${geo.matrix.map(v=>+v.toFixed(4)).join(',')})`;
+      fshade.style.width=Math.round(fw*.6)+'px'; fshade.style.height=stripLen+'px';
+      fshade.style.opacity=String(clamp(Math.min(prog,1-prog)/.12,0,1));   // bend shading lives mid-turn only: at rest the landed page must match the settled view exactly
+      fshade.style.transform=`translate(${geo.mx.toFixed(1)}px,${geo.my.toFixed(1)}px) rotate(${Math.atan2(-geo.ny,-geo.nx).toFixed(4)}rad) translate(0,${-stripLen/2}px)`;
+      cast.style.width=Math.round(fw*.34)+'px'; cast.style.height=stripLen+'px';
+      cast.style.opacity=String(Math.min(.85,Math.sin(Math.min(1,prog)*Math.PI)*1.1));
+      cast.style.transform=`translate(${geo.mx.toFixed(1)}px,${geo.my.toFixed(1)}px) rotate(${Math.atan2(geo.ny,geo.nx).toFixed(4)}rad) translate(0,${-stripLen/2}px)`;
+    }
     under.forEach(u=>u._s.style.opacity=(1-prog)*.85); }};
-  const _end=()=>{ try{ mo.disconnect(); }catch(e){} };
+  const _end=()=>{ try{ mo.disconnect(); }catch(e){} stage.removeEventListener('pointermove',onPtr,true); };
   const obs=new MutationObserver(()=>{ if(!wrap.isConnected){ _end(); obs.disconnect(); } });
   obs.observe(stage,{childList:true});
   flip.setP(0); return true;
