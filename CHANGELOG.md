@@ -1,5 +1,12 @@
 # Comic Shelf: change log
 
+## cr-v63 — 2026-11-19
+
+- **Fit width.** A Width button in the reader's top bar (saved on this device as `cr.fitWidth`, off by default) stacks every page at the full screen width and lets you scroll down through the whole issue, like a webtoon. Turning it on keeps you on the page you were on; turning it off returns you there. The page counter and scrubber follow the scroll position. Pages lazy-load so long issues stay smooth. Swipe and Paper curl page turns work only when Fit width is off; a vertical scroll never turns a page or toggles the bars.
+- New suite `test/e2e_v63.py`.
+
+
+
 ## cr-v60 — 2026-11-15
 
 - **Paper curl on two-up, spreads, folds and half pages.** Landscape and spread turns no longer show vertical strip seams or garbled slices: each curl uses one shared page texture on overlapping, edge-hinged strips (transforms only, still sharp). During a two-up turn the neighbouring page stays visible. Portrait curl and Swipe are unchanged.
