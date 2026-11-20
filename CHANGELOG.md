@@ -1,5 +1,9 @@
 # Comic Shelf: change log
 
+## cr-v64 — 2026-11-19
+
+- **The reader bars get out of the way.** Tapping the comic page toggles the top and bottom bars (in Swipe / Paper curl the left and right edges still turn the page and the centre tap toggles; in panel view the centre tap toggles). Scrolling now hides the bars too: scrolling the issue in Fit width, a vertical scroll gesture on the page, or completing a page turn all slide them away, and a tap brings them back. This replaces the v63 note that a vertical scroll never toggles the bars. Also fixed: taps in Fit width never reached the toggle at all, because fit-width pointers are not tracked in the gesture map — they are now handled on pointer-up before that check.
+
 ## cr-v63 — 2026-11-19
 
 - **Fit width.** A Width button in the reader's top bar (saved on this device as `cr.fitWidth`, off by default) stacks every page at the full screen width and lets you scroll down through the whole issue, like a webtoon. Turning it on keeps you on the page you were on; turning it off returns you there. The page counter and scrubber follow the scroll position. Pages lazy-load so long issues stay smooth. Swipe and Paper curl page turns work only when Fit width is off; a vertical scroll never turns a page or toggles the bars.

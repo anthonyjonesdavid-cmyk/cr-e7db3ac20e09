@@ -231,6 +231,7 @@ const Fit={
   fillVisible(){ if(!R.viewEl) return; const y0=stage.scrollTop, y1=y0+stage.clientHeight, pad=stage.clientHeight*1.2;
     R.viewEl.querySelectorAll('.pg').forEach(d=>{ const t=d.offsetTop, b=t+d.offsetHeight; if(b>=y0-pad&&t<=y1+pad) this.fill(d); }); },
   onScroll(){ if(this.lock||!this.on||!R.viewEl) return;
+    hideUI();   // v64: scrolling the issue hides the bars (programmatic scrolls run under this.lock and never reach here)
     const y=stage.scrollTop+Math.min(56,stage.clientHeight*.1);
     let cur=null; R.viewEl.querySelectorAll('.pg').forEach(d=>{ if(d.offsetTop<=y) cur=d; });
     if(!cur) return; const p=+cur.dataset.p; if(p===this.cur) return;
@@ -494,6 +495,7 @@ function dropLanding(){ if(!landing) return; cancelAnimationFrame(landing.raf); 
 function finishFlip(complete){ if(!flip) return; const f=flip; flip=null;
   if(R.viewEl){ R.viewEl.style.visibility=''; R.viewEl.querySelectorAll('.pg').forEach(el=>{ el.style.visibility=''; }); }
   if(!complete){ f.wrap.remove(); return; }
+  hideUI();   // v64: a completed turn (swipe, curl, or edge tap) slides the bars away
   dropLanding(); R.vi=f.t; renderView(); const view=R.viewEl, L=landing={wrap:f.wrap,raf:0,to:0};
   const painted=()=>!view.querySelector('.pg.loading');
   const swap=()=>{ if(landing!==L) return; let n=0; const tick=()=>{ if(landing!==L) return; if(++n<2){ L.raf=requestAnimationFrame(tick); return; } dropLanding(); };   // 2 frames: let WebKit composite the new canvases first
@@ -548,11 +550,12 @@ stage.addEventListener('pointermove',e=>{
   else if(d.mode==='rubber'&&R.viewEl) R.viewEl.style.transform=`translateX(${dx*.12}px)`;
 });
 function pointerEnd(e,cancelled){
+  if(drag&&drag.fit){ const d=drag; if(e.pointerId!==d.id) return; drag=null;   // v64: fit-width pointers never enter ptrs (pointerdown returns early), so fit taps are handled here — before v64 they never reached onTap at all
+    const dx=e.clientX-d.x0, dy=e.clientY-d.y0, dt=tstamp(e)-d.t0; if(!cancelled&&!d.mode&&Math.hypot(dx,dy)<G.TAP_SLOP&&dt<G.TAP_MS) onTap(stagePt(e)); return; }
   if(!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId);
   if(pinch){ if(ptrs.size<2){ endPinch(); suppressUntilAllUp=ptrs.size>0; } return; }
   if(ptrs.size===0) suppressUntilAllUp=false;
   const d=drag; if(!d||e.pointerId!==d.id) return; drag=null;
-  if(d.fit){ const dx=e.clientX-d.x0, dy=e.clientY-d.y0, dt=tstamp(e)-d.t0; if(!cancelled&&!d.mode&&Math.hypot(dx,dy)<G.TAP_SLOP&&dt<G.TAP_MS) onTap(stagePt(e)); return; }
   if(!cancelled) pushS(d,e);
   const dx=e.clientX-d.x0, dy=e.clientY-d.y0, dt=tstamp(e)-d.t0;
   if(!d.mode&&!cancelled&&Math.hypot(dx,dy)<G.TAP_SLOP&&dt<G.TAP_MS){ onTap(stagePt(e)); return; }
@@ -561,6 +564,7 @@ function pointerEnd(e,cancelled){
     if(!cancelled&&(quick||v>=G.FLICK_VEL||Math.abs(dx)>=Math.min(60,stage.clientWidth*.12))){ const vdir=dx<0?-1:1; stepPanel(R.rtl?vdir>0:vdir<0); } else showPanel(true); return; }
   if(d.mode==='pan'){ scheduleHi(); return; }
   if(d.zoomed) return;
+  if(d.mode==='vert'){ hideUI(); return; }   // v64: a vertical scroll gesture on the page hides the bars
   if(!d.mode&&!cancelled&&Math.abs(dx)>=G.SLOP&&Math.abs(dx)>Math.abs(dy)*G.AXIS){   // whole flick landed between move events
     const v=Math.abs(vel(d,tstamp(e))), quick=dt<=G.QUICK_MS&&Math.abs(dx)>=G.QUICK_MIN;
     if(quick||v>=G.FLICK_VEL||Math.abs(dx)>=pageSpan()*G.COMMIT) go(dx<0?-1:1,440); return; }
@@ -589,6 +593,7 @@ function singleTap(pt){ if(Bag.ateTap()) return; if(Fit.on){ toggleUI(); return;
   if(P.on){ if(pt.x<edge) stepPanel(R.rtl); else if(pt.x>W-edge) stepPanel(!R.rtl); else toggleUI(); return; }
   if(Z.s<=1.01&&pt.x<edge) go(1); else if(Z.s<=1.01&&pt.x>W-edge) go(-1); else toggleUI(); }
 function toggleUI(force){ const on=force??!readerEl.classList.contains('ui'); readerEl.classList.toggle('ui',on); clearTimeout(R.uiT); }
+function hideUI(){ if(!scrubbing&&readerEl.classList.contains('ui')) toggleUI(false); }   // v64: scrolling or turning a page slides the bars away; a tap on the page brings them back
 function doubleTap(pt){ if(Fit.on||flip||P.busy) return; if(P.on){ exitPanels(true); return; } if(Z.s>1.01){ resetZoom(true); return; }
   if(panelsOn()&&unitsOfView(R.vi).length){ enterPanels(pt).then(ok=>{ if(!ok&&Z.s<=1.01&&!P.on){ zoomAt(pt,2.5,true); scheduleHi(); } }); return; }
   zoomAt(pt,2.5,true); scheduleHi(); }
