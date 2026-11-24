@@ -707,8 +707,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .sgrp .segctl.sturn button{flex:1;min-width:0;height:40px}
 
 /* ---------- cr-v66: Line art view + Timeline artist filter ---------- */
+/* cr-v67: gentler Inks levels — dark fills lift to mid gray so line work stays visible */
 #reader.inks #stage canvas,#reader.inks #stage img,#reader.inks #bagOpen .bag-issue img,#reader.inks #pgrid img,#reader.inks #pgrid canvas{
-  filter:grayscale(1) contrast(3.2) brightness(1.12);
+  filter:grayscale(1) contrast(1.35) brightness(1.4);
   filter:url(#crInks);
 }
 #tlFilter.on{background:#fff;color:#000}

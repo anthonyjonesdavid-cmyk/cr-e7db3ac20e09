@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v67 — 2026-11-24
+
+- **Lighter Inks.** Line art view still turns the page black-and-white, but the levels curve is gentler: black ink stays crisp, and dark color fills lift to mid and light-mid grays instead of crushing to black, so line work on dark pages stays visible. The CSS fallback is the same idea (less contrast, more brightness).
+- **One page at a time in Fit width.** A wide scanned two-page sheet was showing both facing pages side by side at full width. The existing 1-up / 2-up button in the reader top bar now stays available in Width when the issue has a wide sheet (saved on this device as `cr.fitSingle`, off by default so spreads stay whole). 1-up splits each wide sheet down the middle and stacks the halves at full width, in reading order (RTL shows the right half first). Continuous scroll, the page counter and the scrubber count those halves. Narrow pages are unchanged. Home is unchanged.
+- New suite `test/e2e_v67.py`.
+
 ## cr-v66 — 2026-11-24
 
 - **Line art view.** An Inks button in the reader's top bar (saved on this device as `cr.inks`, off by default) turns the page crisp black and white, like an original art board — grayscale with a high-contrast levels curve, so inks stay sharp and fills don't go muddy gray. Tap it again to bring the color back. It works with Swipe, Paper curl and Fit width, and with the bag-and-board opening and the All Pages grid.

@@ -755,8 +755,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .sgrp .segctl.sturn button{flex:1;min-width:0;height:40px}
 
 /* ---------- cr-v66: Line art view + Timeline artist filter ---------- */
+/* cr-v67: gentler Inks levels — dark fills lift to mid gray so line work stays visible */
 #reader.inks #stage canvas,#reader.inks #stage img,#reader.inks #bagOpen .bag-issue img,#reader.inks #pgrid img,#reader.inks #pgrid canvas{
-  filter:grayscale(1) contrast(3.2) brightness(1.12);
+  filter:grayscale(1) contrast(1.35) brightness(1.4);
   filter:url(#crInks);
 }
 #tlFilter.on{background:#fff;color:#000}
@@ -912,7 +913,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=63',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=67',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -930,9 +931,9 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListene
   <filter id="crInks" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">
     <feColorMatrix type="saturate" values="0" result="g"/>
     <feComponentTransfer in="g">
-      <feFuncR type="linear" slope="5" intercept="-2"/>
-      <feFuncG type="linear" slope="5" intercept="-2"/>
-      <feFuncB type="linear" slope="5" intercept="-2"/>
+      <feFuncR type="table" tableValues="0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1"/>
+      <feFuncG type="table" tableValues="0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1"/>
+      <feFuncB type="table" tableValues="0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1"/>
     </feComponentTransfer>
   </filter>
 </svg>
@@ -2349,6 +2350,7 @@ function dropJobs(pred){ for(const [k,j] of jobs) if(!j.started&&pred(j)){ jobs.
 const keyFor=(i,w,h)=>`${i}|${Math.round(w*DPR)}x${Math.round(h*DPR)}`;
 let aspectT=0;
 function noteAspect(i,a){ const old=R.aspects[i]; R.aspects[i]=a; if(i>0&&!R.comic.pageAspect&&a>0.3&&a<1.15){ R.comic.pageAspect=a; /* persisted with the next position save: no extra DB write mid-gesture */ if(R.spread){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) renderView(); },30); return; } }
+  if(Fit.on&&Fit.wantSingle()&&((old||0)>SPREAD_AR)!==(a>SPREAD_AR)){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(Fit.on) Fit.relayout(); },30); return; }
   if(R.spread) return;   // spread geometry doesn't depend on individual page shapes
   if(R.half&&old&&(old>WIDE)!==(a>WIDE)&&i>0){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) relayout(true); },30); return; } if(old&&Math.abs(old-a)/a>0.03&&R.viewEl&&pagesOf(R.views[R.vi]).includes(i)){ clearTimeout(aspectT); aspectT=setTimeout(()=>{ if(!flip&&!drag&&Z.s<=1.01) renderView(); },30); } }
 function requestPage(i,w,h,prio){ const key=keyFor(i,w,h); const e=cacheGet(key); if(e) return Promise.resolve(e); const doc=R.doc;
@@ -2447,17 +2449,25 @@ function prefetch(){ const want=new Set(pagesOf(R.views[R.vi]));
   dropJobs(j=>(j.kind==='page'&&!want.has(j.page))||j.kind==='hi'); }
 function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; let a=ordOf(ps[0])+1, b=ordOf(ps[ps.length-1])+1, N=R.seq.length;
   if(R.half){ N=R.views.length-1; a=b=Math.min(R.vi+1,N); }   // the end card isn't counted   // portrait half pages: counter + scrubber count halves
+  if(Fit.on){ const units=Fit.units(); N=units.length||1; if(Fit.cur>=R.n) a=b=N; else { const k=Fit.unitIndex(); a=b=clamp(k+1,1,N); } }
   $('#pgText').textContent=(a===b?a:`${a}–${b}`)+' / '+N;
   const s=$('#scrub'); s.max=N; s.value=b; s.dir=R.rtl?'rtl':'ltr'; s.style.setProperty('--pct',(N>1?(b-1)/(N-1)*100:100)+'%');
   $('#rRtl').classList.toggle('on',R.rtl); $('#rRtl').setAttribute('aria-pressed',R.rtl);
   const ro=$('#rRotate'); ro.classList.toggle('hidden',Fit.on||!canRot()); ro.classList.toggle('on',rotOn()); ro.setAttribute('aria-pressed',rotOn()); ro.setAttribute('aria-label',rotOn()?'Undo rotate':'Rotate spread to fill the screen');
-  const sp=$('#rSpread'); sp.classList.toggle('hidden',Fit.on||!isLandscape()||R.n<2||R.fold); sp.classList.toggle('on',R.spread); $('#rSpreadTxt').textContent=R.spread?'2-up':'1-up';
+  const sp=$('#rSpread');
+  const showFit=Fit.on&&(Fit.wantSingle()||Fit.hasWide());
+  const showSpread=!Fit.on&&isLandscape()&&R.n>=2&&!R.fold;
+  sp.classList.toggle('hidden',!(showFit||showSpread));
+  if(Fit.on){ const one=Fit.wantSingle(); sp.classList.toggle('on',!one); $('#rSpreadTxt').textContent=one?'1-up':'2-up'; sp.title=one?'Show two-page spreads at full width':'Show one page at a time at full width'; }
+  else { sp.classList.toggle('on',R.spread); $('#rSpreadTxt').textContent=R.spread?'2-up':'1-up'; sp.title='Single page or two-page spread in landscape'; }
   Fit.sync(); }
 
 /* ---- progress ---- */
 let saveT=0;
 function saveSoon(){ clearTimeout(saveT); saveT=setTimeout(saveNow,250); }
-function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return; let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ordOf(ps[ps.length-1])+1)/R.seq.length; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
+function saveNow(){ clearTimeout(saveT); const c=R.comic; if(!c||!R.views.length) return;
+  if(Fit.on){ const p=Fit.cur<R.n?Fit.cur:(R.n-1), units=Fit.units(), k=Fit.unitIndex(); c.page=p; c.half=(Fit.wantSingle()&&Fit.curH)||null; c.progress=units.length?(Math.min(Math.max(k,0),units.length-1)+1)/units.length:(ordOf(p)+1)/Math.max(1,R.seq.length); c.lastRead=Date.now(); dbPut(c).catch(()=>{}); return; }
+  let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.length) ps=[R.n-1]; c.page=ps[0]; c.half=halfOf(R.vi)||null; c.progress=R.half?(R.vi+1)/R.views.length:(ordOf(ps[ps.length-1])+1)/R.seq.length; c.lastRead=Date.now(); dbPut(c).catch(()=>{}); }
 addEventListener('pagehide',saveNow); document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveNow(); });
 
 /* ---- open / close ---- */
@@ -2499,7 +2509,7 @@ $('#rBack').onclick=()=>{ if(history.state&&history.state.r) history.back(); els
 addEventListener('popstate',()=>{ const m=location.hash.match(/^#\/read\/(.+)$/); if(m){ if(!R.comic||R.comic.id!==m[1]) openReader(m[1],{push:false}); } else if(R.comic) closeReader(); });
 $('#rRtl').onclick=()=>{ R.rtl=!R.rtl; R.comic.rtl=R.rtl; dbPut(R.comic); cancelFlipNow(); if(R.half) relayout(true); else renderView(); toast(R.rtl?'Right-to-left (manga) on':'Left-to-right'); };
 $('#rRotate').onclick=()=>setRot(!rotOn());
-$('#rSpread').onclick=()=>{ if(Fit.on) return; store.set('singleLandscape',!store.get('singleLandscape',false)); relayout(true); };
+$('#rSpread').onclick=()=>{ if(Fit.on){ Fit.toggleSingle(); return; } store.set('singleLandscape',!store.get('singleLandscape',false)); relayout(true); };
 $('#rFit').onclick=()=>Fit.toggle();
 $('#rInks').onclick=()=>Inks.toggle();
 // rotation keeps the place: half (sheet s, half h) <-> sheet s; coming back to portrait on the same sheet restores the same half
@@ -2519,58 +2529,78 @@ const Inks={
 Inks.sync();
 
 /* ================= v63: Fit width (continuous vertical scroll) ================= */
+/* v67: 1-up splits a wide scanned two-page image into halves, each at full width */
 const Fit={
-  on:false, cur:0, io:null, lock:false,
+  on:false, cur:0, curH:null, io:null, lock:false,
   want(){ return store.get('fitWidth',false)===true; },
+  wantSingle(){ return store.get('fitSingle',false)===true; },
+  isWide(i){ return i<R.n&&(R.aspects[i]||0)>SPREAD_AR; },
+  hasWide(){ return (R.seq||[]).some(i=>this.isWide(i)); },
+  items(){ const out=[], split=this.wantSingle();
+    for(const i of R.seq){ if(split&&this.isWide(i)) (R.rtl?['R','L']:['L','R']).forEach(h=>out.push({p:i,h})); else out.push({p:i,h:null}); }
+    out.push({p:R.n,h:null}); return out; },
+  units(){ return this.items().filter(x=>x.p<R.n); },
+  unitIndex(){ const u=this.units(); const i=u.findIndex(x=>x.p===this.cur&&(x.h||null)===(this.curH||null)); return i>=0?i:Math.max(0,u.findIndex(x=>x.p===this.cur)); },
+  labelOf(p,h){ if(p>=R.n) return ''; if(this.wantSingle()){ const k=this.units().findIndex(x=>x.p===p&&(x.h||null)===(h||null)); return k>=0?k+1:ordOf(p)+1; } return ordOf(p)+1; },
   sync(){ const b=$('#rFit'); if(!b) return; b.classList.toggle('on',this.on); b.setAttribute('aria-pressed',this.on?'true':'false'); },
   toggle(){ this.set(!this.on); },
+  toggleSingle(){ store.set('fitSingle',!this.wantSingle());
+    if(!this.on){ updateChrome(); return; }
+    if(this.wantSingle()&&this.isWide(this.cur)&&!this.curH) this.curH=R.rtl?'R':'L';
+    if(!this.wantSingle()) this.curH=null;
+    this.build(); updateChrome(); saveSoon(); },
   set(on){ store.set('fitWidth',!!on); if(!R.comic||!R.doc){ this.sync(); return; } if(!!on===this.on){ this.sync(); return; } if(on) this.enter(); else this.leave(); },
   pageNow(){ if(this.on) return this.cur; const ps=pagesOf(R.views[R.vi]||[]).filter(p=>p!=null); return ps.length?ps[0]:(R.comic&&R.comic.page||0); },
-  el(p){ return zoomer.querySelector('.pg[data-p="'+p+'"]'); },
-  list(){ return R.seq.concat([R.n]); },
-  sizeOf(i){ const W=stage.clientWidth, ar=(R.aspects[i]||R.comic.aspect||0.66)||0.66; return {w:W,h:Math.max(1,Math.round(W/ar))}; },
+  el(p,h){ if(h){ const n=zoomer.querySelector('.pg[data-p="'+p+'"][data-half="'+h+'"]'); if(n) return n; } return zoomer.querySelector('.pg[data-p="'+p+'"]'); },
+  list(){ return this.items().map(x=>x.p); },
+  sizeOf(i,h){ const W=stage.clientWidth, ar0=(R.aspects[i]||R.comic.aspect||0.66)||0.66, ar=h?ar0/2:ar0; return {w:W,h:Math.max(1,Math.round(W/ar))}; },
   enter(){ cancelFlipNow(); if(P.on){ P.on=false; P.key=null; panelUI(false); } resetZoom(false); freeHi();
-    const keep=this.pageNow(); this.on=true; this.cur=keep;
+    const keep=this.pageNow(), keepH=this.wantSingle()?((R.comic&&R.comic.half)||null):null; this.on=true; this.cur=keep; this.curH=keepH;
     R.spread=false; R.half=false; buildViews(); R.vi=clamp(viewOfPage(keep),0,R.views.length-1);
     this.build(); this.sync(); updateChrome(); saveSoon(); },
   leave(){ const keep=this.cur; this.teardown(); this.on=false;
-    R.spread=wantSpread(); R.half=wantHalf(); buildViews(); R.vi=clamp(viewOfPage(keep),0,R.views.length-1);
+    R.spread=wantSpread(); R.half=wantHalf(); buildViews(); R.vi=clamp(viewOfPage(keep,this.curH),0,R.views.length-1);
     renderView(); this.sync(); },
   teardown(){ if(this.io){ this.io.disconnect(); this.io=null; } stage.classList.remove('fitw'); if(this._onScroll) stage.removeEventListener('scroll',this._onScroll); this.lock=false; },
   build(){ if(this.io){ this.io.disconnect(); this.io=null; } if(this._onScroll) stage.removeEventListener('scroll',this._onScroll);
     stage.classList.add('fitw'); zoomer.style.transform=''; zoomer.classList.remove('anim');
     const view=document.createElement('div'); view.className='view strip';
-    this.list().forEach(i=>{ const r=this.sizeOf(i), d=document.createElement('div'); d.className='pg loading'; d.dataset.p=i;
+    this.items().forEach(({p:i,h})=>{ const r=this.sizeOf(i,h), d=document.createElement('div'); d.className='pg loading'; d.dataset.p=i; if(h) d.dataset.half=h;
       d.style.width=r.w+'px'; d.style.height=r.h+'px';
-      const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i===R.n?'':(ordOf(i)+1); d.appendChild(ph); view.appendChild(d); });
+      const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i===R.n?'':this.labelOf(i,h); d.appendChild(ph); view.appendChild(d); });
     zoomer.replaceChildren(view); R.viewEl=view;
     this.io=new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting) this.fill(en.target); else this.vacate(en.target); }),{root:stage,rootMargin:'120% 0px',threshold:0});
     view.querySelectorAll('.pg').forEach(d=>this.io.observe(d));
     this._onScroll=()=>this.onScroll(); stage.addEventListener('scroll',this._onScroll,{passive:true});
-    this.lock=true; const el=this.el(this.cur); if(el) stage.scrollTop=el.offsetTop; this.lock=false; this.fillVisible(); },
+    this.lock=true; const el=this.el(this.cur,this.curH); if(el) stage.scrollTop=el.offsetTop; this.lock=false; this.fillVisible(); },
   relayout(){ if(!this.on||!R.viewEl) return;
-    const el=this.el(this.cur), frac=el?(stage.scrollTop-el.offsetTop)/Math.max(1,el.offsetHeight):0;
-    this.list().forEach(i=>{ const d=this.el(i), r=this.sizeOf(i); if(!d) return; d.style.width=r.w+'px'; d.style.height=r.h+'px'; const cv=d.querySelector('canvas:not(.tile)'); if(cv) placeCanvas(cv,r.w,r.h,'c'); });
-    this.lock=true; const n=this.el(this.cur); if(n) stage.scrollTop=n.offsetTop+frac*n.offsetHeight; this.lock=false; this.fillVisible(); updateChrome(); },
-  fill(d){ if(!d||!d.isConnected) return; const i=+d.dataset.p, r=this.sizeOf(i);
+    const want=this.items(), have=[...R.viewEl.querySelectorAll('.pg')].map(d=>({p:+d.dataset.p,h:d.dataset.half||null}));
+    const same=want.length===have.length&&want.every((x,i)=>x.p===have[i].p&&(x.h||null)===(have[i].h||null));
+    if(!same){ this.build(); updateChrome(); return; }
+    const el=this.el(this.cur,this.curH), frac=el?(stage.scrollTop-el.offsetTop)/Math.max(1,el.offsetHeight):0;
+    want.forEach(({p:i,h})=>{ const d=this.el(i,h), r=this.sizeOf(i,h); if(!d) return; d.style.width=r.w+'px'; d.style.height=r.h+'px'; const cv=d.querySelector('canvas:not(.tile)'); if(cv) placeCanvas(cv,r.w,r.h,'c'); });
+    this.lock=true; const n=this.el(this.cur,this.curH); if(n) stage.scrollTop=n.offsetTop+frac*n.offsetHeight; this.lock=false; this.fillVisible(); updateChrome(); },
+  fill(d){ if(!d||!d.isConnected) return; const i=+d.dataset.p, h=d.dataset.half||null, r=this.sizeOf(i,h);
     if(d.dataset.w==String(r.w)&&d.dataset.h==String(r.h)&&d.querySelector('canvas')&&!d.dataset.interim&&!d.classList.contains('loading')) return;
-    fillPage(d,i,r.w,r.h,'c',0); },
-  vacate(d){ if(!d||+d.dataset.p===this.cur) return;
+    fillPage(d,i,r.w,r.h,'c',0,h); },
+  vacate(d){ if(!d||(+d.dataset.p===this.cur&&(d.dataset.half||null)===(this.curH||null))) return;
     d.querySelectorAll('canvas,.phn').forEach(x=>{ if(x.tagName==='CANVAS') freeCanvas(x); x.remove(); });
     delete d.dataset.interim; delete d.dataset.hi; delete d.dataset.w; delete d.dataset.h;
-    d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=(+d.dataset.p===R.n)?'':(ordOf(+d.dataset.p)+1); d.prepend(ph); },
+    d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=(+d.dataset.p===R.n)?'':this.labelOf(+d.dataset.p,d.dataset.half||null); d.prepend(ph); },
   fillVisible(){ if(!R.viewEl) return; const y0=stage.scrollTop, y1=y0+stage.clientHeight, pad=stage.clientHeight*1.2;
     R.viewEl.querySelectorAll('.pg').forEach(d=>{ const t=d.offsetTop, b=t+d.offsetHeight; if(b>=y0-pad&&t<=y1+pad) this.fill(d); }); },
   onScroll(){ if(this.lock||!this.on||!R.viewEl) return;
     hideUI();   // v64: scrolling the issue hides the bars (programmatic scrolls run under this.lock and never reach here)
     const y=stage.scrollTop+Math.min(56,stage.clientHeight*.1);
     let cur=null; R.viewEl.querySelectorAll('.pg').forEach(d=>{ if(d.offsetTop<=y) cur=d; });
-    if(!cur) return; const p=+cur.dataset.p; if(p===this.cur) return;
-    this.cur=p; R.vi=clamp(viewOfPage(p<R.n?p:R.n),0,R.views.length-1); updateChrome(); saveSoon(); },
-  goTo(p){ if(!this.on) return; const q=p>=R.n?R.n:(R.seq.includes(p)?p:(R.seq.find(i=>i>=p)??R.seq[R.seq.length-1]??0));
-    this.cur=q; R.vi=clamp(viewOfPage(q),0,R.views.length-1);
-    this.lock=true; const el=this.el(q); if(el) stage.scrollTop=el.offsetTop; this.lock=false; this.fillVisible(); updateChrome(); saveSoon(); },
-  step(dir){ if(!this.on) return; const L=this.list(), k=Math.max(0,L.indexOf(this.cur)); this.goTo(L[clamp(k+dir,0,L.length-1)]); }
+    if(!cur) return; const p=+cur.dataset.p, h=cur.dataset.half||null; if(p===this.cur&&(h||null)===(this.curH||null)) return;
+    this.cur=p; this.curH=h; R.vi=clamp(viewOfPage(p<R.n?p:R.n),0,R.views.length-1); updateChrome(); saveSoon(); },
+  goTo(p,h){ if(!this.on) return; const q=p>=R.n?R.n:(R.seq.includes(p)?p:(R.seq.find(i=>i>=p)??R.seq[R.seq.length-1]??0));
+    let hh=null;
+    if(this.wantSingle()&&this.isWide(q)&&q<R.n){ const ord=R.rtl?['R','L']:['L','R']; hh=(h&&ord.includes(h))?h:(this.cur===q&&this.curH&&ord.includes(this.curH)?this.curH:ord[0]); }
+    this.cur=q; this.curH=hh; R.vi=clamp(viewOfPage(q),0,R.views.length-1);
+    this.lock=true; const el=this.el(q,hh); if(el) stage.scrollTop=el.offsetTop; this.lock=false; this.fillVisible(); updateChrome(); saveSoon(); },
+  step(dir){ if(!this.on) return; const L=this.items(), k=Math.max(0,L.findIndex(x=>x.p===this.cur&&(x.h||null)===(this.curH||null))); const t=L[clamp(k+dir,0,L.length-1)]; this.goTo(t.p,t.h); }
 };
 
 /* ================= v59: bag-and-board opening + paper curl ================= */
@@ -2989,14 +3019,14 @@ function thumb(i,prio){ const u=R.thumbs.get(i); if(u){ R.thumbs.delete(i); R.th
   return enqueue('t|'+i,'thumb',i,prio,async()=>{ const page=await doc.getPage(i+1); const c=await renderToCanvas(page,110,165,2,80000); page.cleanup(); const b=await toBlob(c,.7); freeCanvas(c);
     const url=URL.createObjectURL(b); R.thumbs.set(i,url); while(R.thumbs.size>400){ const [k,v]=R.thumbs.entries().next().value; URL.revokeObjectURL(v); R.thumbs.delete(k); } return url; }); }
 const scrub=$('#scrub'), bubble=$('#bubble');
-function showBubble(){ const v=+scrub.value, n=R.half?R.views.length-1:R.seq.length, frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
+function showBubble(){ const units=Fit.on?Fit.units():null, v=+scrub.value, n=units?units.length:(R.half?R.views.length-1:R.seq.length), frac=n>1?(v-1)/(n-1):0, w=scrub.clientWidth, x=(R.rtl?1-frac:frac)*(w-16)+8;
   bubble.classList.remove('hidden'); bubble.style.left=clamp(x,56,w-40)+'px'; bubble.querySelector('span').textContent=`Page ${v}`;
-  const sh=R.half?((R.views[v-1]||[0])[0]):(R.seq[v-1]??0);   // half pages: thumbnail of that half's sheet
+  const sh=units?((units[v-1]||units[0]||{}).p??0):(R.half?((R.views[v-1]||[0])[0]):(R.seq[v-1]??0));   // half pages: thumbnail of that half's sheet
   scrub.style.setProperty('--pct',frac*100+'%'); const img=bubble.querySelector('img'); img.dataset.p=sh; const u=R.thumbs.get(sh);
   if(u) img.src=u; else { img.removeAttribute('src'); thumb(sh,-2).then(url=>{ if(img.dataset.p==String(sh)) img.src=url; }).catch(()=>{}); } }
 const hideBubble=ms=>setTimeout(()=>{ bubble.classList.add('hidden'); scrubbing=false; },ms);
 scrub.addEventListener('input',()=>{ scrubbing=true; clearTimeout(R.uiT); showBubble(); });
-scrub.addEventListener('change',()=>{ if(R.half) jumpToView(+scrub.value-1); else jumpTo(R.seq[+scrub.value-1]??0); hideBubble(600); });
+scrub.addEventListener('change',()=>{ if(Fit.on){ const units=Fit.units(), t=units[clamp(+scrub.value-1,0,Math.max(0,units.length-1))]; if(t) Fit.goTo(t.p,t.h); hideBubble(600); return; } if(R.half) jumpToView(+scrub.value-1); else jumpTo(R.seq[+scrub.value-1]??0); hideBubble(600); });
 $('#rGrid').onclick=openPages; $('#rMore').onclick=e=>{ e.stopPropagation(); const c=R.comic; if(!c) return; openMenu($('#rMore'),[{label:'Issue Info',icon:IC.book,id:'rmInfo',run:readerInfo},{label:'Add to Reading List…',icon:IC.list,id:'rmQueue',run:()=>addToQueue(c.id)}]); }; $('#pagesClose').onclick=()=>$('#pages').classList.add('hidden');
 let pagesIO=null;
 function openPages(){ const grid=$('#pgrid'), cur=new Set(pagesOf(R.views[R.vi]));
