@@ -198,7 +198,7 @@ with sync_playwright() as p:
     ok(f'{lab}: Width default keeps a wide sheet as one full-width page (2-up)',
        two['fit'] and two['aspect'] and two['aspect']>1.2 and len(two['wide'])==1 and two['wide'][0]['half'] is None
        and abs(two['wide'][0]['w']-two['tw'])<=2 and abs(two['wide'][0]['h']-round(two['tw']/two['aspect']))<=3
-       and two['store'] in (None,'false') and two['txt']=='2-up' and not two['hidden'],
+       and two['store'] in (None,'false') and two['txt']=='1 page' and not two['on'] and not two['hidden'],
        json.dumps(two))
     ok(f'{lab}: 1-up / 2-up button is in the top bar next to Width, tap target >=40px',
        not two['hidden'] and two['bw']>=40 and two['bh']>=40 and two['by']>=-2 and two['bx']<two['fx'],
@@ -222,7 +222,7 @@ with sync_playwright() as p:
     tall=all(box['h']>one['th']*0.7 for box in one['boxes'])  # each half is roughly portrait at full width
     order=[box['half'] for box in one['boxes']]
     ok(f'{lab}: 1-up splits the wide sheet into two stacked full-width pages (L then R)',
-       stacked and fullw and tall and order==['L','R'] and one['store']=='true' and one['txt']=='1-up' and one['halves']==4
+       stacked and fullw and tall and order==['L','R'] and one['store']=='true' and one['txt']=='1 page' and one['halves']==4
        and one['nItems']>one['nPdf'] and one['curH'] in ('L','R'),
        json.dumps(one))
 
@@ -274,7 +274,7 @@ with sync_playwright() as p:
         txt:document.getElementById('rSpreadTxt').textContent, curH:window.__cr.fit.curH};
     }""")
     ok(f'{lab}: turning 2-up back on shows the wide sheet whole again',
-       back2['n']==1 and back2['half'] is None and back2['store']=='false' and back2['txt']=='2-up' and back2['curH'] is None,
+       back2['n']==1 and back2['half'] is None and back2['store']=='false' and back2['txt']=='1 page' and back2['curH'] is None,
        json.dumps(back2))
 
     # Persist 1-up across close/reopen
@@ -285,7 +285,7 @@ with sync_playwright() as p:
       txt:document.getElementById('rSpreadTxt').textContent, single:window.__cr.fit.wantSingle(),
       hasHalves:[...document.querySelectorAll('#stage.fitw .pg')].some(d=>d.dataset.half)});""")
     ok(f'{lab}: cr.fitSingle persists and Width reopens in 1-up',
-       persist['store']=='true' and persist['fit'] and persist['txt']=='1-up' and persist['single'] and persist['hasHalves'],
+       persist['store']=='true' and persist['fit'] and persist['txt']=='1 page' and persist['single'] and persist['hasHalves'],
        json.dumps(persist))
 
     # Home is unchanged: back to shelf, home tab still has the usual layout hooks

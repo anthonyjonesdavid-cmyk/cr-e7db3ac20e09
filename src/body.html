@@ -88,7 +88,7 @@
     <button class="back" id="rBack"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Shelf</button>
     <div class="rtitle" id="rTitle"></div>
     <button class="rbtn" id="rRtl" aria-pressed="false" title="Right-to-left (manga)"><svg class="i" viewBox="0 0 24 24"><path d="M20 7H5m0 0 4-4M5 7l4 4M4 17h15m0 0-4-4m4 4-4 4"/></svg>RTL</button>
-    <button class="rbtn" id="rSpread" title="Single page or two-page spread in landscape"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg><span id="rSpreadTxt">2-up</span></button>
+    <button class="rbtn" id="rSpread" aria-pressed="false" title="One page at a time" aria-label="One page at a time"><svg class="i" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="1.5"/></svg><span id="rSpreadTxt">1 page</span></button>
     <button class="rbtn" id="rFit" aria-pressed="false" title="Fit width: scroll the whole issue at full width" aria-label="Fit width"><svg class="i" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="18" rx="1"/><path d="M3 8v8M21 8v8M3 12H1M23 12h-2M3 12l2-2M3 12l2 2M21 12l-2-2M21 12l-2 2"/></svg><span class="w">Width</span></button>
     <button class="rbtn" id="rInks" aria-pressed="false" title="Line art view: crisp black-and-white inks" aria-label="Line art view"><svg class="i" viewBox="0 0 24 24"><path d="M16 3l5 5L9 20H4v-5z"/><path d="M14 5l5 5"/></svg><span class="w">Inks</span></button>
     <button class="rbtn" id="rMore" title="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
@@ -137,7 +137,7 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=67',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=68',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>

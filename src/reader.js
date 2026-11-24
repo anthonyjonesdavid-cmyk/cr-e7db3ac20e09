@@ -136,8 +136,11 @@ function updateChrome(){ let ps=pagesOf(R.views[R.vi]).filter(p=>p<R.n); if(!ps.
   const showFit=Fit.on&&(Fit.wantSingle()||Fit.hasWide());
   const showSpread=!Fit.on&&isLandscape()&&R.n>=2&&!R.fold;
   sp.classList.toggle('hidden',!(showFit||showSpread));
-  if(Fit.on){ const one=Fit.wantSingle(); sp.classList.toggle('on',!one); $('#rSpreadTxt').textContent=one?'1-up':'2-up'; sp.title=one?'Show two-page spreads at full width':'Show one page at a time at full width'; }
-  else { sp.classList.toggle('on',R.spread); $('#rSpreadTxt').textContent=R.spread?'2-up':'1-up'; sp.title='Single page or two-page spread in landscape'; }
+  const one=Fit.on?Fit.wantSingle():!R.spread;
+  sp.classList.toggle('on',one); sp.setAttribute('aria-pressed',one?'true':'false');
+  $('#rSpreadTxt').textContent='1 page';
+  sp.title=one?'Showing one page at a time. Tap to show two-page spreads.':'Show one page at a time';
+  sp.setAttribute('aria-label','One page at a time');
   Fit.sync(); }
 
 /* ---- progress ---- */
@@ -173,7 +176,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if(R.comic!==c){ doc.destroy().catch(()=>{}); return; }
   R.doc=doc; if(c.creditsV!==1){ c.creditsV=1; pdfCredits(doc).then(m=>{ c.metaCredits=m; dbPut(c); }).catch(()=>{}); } if(doc.numPages!==R.n){ R.n=c.pages=doc.numPages; R.aspects=new Array(R.n).fill(c.aspect||0.66); }
   R.fold=false; try{ R.fold=await turnIsFold(doc,c); }catch(e){ console.warn('page-turn detection failed',e); } if(R.comic!==c) return;
-  R.rot=null; if(!R.fold) try{ await scanAspects(doc,c); }catch(e){ console.warn('page shapes',e); } if(R.comic!==c) return;
+  R.rot=null; try{ await scanAspects(doc,c); }catch(e){ console.warn('page shapes',e); } if(R.comic!==c) return;
   R.spread=wantSpread(); R.half=wantHalf(); const at=opts.atCover?0:(c.page||0), half=opts.atCover?null:c.half; R.lastHalf=half?{s:at,h:half}:null; buildViews(); R.vi=clamp(viewOfPage(at,half),0,R.views.length-1);
   if(Fit.want()) Fit.enter(); else renderView();
   if(needsBlack(c)) kickBlack(300);   /* not checked yet: checked now in the background, from the current page on; blank pages drop out in place */
