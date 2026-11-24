@@ -26,7 +26,9 @@ const IC={
   cal:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   rack:'<svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg>',
   grid:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 10h18M12 10v11"/></svg>',
+  art:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>',
 };
+
 function cover(c){ if(!c.cover) return ''; let u=coverURL.get(c.id); if(!u){ u=URL.createObjectURL(c.cover instanceof Blob?c.cover:new Blob([c.cover],{type:'image/jpeg'})); coverURL.set(c.id,u); } return u; }
 const pctOf=c=>c.pages?Math.round(clamp(c.progress||0,0,1)*100):0;
 const isDone=c=>(c.progress||0)>=1, isUnread=c=>!c.lastRead&&!((c.progress||0)>0), inProg=c=>!isDone(c)&&!isUnread(c);
@@ -464,10 +466,17 @@ function modal(html,onOpen,cls){ return new Promise(res=>{ const w=document.crea
   w.addEventListener('click',e=>{ if(e.target===w) close(null); const b=e.target.closest('[data-r]'); if(b) close(b.dataset.r); });
   onOpen&&onOpen(w,close); }); }
 async function confirmBox(title,msg,ok='Delete'){ return (await modal(`<div class="mh"><h3>${esc(title)}</h3></div><div class="mb"><p class="confirm-msg">${esc(msg)}</p></div><div class="mf"><button class="btn ghost" data-r="no">Cancel</button><button class="btn red" data-r="yes" id="confirmOk">${esc(ok)}</button></div>`)).r==='yes'; }
+function artQuery(c){ const series=(c.series||'').trim(), title=(c.title||'').trim(), n=issueNo(title);
+  if(series && n!==Infinity) return series+' #'+n;
+  if(series) return series;
+  return title; }
+function artSearchUrl(c){ return 'https://comicartindex.com/sales/?q='+encodeURIComponent(artQuery(c)); }
+function openOriginalArt(c){ const u=artSearchUrl(c); window.open(u,'_blank','noopener,noreferrer'); }
 async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) return; document.querySelector('.mwrap')?.remove();
   const {r}=await modal(`<div class="grp"><div class="hd"><img src="${cover(c)}" alt="" loading="lazy" decoding="async"><div><b>${esc(c.title)}</b><span>${c.series?esc(c.series)+' · ':''}${c.pages} pages${c.lastRead?' · '+pctOf(c)+'%':''}</span></div></div>${creditsHTML(c)?`<div class="crwrap">${creditsHTML(c)}</div>`:''}
     <button class="act" data-r="read" id="aRead">${IC.book}${c.lastRead&&!isDone(c)?'Continue Reading':'Read'}</button>
     <button class="act" data-r="about" id="aAbout">${IC.book}About this issue</button>
+    <button class="act" id="aArt">${IC.art}Find original art</button>
     <button class="act" data-r="queue" id="aQueue">${IC.list}Add to Reading List…</button>
     <button class="act" data-r="edit" id="aEdit">${IC.edit}Edit Title &amp; Series</button>
     <button class="act" data-r="date" id="aDate">${IC.cal}Release Date<small class="actv">${esc(fmtDate(dateOf(c)))}</small></button>
@@ -475,7 +484,8 @@ async function actionSheet(id,o={}){ const c=comics.find(x=>x.id===id); if(!c) r
     <button class="act" data-r="pin" id="aPin">${IC.pin}${isPinned(c.id)?'Unpin from Continue Reading':'Pin to Continue Reading'}</button>
     ${o.cont&&!isPinned(c.id)?`<button class="act" data-r="conthide" id="aContHide">${IC.undo}Remove from Continue Reading</button>`:''}
     <button class="act red" data-r="delete" id="aDelete">${IC.trash}Delete from Device</button></div>
-    <button class="cancel" data-r="cancel">Cancel</button>`,null,'sheet');
+    <button class="cancel" data-r="cancel">Cancel</button>`,
+  w=>{ const b=w.querySelector('#aArt'); if(b) b.addEventListener('click',e=>{ e.stopPropagation(); openOriginalArt(c); const x=w.querySelector('[data-r=cancel]'); if(x) x.click(); else w.remove(); }); },'sheet');
   if(r==='read') openReader(id); else if(r==='about') openAbout(id); else if(r==='queue') addToQueue(id); else if(r==='edit') editComic(id); else if(r==='date') dateSheet(id); else if(r==='delete') deleteComic(id); else if(r==='conthide') contHide(id); else if(r==='pin') contPin(id,!isPinned(id));
   else if(r==='toggle'){ if(isDone(c)){ c.progress=0; c.page=0; c.lastRead=0; } else { c.progress=1; } await dbPut(c); renderShelf(); } }
 async function editComic(id){ const c=comics.find(x=>x.id===id); if(!c) return;
@@ -663,8 +673,9 @@ async function lookupAll(){ const L=comics.filter(lkEligible); document.querySel
       const sm=document.querySelector('#lkSum'); if(sm) sm.textContent=`${n} of ${L.length} checked · ${f} found${amb?` · ${amb} need a volume`:''}`; await new Promise(r=>setTimeout(r,250)); }
     done=true; const b=document.querySelector('#lkDone'); if(b) b.textContent='Done'; if(f) renderShelf(); })();
   await p; ctl.abort(); if(f) renderShelf(); }
-const TL={on:false};
-function tlGroups(){ const by=new Map(), unk=[]; comics.forEach(c=>{ const d=dateOf(c); if(d){ if(!by.has(d.y)) by.set(d.y,[]); by.get(d.y).push({c,d}); } else unk.push(c); });
+const TL={on:false,artist:''};
+function tlList(){ if(!TL.artist) return comics; const key=crKey(TL.artist); return comics.filter(c=>{ const k=creditsOf(c); return k&&k.artist.some(n=>crKey(n)===key); }); }
+function tlGroups(){ const by=new Map(), unk=[]; tlList().forEach(c=>{ const d=dateOf(c); if(d){ if(!by.has(d.y)) by.set(d.y,[]); by.get(d.y).push({c,d}); } else unk.push(c); });
   const years=[...by.keys()].sort((a,b)=>a-b); years.forEach(y=>by.get(y).sort((a,b)=>(a.d.m||13)-(b.d.m||13)||(a.c.series||'').localeCompare(b.c.series||'')||byIssue(a.c,b.c)));
   return {by,years,unk:unk.sort((a,b)=>(a.series||a.title).localeCompare(b.series||b.title)||byIssue(a,b))}; }
 function tlRange(){ const {years}=tlGroups(); return years.length?(years[0]===years.at(-1)?String(years[0]):`${years[0]} – ${years.at(-1)}`):''; }
@@ -675,8 +686,11 @@ function renderTimeline(){ const el=$('#tlScroll'); if(!el) return; const {by,ye
   unk.forEach((c,k)=>{ h+=card(c,null,k===0?'Unknown':''); });
   const decades=[]; if(years.length) for(let d=Math.floor(years[0]/10)*10;d<=years.at(-1);d+=10) decades.push(d);   // v41: every decade in range; empty ones jump to the nearest with a note
   $('#tlDec').innerHTML=decades.map(d=>`<button class="chip" data-dec="${d}">${d}s</button>`).join('')+(unk.length?'<button class="chip" data-dec="unk">Unknown</button>':'');
-  el.innerHTML=comics.length?`<div class="tlg" id="tlGrid">${h}</div>${unk.length?'<p class="tlhint">Unknown dates: long-press an issue to set one, or use Look Up Release Dates in Settings.</p>':''}`:'<p class="qempty">No comics yet.</p>';
-  $('#tlCount').textContent=`${comics.length} issue${comics.length===1?'':'s'}`; el.scrollTop=st; tlSpy(); }
+  const L=tlList(), filt=TL.artist;
+  el.innerHTML=L.length?`<div class="tlg" id="tlGrid">${h}</div>${unk.length?'<p class="tlhint">Unknown dates: long-press an issue to set one, or use Look Up Release Dates in Settings.</p>':''}`:comics.length&&filt?`<p class="qempty">No issues drawn by ${esc(filt)}.</p>`:'<p class="qempty">No comics yet.</p>';
+  $('#tlCount').textContent=filt?`${L.length} · ${filt}`:`${L.length} issue${L.length===1?'':'s'}`;
+  const fb=$('#tlFilter'); if(fb){ fb.classList.toggle('on',!!filt); fb.setAttribute('aria-pressed',filt?'true':'false'); fb.setAttribute('aria-label',filt?`Filter by artist, ${filt}`:'Filter by artist'); fb.title=filt?`Showing ${filt}`:'Filter by artist'; }
+  el.scrollTop=st; tlSpy(); }
 function tlFirstVisible(){ const el=$('#tlScroll'), top=el.getBoundingClientRect().top; for(const c of el.querySelectorAll('.tc')){ const r=c.getBoundingClientRect(); if(r.bottom>top+8) return c; } return null; }
 // v41 decade chips. Root causes of "the chip does nothing" on iPad: tlSpy ran on every scroll frame of the smooth jump and called
 // chip.scrollIntoView(), which in WebKit cancels the in-flight smooth scroll of #tlScroll (jump stops after a few px, old chip re-lit);

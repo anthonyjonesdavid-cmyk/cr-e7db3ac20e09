@@ -69,3 +69,18 @@ function edgeBack(el,back){ let d=null;
   el.addEventListener('touchend',()=>{ if(!d) return; const go=(d.dx||0)>80; d=null; if(go){ el.style.transition='transform .18s ease-out'; el.style.transform='translateX(100%)'; setTimeout(()=>{ el.style.transition=''; el.style.transform=''; back(); },180); } else { el.style.transition='transform .15s'; el.style.transform=''; setTimeout(()=>el.style.transition='',160); } });
   el.addEventListener('touchcancel',()=>{ d=null; el.style.transform=''; }); }
 edgeBack($('#creator'),closeCreator); edgeBack($('#creators'),closeCreators);
+
+/* ================= v66: Timeline artist filter ================= */
+function tlArtists(){ const m=new Map();
+  for(const c of comics){ const k=creditsOf(c); if(!k) continue;
+    for(const n of k.artist){ const key=crKey(n); let e=m.get(key); if(!e) m.set(key,e={name:crNorm(n),n:0}); e.n++; } }
+  return [...m.values()].sort((a,b)=>lastKey(a.name).localeCompare(lastKey(b.name))||a.name.localeCompare(b.name)); }
+function openArtistFilter(){ const L=tlArtists(), cur=TL.artist||'';
+  const row=(id,name,n,on)=>`<button type="button" class="tlp${on?' on':''}" ${id} data-artist="${esc(name)}"><span>${esc(name)}</span><span class="tlpc">${n}</span></button>`;
+  return modal(`<div class="mh"><h3>Filter by artist</h3></div><div class="mb tlpicks" id="tlPicks">
+    ${row('id="tlAll"','All artists',comics.length,!cur)}
+    ${L.map(e=>row('',e.name,e.n,cur&&crKey(e.name)===crKey(cur))).join('')||'<p class="qempty">No artist credits in your library yet.</p>'}
+  </div><div class="mf"><button class="btn ghost" data-r="cancel">Cancel</button></div>`,
+  (w,close)=>{ w.querySelector('#tlPicks')?.addEventListener('click',e=>{ const b=e.target.closest('[data-artist]'); if(!b) return; e.stopPropagation();
+    const name=b.id==='tlAll'?'':b.dataset.artist; if(TL.artist!==name){ TL.artist=name; TL.pin=null; renderTimeline(); } close('pick'); }); },'tlfilt'); }
+$('#tlFilter')?.addEventListener('click',()=>openArtistFilter());

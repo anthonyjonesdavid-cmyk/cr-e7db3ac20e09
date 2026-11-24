@@ -622,8 +622,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .ntsrc{font-size:11px;color:#0a84ff;text-decoration:none;white-space:nowrap;margin-left:2px;padding:2px 0}
 .ntfoot{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap}.ntfoot .pillbtn{min-height:40px;padding:0 16px}
 /* ---- Animate page ---- */
-@media (max-width:700px){#rFit .w{display:none}}
-@media (max-width:560px){#rAnim .w{display:none}}
+@media (max-width:700px){#rFit .w,#rInks .w{display:none}}
 .anmodal{width:min(560px,100%)}
 .anplan{display:flex;flex-direction:column;gap:8px}
 .anscore{display:flex;gap:8px;align-items:flex-start;margin:0 0 4px;font-size:13.5px;color:#cfd2d8}
@@ -706,3 +705,21 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* Settings: page-turn segment stays a 40px target */
 .sgrp .segctl.sturn{display:flex;width:100%;justify-self:stretch;margin-top:2px}
 .sgrp .segctl.sturn button{flex:1;min-width:0;height:40px}
+
+/* ---------- cr-v66: Line art view + Timeline artist filter ---------- */
+#reader.inks #stage canvas,#reader.inks #stage img,#reader.inks #bagOpen .bag-issue img,#reader.inks #pgrid img,#reader.inks #pgrid canvas{
+  filter:grayscale(1) contrast(3.2) brightness(1.12);
+  filter:url(#crInks);
+}
+#tlFilter.on{background:#fff;color:#000}
+.tlcount{max-width:28vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal.tlfilt{width:min(400px,100%);display:flex;flex-direction:column;max-height:min(80vh,640px);overflow:hidden}
+.modal.tlfilt .mb{padding:0;min-height:0;overflow:auto}
+.tlpicks{padding:0}
+.tlp{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;height:48px;padding:0 20px;font-size:16px;font-weight:600;text-align:left;border-bottom:.5px solid var(--el3);color:#fff}
+.tlp:last-child{border-bottom:0}
+.tlp:active{background:var(--el2)}
+.tlp.on{background:#fff;color:#000}
+.tlp span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlpc{flex:none;color:var(--mut);font-weight:500;font-variant-numeric:tabular-nums}
+.tlp.on .tlpc{color:#0009}

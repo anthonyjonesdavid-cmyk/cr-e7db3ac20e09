@@ -1,5 +1,14 @@
 # Comic Shelf: change log
 
+## cr-v66 — 2026-11-24
+
+- **Line art view.** An Inks button in the reader's top bar (saved on this device as `cr.inks`, off by default) turns the page crisp black and white, like an original art board — grayscale with a high-contrast levels curve, so inks stay sharp and fills don't go muddy gray. Tap it again to bring the color back. It works with Swipe, Paper curl and Fit width, and with the bag-and-board opening and the All Pages grid.
+- **Artist filter on Timeline.** A Filter button on the Timeline tab opens a list of artists taken from the creator credits the app already has (pencillers and artists, sorted by name, with issue counts). Pick one to see only the issues they drew, in release order. Choose All artists to show everything again. Home is unchanged.
+- **Find original art.** The long-press info sheet has a Find original art button that opens a ComicArtIndex search for that issue (series title plus issue number) in a new tab: `https://comicartindex.com/sales/?q=…`.
+- New suite `test/e2e_v66.py`.
+- The Animate button stays off the reader toolbar (cr-v65), including in the source build.
+
+
 ## cr-v64 — 2026-11-19
 
 - **The reader bars get out of the way.** Tapping the comic page toggles the top and bottom bars (in Swipe / Paper curl the left and right edges still turn the page and the centre tap toggles; in panel view the centre tap toggles). Scrolling now hides the bars too: scrolling the issue in Fit width, a vertical scroll gesture on the page, or completing a page turn all slide them away, and a tap brings them back. This replaces the v63 note that a vertical scroll never toggles the bars. Also fixed: taps in Fit width never reached the toggle at all, because fit-width pointers are not tracked in the gesture map — they are now handled on pointer-up before that check.

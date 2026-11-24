@@ -78,7 +78,7 @@
     <div id="binStage"><div class="bn-back" aria-hidden="true"></div><div id="binCards"></div><div class="bn-front" aria-hidden="true"><i></i></div>
       <p class="bn-hint">Swipe to flip · tap the raised comic to read</p></div></section>
   <main id="recent" class="tabview hidden" aria-label="Recently Added"><div class="scrollv" id="recScroll"><div class="lgrid rgrid" id="recGrid"></div></div></main>
-  <main id="timeline" class="tabview hidden" aria-label="Timeline"><div class="tlbar"><div class="tldec" id="tlDec" aria-label="Jump to decade"></div><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlBin" aria-label="Back-issue bin"><svg class="i" viewBox="0 0 24 24"><path d="M3 9h18l-2 11H5z"/><path d="M7 9V5h3v4M11 9V4h3v5M15 9V6h3v3"/></svg></button><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div><div class="scrollv" id="tlScroll"></div></main>
+  <main id="timeline" class="tabview hidden" aria-label="Timeline"><div class="tlbar"><div class="tldec" id="tlDec" aria-label="Jump to decade"></div><div class="tlr"><span id="tlCount" class="tlcount"></span><button class="icbtn" id="tlFilter" aria-pressed="false" title="Filter by artist" aria-label="Filter by artist"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16l-6 7v5l-4 2v-7z"/></svg></button><button class="icbtn" id="tlBin" aria-label="Back-issue bin"><svg class="i" viewBox="0 0 24 24"><path d="M3 9h18l-2 11H5z"/><path d="M7 9V5h3v4M11 9V4h3v5M15 9V6h3v3"/></svg></button><button class="icbtn" id="tlRack" aria-label="Spinner rack"><svg class="i" viewBox="0 0 24 24"><path d="M12 2v20M7 22h10"/><rect x="5" y="4" width="14" height="5" rx="1"/><rect x="5" y="11" width="14" height="5" rx="1"/></svg></button></div></div><div class="scrollv" id="tlScroll"></div></main>
 </section>
 
 <!-- ================= READER ================= -->
@@ -90,7 +90,7 @@
     <button class="rbtn" id="rRtl" aria-pressed="false" title="Right-to-left (manga)"><svg class="i" viewBox="0 0 24 24"><path d="M20 7H5m0 0 4-4M5 7l4 4M4 17h15m0 0-4-4m4 4-4 4"/></svg>RTL</button>
     <button class="rbtn" id="rSpread" title="Single page or two-page spread in landscape"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="14" rx="1"/><rect x="13" y="5" width="8" height="14" rx="1"/></svg><span id="rSpreadTxt">2-up</span></button>
     <button class="rbtn" id="rFit" aria-pressed="false" title="Fit width: scroll the whole issue at full width" aria-label="Fit width"><svg class="i" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="18" rx="1"/><path d="M3 8v8M21 8v8M3 12H1M23 12h-2M3 12l2-2M3 12l2 2M21 12l-2-2M21 12l-2 2"/></svg><span class="w">Width</span></button>
-    <button class="rbtn" id="rAnim" aria-label="Animate page" title="Animate this page with Grok Imagine"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span class="w">Animate</span></button>
+    <button class="rbtn" id="rInks" aria-pressed="false" title="Line art view: crisp black-and-white inks" aria-label="Line art view"><svg class="i" viewBox="0 0 24 24"><path d="M16 3l5 5L9 20H4v-5z"/><path d="M14 5l5 5"/></svg><span class="w">Inks</span></button>
     <button class="rbtn" id="rMore" title="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
     <button class="rbtn" id="rGrid" title="All pages" aria-label="All pages"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
   </div></div>
@@ -150,3 +150,14 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListene
   <section id="creator" class="hidden" aria-label="Creator"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="crClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
     <div class="rkt"><h2 id="crName"></h2><small id="crSub"></small></div><span></span></div></header><div class="scrollv" id="crBody"></div></section>
+
+<svg id="crInksSvg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+  <filter id="crInks" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">
+    <feColorMatrix type="saturate" values="0" result="g"/>
+    <feComponentTransfer in="g">
+      <feFuncR type="linear" slope="5" intercept="-2"/>
+      <feFuncG type="linear" slope="5" intercept="-2"/>
+      <feFuncB type="linear" slope="5" intercept="-2"/>
+    </feComponentTransfer>
+  </filter>
+</svg>

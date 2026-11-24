@@ -157,7 +157,7 @@ async function openReader(id,opts={}){ const {push=true}=opts;
   if('queue' in opts){ c.lastQueue=opts.queue||null; } const lq=queues.find(q=>q.id===c.lastQueue&&q.items.includes(c.id)); R.queue=lq?lq.id:null;
   R.gen++; R.comic=c; Wake.sync(); if(typeof Rain!=='undefined') Rain.sync(false); R.n=c.pages; R.rtl=!!c.rtl; R.aspects=new Array(c.pages).fill(c.aspect||0.66); R.vi=0; R.views=[];
   const fromShelf=readerEl.classList.contains('hidden');
-  Fit.teardown(); Fit.on=false; Fit.sync();
+  Fit.teardown(); Fit.on=false; Fit.sync(); Inks.sync();
   hideToast(); readerEl.classList.remove('hidden'); readerEl.classList.add('ui'); $('#shelf').classList.add('hidden'); $('#rTitle').textContent=c.title; zoomer.replaceChildren(); R.viewEl=null;
   if(fromShelf) Bag.play(c);
   let doc; try{ doc=await openPdf(new IDBSource(c.id,c.size)); }catch(err){ console.warn(err); toast('Could not open this comic: '+(err.message||err)); closeReader(); return; }
@@ -180,12 +180,22 @@ $('#rRtl').onclick=()=>{ R.rtl=!R.rtl; R.comic.rtl=R.rtl; dbPut(R.comic); cancel
 $('#rRotate').onclick=()=>setRot(!rotOn());
 $('#rSpread').onclick=()=>{ if(Fit.on) return; store.set('singleLandscape',!store.get('singleLandscape',false)); relayout(true); };
 $('#rFit').onclick=()=>Fit.toggle();
+$('#rInks').onclick=()=>Inks.toggle();
 // rotation keeps the place: half (sheet s, half h) <-> sheet s; coming back to portrait on the same sheet restores the same half
 function relayout(force){ if(!R.comic||!R.doc) return; if(Fit.on){ Fit.relayout(); return; } cancelFlipNow(); const ps=pagesOf(R.views[R.vi]); const keep=ps.length?ps[0]:(R.comic.page||0); const sp=wantSpread(), hf=wantHalf();
   if(R.half&&R.views.length&&halfOf(R.vi)) R.lastHalf={s:keep,h:halfOf(R.vi)};
   if(sp!==R.spread||hf!==R.half||force||!R.views.length){ R.spread=sp; R.half=hf; buildViews(); }
   R.vi=clamp(viewOfPage(keep,R.half&&R.lastHalf&&R.lastHalf.s===keep?R.lastHalf.h:null),0,R.views.length-1); renderView(); }
 let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayout(),120); }).observe(stage);
+
+/* ================= v66: Line art view (crisp black-and-white inks) ================= */
+const Inks={
+  want(){ return store.get('inks',false)===true; },
+  sync(){ const on=this.want(); readerEl.classList.toggle('inks',on); const b=$('#rInks'); if(!b) return; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); },
+  toggle(){ this.set(!this.want()); },
+  set(on){ store.set('inks',!!on); this.sync(); }
+};
+Inks.sync();
 
 /* ================= v63: Fit width (continuous vertical scroll) ================= */
 const Fit={
