@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v69 — 2026-11-24
+
+- **Inks a bit darker.** Line art view is about 15% darker in the midtones and fills than cr-v68, so pages don't wash out, while black ink stays crisp and whites stay near white. Still much lighter than the old crush that hid line work on dark pages.
+- Suite `test/e2e_v67.py` updated for the new levels curve.
+
 ## cr-v68 — 2026-11-24
 
 - **1 page in Fit width is clearer, and looks like one page.** The reader top-bar button is now a "1 page" toggle, highlighted like Width when it is on (saved as `cr.fitSingle`, still off by default). It splits a wide scanned two-page sheet into halves and stacks them at full width, so you see one page at a time; the next half is below, not beside it. The same label is used for single-page landscape when Width is off. A suite with realistic 1.32 and 1.45 facing-page scans (`Facing_Pages_01`) checks that only one half is on screen. Page shapes are now read for fold comics too, so a book of scanned two-page sheets (which the app treats as fold-in-the-middle) still splits correctly in 1 page mode.

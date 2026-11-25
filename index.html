@@ -756,8 +756,9 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 /* ---------- cr-v66: Line art view + Timeline artist filter ---------- */
 /* cr-v67: gentler Inks levels — dark fills lift to mid gray so line work stays visible */
+/* cr-v69: ~15% darker midtones/fills than v68, whites stay near white, black lines stay crisp */
 #reader.inks #stage canvas,#reader.inks #stage img,#reader.inks #bagOpen .bag-issue img,#reader.inks #pgrid img,#reader.inks #pgrid canvas{
-  filter:grayscale(1) contrast(1.35) brightness(1.4);
+  filter:grayscale(1) contrast(1.4) brightness(1.2);
   filter:url(#crInks);
 }
 #tlFilter.on{background:#fff;color:#000}
@@ -913,7 +914,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=68',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=69',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -931,9 +932,9 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListene
   <filter id="crInks" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">
     <feColorMatrix type="saturate" values="0" result="g"/>
     <feComponentTransfer in="g">
-      <feFuncR type="table" tableValues="0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1"/>
-      <feFuncG type="table" tableValues="0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1"/>
-      <feFuncB type="table" tableValues="0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1"/>
+      <feFuncR type="table" tableValues="0 0.31 0.49 0.60 0.68 0.75 0.82 0.90 0.95 0.98 1"/>
+      <feFuncG type="table" tableValues="0 0.31 0.49 0.60 0.68 0.75 0.82 0.90 0.95 0.98 1"/>
+      <feFuncB type="table" tableValues="0 0.31 0.49 0.60 0.68 0.75 0.82 0.90 0.95 0.98 1"/>
     </feComponentTransfer>
   </filter>
 </svg>

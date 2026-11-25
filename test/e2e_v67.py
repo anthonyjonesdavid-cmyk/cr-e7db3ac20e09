@@ -58,7 +58,7 @@ OLD_FILTER='''()=>{
   set(document.getElementById('crInks'));
 }'''
 NEW_FILTER='''()=>{
-  const vals='0 0.36 0.58 0.70 0.80 0.86 0.91 0.95 0.97 0.99 1';
+  const vals='0 0.31 0.49 0.60 0.68 0.75 0.82 0.90 0.95 0.98 1';
   const set=(el)=>{ if(!el) return;
     ['feFuncR','feFuncG','feFuncB'].forEach(t=>{
       const f=el.querySelector(t); if(!f) return;
@@ -89,10 +89,10 @@ with sync_playwright() as p:
       return {type:r&&r.getAttribute('type'), table:r&&r.getAttribute('tableValues'), slope:r&&r.getAttribute('slope'), intercept:r&&r.getAttribute('intercept'), css:tag};
     }""")
     ok(f'{lab}: Inks SVG filter is a gentle table, not slope-5 crush',
-       src['type']=='table' and src['table'] and '0.36' in src['table'] and src['slope'] in (None,'') and src['intercept'] in (None,''),
+       src['type']=='table' and src['table'] and '0.31' in src['table'] and '0.36' not in src['table'] and src['slope'] in (None,'') and src['intercept'] in (None,''),
        json.dumps(src))
     ok(f'{lab}: CSS fallback no longer uses contrast(3.2)',
-       'contrast(3.2)' not in (src['css'] or '') and ('contrast(1.35)' in (src['css'] or '') or 'url("#crInks")' in (src['css'] or '') or 'url(#crInks)' in (src['css'] or '')),
+       'contrast(3.2)' not in (src['css'] or '') and 'brightness(1.4)' not in (src['css'] or '') and ('contrast(1.4)' in (src['css'] or '') or 'brightness(1.2)' in (src['css'] or '') or 'url("#crInks")' in (src['css'] or '') or 'url(#crInks)' in (src['css'] or '')),
        src['css'][:400] if src['css'] else 'no css')
 
     open_c(pg,'Dark Inks 01'); wait_render(pg); wait_painted(pg)
@@ -128,7 +128,7 @@ with sync_playwright() as p:
     before_path=os.path.join(SH,f'{ENG}-v67-inks-dark-before-ipad-portrait.png')
     before_box, before_page=shot_page(before_path, True)
     pg.evaluate(NEW_FILTER); pg.wait_for_timeout(700); wait_painted(pg)
-    after_path=os.path.join(SH,f'{ENG}-v67-inks-dark-after-ipad-portrait.png')
+    after_path=os.path.join(SH,f'{ENG}-v69-inks-dark-ipad-portrait.png')
     after_box, after_page=shot_page(after_path, True)
 
     ok(f'{lab}: Inks before/after shots are of page 1',
