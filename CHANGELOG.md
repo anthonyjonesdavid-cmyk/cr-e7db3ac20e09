@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v71 — 2026-11-25
+
+- **Inks: thin line work is darker and sharper.** Lettering, balloon outlines, panel borders, hatching and figure contours that a scan leaves slightly gray (anti-aliased strokes) are pushed toward black, so words and drawings are easier to read. Broad mid-gray fills and whites stay as they were in cr-v70. The Inks button itself is unchanged. On iPad, each page is processed once when Inks is on, so Fit width scrolling stays smooth.
+- New suite `test/e2e_v71.py` measures lettering and a gray fill on a scanned-lettering fixture (`Ink_Lines_01`).
+
 ## cr-v70 — 2026-11-25
 
 - **Inks: only the blacks are darker.** Scanned solid ink (silhouettes, heavy shadows — input around 0.05-0.2, which v69 lifted to charcoal) now maps to near-black, so line work doesn't look washed. Mid-grays and everything lighter are unchanged from cr-v69. The levels table has 21 stops so the toe can blend back into the v69 curve by input 0.3.

@@ -23,10 +23,12 @@ def wait_painted(pg,t=20000):
       if(!c||!c.width||!c.height) return false;
       try{
         const x=c.getContext('2d',{willReadFrequently:true}); if(!x) return false;
-        const mid=x.getImageData(c.width>>1,c.height>>1,8,8).data;
-        let min=765,max=0;
-        for(let i=0;i<mid.length;i+=4){ const s=mid[i]+mid[i+1]+mid[i+2]; if(s<min)min=s; if(s>max)max=s; }
-        return max>0 && min<750;
+        const pts=[[c.width>>1,c.height>>1],[c.width*0.25,c.height*0.4],[c.width*0.75,c.height*0.4],[16,16]];
+        for(const p of pts){
+          const mid=x.getImageData(p[0]|0,p[1]|0,8,8).data;
+          for(let i=0;i<mid.length;i+=4){ if(mid[i]+mid[i+1]+mid[i+2]<750) return true; }
+        }
+        return c.classList.contains('inks-baked') && c.width>10;
       }catch(e){ return c.width>10; }
     }""",timeout=t)
 def open_c(pg,title='Ink Tones 01'):
@@ -61,7 +63,7 @@ with sync_playwright() as p:
     dismiss(pg)
 
     src=pg.evaluate("""()=>{
-      const r=document.querySelector('#crInks feFuncR');
+      const r=document.querySelector('#crInks feComponentTransfer[result="ink"] feFuncR')||document.querySelector('#crInks feFuncR');
       return {type:r&&r.getAttribute('type'), table:r&&r.getAttribute('tableValues'), n:r&&(r.getAttribute('tableValues')||'').trim().split(/\\s+/).length};
     }""")
     ok(f'{lab}: Inks table has a dark toe and keeps the v69 mid-grays (21 stops)',

@@ -7,10 +7,11 @@ let flip=null, animating=false, anim=null, drag=null, pinch=null, scrubbing=fals
 /* ---- bitmap LRU (pixel budget; evicted canvases are zeroed to release memory on iPad) ---- */
 const cache=new Map(); let cachePx=0;
 function cacheGet(k){ const e=cache.get(k); if(e){ cache.delete(k); cache.set(k,e); } return e; }
-function cachePut(k,e){ if(cache.has(k)){ freeCanvas(e.canvas); return cache.get(k); } cache.set(k,e); cachePx+=e.px;
-  while(cachePx>CACHE_BUDGET&&cache.size>1){ const [ok,oe]=cache.entries().next().value; if(ok===k) break; cache.delete(ok); cachePx-=oe.px; freeCanvas(oe.canvas); } return e; }
+function freeEntry(e){ if(!e) return; freeCanvas(e.canvas); if(e.inks){ freeCanvas(e.inks); e.inks=null; e.inksKey=null; } }
+function cachePut(k,e){ if(cache.has(k)){ freeEntry(e); return cache.get(k); } cache.set(k,e); cachePx+=e.px;
+  while(cachePx>CACHE_BUDGET&&cache.size>1){ const [ok,oe]=cache.entries().next().value; if(ok===k) break; cache.delete(ok); cachePx-=oe.px; freeEntry(oe); } return e; }
 function cacheAny(i){ const pre=i+'|'; let best=null; for(const [k,e] of cache) if(k.startsWith(pre)&&(!best||e.px>best.px)) best=e; return best; }
-function cacheClear(){ cache.forEach(e=>freeCanvas(e.canvas)); cache.clear(); cachePx=0; }
+function cacheClear(){ cache.forEach(e=>freeEntry(e)); cache.clear(); cachePx=0; }
 
 /* ---- priority job queue: one pdf.js render at a time, nearest pages first ---- */
 const jobs=new Map(); let running=0;
@@ -99,7 +100,7 @@ function halfCopy(ent,half){ const sw=ent.canvas.width, sh=ent.canvas.height, hw
 function copyOf(ent){ const c=document.createElement('canvas'); c.width=ent.canvas.width; c.height=ent.canvas.height; c.getContext('2d',{alpha:false}).drawImage(ent.canvas,0,0); return c; }
 // half: show one half of sheet i; the whole sheet is rendered at twice the width (shared by both halves) and that half is copied
 function fillPage(d,i,w,h,align,prio,half){ Object.assign(d.dataset,{p:i,w,h,a:align}); if(half) d.dataset.half=half; else delete d.dataset.half; const fw=half?w*2:w;
-  const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas,.phn').forEach(x=>x.remove()); const c=half?halfCopy(ent,half):copyOf(ent); placeCanvas(c,w,h,align); d.prepend(c); };
+  const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas,.phn').forEach(x=>x.remove()); const src=Inks.want()?inksOf(ent,half?w*2:w):ent; const c=half?halfCopy(src,half):copyOf(src); if(Inks.want()) c.classList.add('inks-baked'); placeCanvas(c,w,h,align); d.prepend(c); };
   const e=cacheGet(keyFor(i,fw,h)); if(e){ show(e); return; }
   const any=cacheAny(i); if(any){ show(any); d.dataset.interim='1'; }
   else { d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i+1; d.prepend(ph); }
@@ -201,11 +202,47 @@ function relayout(force){ if(!R.comic||!R.doc) return; if(Fit.on){ Fit.relayout(
 let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayout(),120); }).observe(stage);
 
 /* ================= v66: Line art view (crisp black-and-white inks) ================= */
+/* v71: bake the SVG line-boost into the page canvas once. A live feGaussianBlur over
+   large Fit-width bitmaps is too slow to composite every scroll frame on WebKit. */
+const INKS_TONE=[0,0.02,0.04,0.08,0.18,0.36,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
+const INKS_MASK=[1,1,1,1,0.67,0,0,0,0,0,0];
+function inksLerp(tbl,x,step,last){ x=x<0?0:x>1?1:x; const i=x/step, lo=Math.min(last,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }
+function inksParams(){ const f=document.getElementById('crInks'), u=f&&f.querySelector('feComposite[result="unsharp"]'), b=f&&f.querySelector('feGaussianBlur');
+  const k3=u?parseFloat(u.getAttribute('k3')):-4, sig=b?parseFloat(String(b.getAttribute('stdDeviation')||'1.2').split(/\s+/)[0]):1.2;
+  const r=f&&f.querySelector('feComponentTransfer[result="ink"] feFuncR');
+  const typ=r&&r.getAttribute('type')||'table';
+  const toneKey=typ==='linear'?('lin:'+(r.getAttribute('slope')||'1')+':'+(r.getAttribute('intercept')||'0')):('tbl:'+(r&&r.getAttribute('tableValues')||''));
+  return {amount:Number.isFinite(k3)?-k3:4, sigmaCss:Number.isFinite(sig)&&sig>0?sig:1.2, typ, toneKey, r}; }
+function inksToneFn(p){ const r=p.r;
+  if(p.typ==='linear'&&r){ const s=parseFloat(r.getAttribute('slope')||'1'), ic=parseFloat(r.getAttribute('intercept')||'0');
+    return x=>{ let v=s*x+ic; return v<0?0:v>1?1:v; }; }
+  if(r){ const vals=String(r.getAttribute('tableValues')||'').trim().split(/\s+/).map(Number).filter(n=>Number.isFinite(n));
+    if(vals.length>=2){ const last=vals.length-1; return x=>{ x=x<0?0:x>1?1:x; const i=x*last, lo=Math.min(last-1,Math.floor(i)), t=i-lo; return vals[lo]*(1-t)+vals[lo+1]*t; }; } }
+  return x=>inksLerp(INKS_TONE,x,0.05,19); }
+function inksKernel(sigma){ const r=Math.max(1,Math.ceil(sigma*3)), k=new Float32Array(2*r+1), s2=2*sigma*sigma; let sum=0;
+  for(let i=-r,j=0;i<=r;i++,j++){ const v=Math.exp(-(i*i)/s2); k[j]=v; sum+=v; } for(let j=0;j<k.length;j++) k[j]/=sum; return {k,r}; }
+function inksBlur(src,dst,w,h,kern,horiz){ const {k,r}=kern;
+  if(horiz){ for(let y=0;y<h;y++){ const row=y*w; for(let x=0;x<w;x++){ let acc=0; for(let i=-r,j=0;i<=r;i++,j++){ let xx=x+i; if(xx<0)xx=0; else if(xx>=w)xx=w-1; acc+=src[row+xx]*k[j]; } dst[row+x]=acc; } } }
+  else { for(let x=0;x<w;x++){ for(let y=0;y<h;y++){ let acc=0; for(let i=-r,j=0;i<=r;i++,j++){ let yy=y+i; if(yy<0)yy=0; else if(yy>=h)yy=h-1; acc+=src[yy*w+x]*k[j]; } dst[y*w+x]=acc; } } } }
+function bakeInksCanvas(src,cssW,amount,sigmaCss,tone){ const w=src.width, h=src.height, out=document.createElement('canvas'); out.width=w; out.height=h;
+  const ctx=out.getContext('2d',{alpha:false,willReadFrequently:true}); ctx.drawImage(src,0,0);
+  const img=ctx.getImageData(0,0,w,h), d=img.data, n=w*h, g=new Float32Array(n), tmp=new Float32Array(n), blur=new Float32Array(n);
+  for(let i=0,p=0;p<n;i+=4,p++) g[p]=(0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])*(1/255);
+  const kern=inksKernel(sigmaCss*(cssW>0?w/cssW:1)); inksBlur(g,tmp,w,h,kern,true); inksBlur(tmp,blur,w,h,kern,false);
+  const a=amount;
+  for(let p=0,i=0;p<n;p++,i+=4){ const gv=g[p], un=(1+a)*gv-a*blur[p], sharp=un<gv?un:gv, m=inksLerp(INKS_MASK,gv,0.1,9);
+    let v=m*sharp+(1-m)*gv; if(v<0)v=0; else if(v>1)v=1; const t=tone(v)*255; d[i]=d[i+1]=d[i+2]=t; d[i+3]=255; }
+  ctx.putImageData(img,0,0); return out; }
+function inksOf(ent,cssW){ const p=inksParams(), key=p.amount+'|'+p.sigmaCss+'|'+p.toneKey+'|'+cssW+'|'+ent.canvas.width+'x'+ent.canvas.height;
+  if(ent.inks&&ent.inksKey===key) return {canvas:ent.inks};
+  if(ent.inks) freeCanvas(ent.inks);
+  ent.inks=bakeInksCanvas(ent.canvas,cssW,p.amount,p.sigmaCss,inksToneFn(p)); ent.inksKey=key; return {canvas:ent.inks}; }
 const Inks={
   want(){ return store.get('inks',false)===true; },
   sync(){ const on=this.want(); readerEl.classList.toggle('inks',on); const b=$('#rInks'); if(!b) return; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); },
   toggle(){ this.set(!this.want()); },
-  set(on){ store.set('inks',!!on); this.sync(); }
+  set(on){ store.set('inks',!!on); this.sync(); this.refresh(); },
+  refresh(){ if(!R.comic||!R.doc) return; if(Fit.on){ if(R.viewEl) R.viewEl.querySelectorAll('.pg').forEach(d=>{ delete d.dataset.w; delete d.dataset.h; }); Fit.fillVisible(); } else renderView(); }
 };
 Inks.sync();
 

@@ -137,7 +137,7 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=70',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=71',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -154,7 +154,23 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListene
 <svg id="crInksSvg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
   <filter id="crInks" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">
     <feColorMatrix type="saturate" values="0" result="g"/>
-    <feComponentTransfer in="g">
+    <!-- cr-v71: unsharp-style line boost. amount 4: unsharp=(1+a)*g - a*blur so alpha stays 1
+         (a straight blur-minus-g arithmetic zeros alpha in WebKit and goes black). feBlend darken
+         keeps only the darkened side, so there are no light halos. A luma mask (g ≲ 0.5) limits the
+         boost to already-dark strokes, so broad mid-gray fills and their edges stay at the v70 curve.
+         Not a morphology erode. -->
+    <feGaussianBlur in="g" stdDeviation="1.2" result="blur"/>
+    <feComposite in="g" in2="blur" operator="arithmetic" k1="0" k2="5" k3="-4" k4="0" result="unsharp"/>
+    <feBlend in="unsharp" in2="g" mode="darken" result="sharp"/>
+    <feComponentTransfer in="g" result="mask">
+      <feFuncR type="table" tableValues="1 1 1 1 0.67 0 0 0 0 0 0"/>
+      <feFuncG type="table" tableValues="1 1 1 1 0.67 0 0 0 0 0 0"/>
+      <feFuncB type="table" tableValues="1 1 1 1 0.67 0 0 0 0 0 0"/>
+    </feComponentTransfer>
+    <feColorMatrix in="mask" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  1 0 0 0 0" result="maskA"/>
+    <feComposite in="sharp" in2="maskA" operator="in" result="sharpMasked"/>
+    <feComposite in="sharpMasked" in2="g" operator="over" result="boosted"/>
+    <feComponentTransfer in="boosted" result="ink">
       <feFuncR type="table" tableValues="0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1"/>
       <feFuncG type="table" tableValues="0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1"/>
       <feFuncB type="table" tableValues="0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1"/>

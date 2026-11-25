@@ -26,10 +26,12 @@ def wait_painted(pg,t=20000):
       if(!c||!c.width||!c.height) return false;
       try{
         const x=c.getContext('2d',{willReadFrequently:true}); if(!x) return false;
-        const mid=x.getImageData(c.width>>1,c.height>>1,8,8).data;
-        let min=765,max=0;
-        for(let i=0;i<mid.length;i+=4){ const s=mid[i]+mid[i+1]+mid[i+2]; if(s<min)min=s; if(s>max)max=s; }
-        return max>0 && min<750;
+        const pts=[[c.width>>1,c.height>>1],[c.width*0.25,c.height*0.4],[c.width*0.75,c.height*0.4],[16,16]];
+        for(const p of pts){
+          const mid=x.getImageData(p[0]|0,p[1]|0,8,8).data;
+          for(let i=0;i<mid.length;i+=4){ if(mid[i]+mid[i+1]+mid[i+2]<750) return true; }
+        }
+        return c.classList.contains('inks-baked') && c.width>10;
       }catch(e){ return c.width>10; }
     }""",timeout=t)
 def open_c(pg,title):
@@ -55,7 +57,7 @@ OLD_FILTER='''()=>{
       f.removeAttribute('tableValues');
     });
   };
-  set(document.getElementById('crInks'));
+  set(document.querySelector('#crInks feComponentTransfer[result="ink"]')||document.getElementById('crInks'));
 }'''
 NEW_FILTER='''()=>{
   const vals='0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1';
@@ -66,7 +68,7 @@ NEW_FILTER='''()=>{
       f.removeAttribute('slope'); f.removeAttribute('intercept');
     });
   };
-  set(document.getElementById('crInks'));
+  set(document.querySelector('#crInks feComponentTransfer[result="ink"]')||document.getElementById('crInks'));
 }'''
 
 with sync_playwright() as p:
@@ -83,7 +85,7 @@ with sync_playwright() as p:
 
     # Filter source is the gentler table, not the old crush
     src=pg.evaluate("""()=>{
-      const f=document.getElementById('crInks'), r=f&&f.querySelector('feFuncR');
+      const f=document.getElementById('crInks'), r=f&&(f.querySelector('feComponentTransfer[result="ink"] feFuncR')||f.querySelector('feFuncR'));
       const css=getComputedStyle(document.documentElement).cssText;
       const tag=[...document.styleSheets].flatMap(s=>{ try{ return [...s.cssRules].map(r=>r.cssText); }catch(e){ return []; } }).filter(t=>t.includes('crInks')||t.includes('grayscale')).join('\\n');
       return {type:r&&r.getAttribute('type'), table:r&&r.getAttribute('tableValues'), slope:r&&r.getAttribute('slope'), intercept:r&&r.getAttribute('intercept'), css:tag};
@@ -103,10 +105,11 @@ with sync_playwright() as p:
     on=pg.evaluate("""()=>{
       const b=document.querySelector('#rInks'), page=document.querySelector('#stage canvas');
       const filt=page?getComputedStyle(page).filter:'';
-      return {on:b.classList.contains('on'), store:localStorage.getItem('cr.inks'), reader:document.getElementById('reader').classList.contains('inks'), filt};
+      return {on:b.classList.contains('on'), store:localStorage.getItem('cr.inks'), reader:document.getElementById('reader').classList.contains('inks'), filt,
+              baked:!!(page&&page.classList.contains('inks-baked'))};
     }""")
-    ok(f'{lab}: Inks still applies url(#crInks) and saves cr.inks',
-       on['on'] and on['store']=='true' and on['reader'] and ('url("#crInks")' in on['filt'] or 'url(#crInks)' in on['filt'] or 'grayscale' in on['filt']),
+    ok(f'{lab}: Inks is on and the page is baked (or still uses url(#crInks))',
+       on['on'] and on['store']=='true' and on['reader'] and (on['baked'] or 'url("#crInks")' in on['filt'] or 'url(#crInks)' in on['filt'] or 'grayscale' in on['filt']),
        json.dumps(on))
 
     # Viewport clip of the visible page (composited, so the CSS/SVG filter is included)
@@ -124,10 +127,10 @@ with sync_playwright() as p:
         return box, page_path
 
     # Before: temporarily restore the old crush, shoot, then put the new curve back
-    pg.evaluate(OLD_FILTER); pg.wait_for_timeout(700); wait_painted(pg)
+    pg.evaluate(OLD_FILTER); pg.evaluate('window.__cr.inks&&window.__cr.inks.refresh()'); pg.wait_for_timeout(700); wait_painted(pg)
     before_path=os.path.join(SH,f'{ENG}-v67-inks-dark-before-ipad-portrait.png')
     before_box, before_page=shot_page(before_path, True)
-    pg.evaluate(NEW_FILTER); pg.wait_for_timeout(700); wait_painted(pg)
+    pg.evaluate(NEW_FILTER); pg.evaluate('window.__cr.inks&&window.__cr.inks.refresh()'); pg.wait_for_timeout(700); wait_painted(pg)
     after_path=os.path.join(SH,f'{ENG}-v69-inks-dark-ipad-portrait.png')
     after_box, after_page=shot_page(after_path, True)
 
