@@ -1,5 +1,10 @@
 # Comic Shelf: change log
 
+## cr-v70 — 2026-11-25
+
+- **Inks: only the blacks are darker.** Scanned solid ink (silhouettes, heavy shadows — input around 0.05-0.2, which v69 lifted to charcoal) now maps to near-black, so line work doesn't look washed. Mid-grays and everything lighter are unchanged from cr-v69. The levels table has 21 stops so the toe can blend back into the v69 curve by input 0.3.
+- New suite `test/e2e_v70.py` measures a 0.12 ink patch (near black) and a 0.5 gray patch (same as v69).
+
 ## cr-v69 — 2026-11-24
 
 - **Inks a bit darker.** Line art view is about 15% darker in the midtones and fills than cr-v68, so pages don't wash out, while black ink stays crisp and whites stay near white. Still much lighter than the old crush that hid line work on dark pages.
