@@ -204,9 +204,36 @@ let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayo
 /* ================= v66: Line art view (crisp black-and-white inks) ================= */
 /* v71: bake the SVG line-boost into the page canvas once. A live feGaussianBlur over
    large Fit-width bitmaps is too slow to composite every scroll frame on WebKit. */
+/* v72: a strength slider (cr.inksStrength, 0–1, default 0.5) morphs the tone curve and
+   the boost amount. Mid (50) is exactly the v71 look. */
 const INKS_TONE=[0,0.02,0.04,0.08,0.18,0.36,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
+const INKS_TONE_STR='0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1';
+const INKS_TONE_LIGHT=[0,0.155,0.31,0.4,0.49,0.545,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
+const INKS_TONE_DARK=[0,0,0.005,0.02,0.05,0.14,0.36,0.48,0.56,0.62,0.68,0.74,0.79,0.84,0.89,0.92,0.95,0.965,0.98,0.99,1];
 const INKS_MASK=[1,1,1,1,0.67,0,0,0,0,0,0];
 function inksLerp(tbl,x,step,last){ x=x<0?0:x>1?1:x; const i=x/step, lo=Math.min(last,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }
+function inksFmt(n){ return String(Math.round(n*1000)/1000); }
+function inksMix(a,b,t){ return a.map((v,i)=>v+(b[i]-v)*t); }
+function inksClampStrength(s){ s=typeof s==='number'&&Number.isFinite(s)?s:0.5; return s<0?0:s>1?1:s; }
+function inksStrengthParams(s){
+  const pct=Math.round(inksClampStrength(s)*100);
+  if(pct===50) return {tone:INKS_TONE, toneStr:INKS_TONE_STR, amount:4, sigmaCss:1.2, contrast:1.5, brightness:1.2};
+  if(pct<50){ const t=pct/50, tone=inksMix(INKS_TONE_LIGHT,INKS_TONE,t);
+    return {tone, toneStr:tone.map(inksFmt).join(' '), amount:4*t, sigmaCss:1.2, contrast:1.25+0.25*t, brightness:1.28-0.08*t}; }
+  const t=(pct-50)/50, tone=inksMix(INKS_TONE,INKS_TONE_DARK,t);
+  return {tone, toneStr:tone.map(inksFmt).join(' '), amount:4+4*t, sigmaCss:1.2+0.3*t, contrast:1.5+0.4*t, brightness:1.2-0.12*t}; }
+function applyInksFilter(p){
+  const f=document.getElementById('crInks');
+  if(f){
+    const b=f.querySelector('feGaussianBlur'); if(b) b.setAttribute('stdDeviation', inksFmt(p.sigmaCss));
+    const u=f.querySelector('feComposite[result="unsharp"]');
+    if(u){ u.setAttribute('k2', inksFmt(1+p.amount)); u.setAttribute('k3', inksFmt(-p.amount)); }
+    f.querySelectorAll('feComponentTransfer[result="ink"] feFuncR, feComponentTransfer[result="ink"] feFuncG, feComponentTransfer[result="ink"] feFuncB')
+      .forEach(el=>el.setAttribute('tableValues', p.toneStr));
+  }
+  if(readerEl){ readerEl.style.setProperty('--inks-contrast', inksFmt(p.contrast)); readerEl.style.setProperty('--inks-brightness', inksFmt(p.brightness)); readerEl.style.setProperty('--inks-pct', (Math.round(inksClampStrength(Inks&&Inks.strength?Inks.strength():0.5)*100))+'%'); }
+}
+function dropInksCache(){ cache.forEach(e=>{ if(e.inks){ freeCanvas(e.inks); e.inks=null; e.inksKey=null; } }); }
 function inksParams(){ const f=document.getElementById('crInks'), u=f&&f.querySelector('feComposite[result="unsharp"]'), b=f&&f.querySelector('feGaussianBlur');
   const k3=u?parseFloat(u.getAttribute('k3')):-4, sig=b?parseFloat(String(b.getAttribute('stdDeviation')||'1.2').split(/\s+/)[0]):1.2;
   const r=f&&f.querySelector('feComponentTransfer[result="ink"] feFuncR');
@@ -238,13 +265,31 @@ function inksOf(ent,cssW){ const p=inksParams(), key=p.amount+'|'+p.sigmaCss+'|'
   if(ent.inks) freeCanvas(ent.inks);
   ent.inks=bakeInksCanvas(ent.canvas,cssW,p.amount,p.sigmaCss,inksToneFn(p)); ent.inksKey=key; return {canvas:ent.inks}; }
 const Inks={
+  _stT:0,
   want(){ return store.get('inks',false)===true; },
-  sync(){ const on=this.want(); readerEl.classList.toggle('inks',on); const b=$('#rInks'); if(!b) return; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); },
+  strength(){ return inksClampStrength(store.get('inksStrength',0.5)); },
+  sync(){ const on=this.want(), s=this.strength(), pct=Math.round(s*100);
+    readerEl.classList.toggle('inks',on);
+    const b=$('#rInks'); if(b){ b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); }
+    const row=$('#inksRow'); if(row){ row.classList.toggle('hidden',!on); row.setAttribute('aria-hidden',on?'false':'true'); }
+    const sl=$('#rInksStrength'); if(sl && Number(sl.value)!==pct) sl.value=String(pct);
+    applyInksFilter(inksStrengthParams(s)); },
   toggle(){ this.set(!this.want()); },
   set(on){ store.set('inks',!!on); this.sync(); this.refresh(); },
+  setStrength(s,immediate){ store.set('inksStrength', inksClampStrength(s)); this.sync();
+    const go=()=>{ this._stT=0; dropInksCache(); this.refresh(); };
+    clearTimeout(this._stT); if(immediate===false) this._stT=setTimeout(go,90); else go(); },
   refresh(){ if(!R.comic||!R.doc) return; if(Fit.on){ if(R.viewEl) R.viewEl.querySelectorAll('.pg').forEach(d=>{ delete d.dataset.w; delete d.dataset.h; }); Fit.fillVisible(); } else renderView(); }
 };
 Inks.sync();
+{
+  const sl=$('#rInksStrength');
+  if(sl){
+    sl.addEventListener('pointerdown',e=>{ e.stopPropagation(); clearTimeout(R.uiT); });
+    sl.addEventListener('input',()=>{ clearTimeout(R.uiT); Inks.setStrength(Number(sl.value)/100, false); });
+    sl.addEventListener('change',()=>{ Inks.setStrength(Number(sl.value)/100, true); });
+  }
+}
 
 /* ================= v63: Fit width (continuous vertical scroll) ================= */
 /* v67: 1-up splits a wide scanned two-page image into halves, each at full width */

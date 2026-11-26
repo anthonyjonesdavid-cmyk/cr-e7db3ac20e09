@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v72 — 2026-11-26
+
+- **Inks strength slider.** When Inks is on, a small Light–Dark slider appears under the reader buttons so you can set how dark the line work is. The middle setting is the same look as cr-v71 (the v70 tone curve plus the line-work boost). Drag toward Light for something closer to the softer cr-v69 curve with little or no boost; drag toward Dark for blacker inks and a stronger boost. The setting is saved on this device (`cr.inksStrength`) and stays put the next time you open the app. The slider hides when Inks is off, and it slides away with the other reader bars. Pages are still processed once and cached; changing the slider redoes the visible pages after a short pause so dragging stays smooth. Home is unchanged.
+- New suite `test/e2e_v72.py`.
+
+
 ## cr-v71 — 2026-11-25
 
 - **Inks: thin line work is darker and sharper.** Lettering, balloon outlines, panel borders, hatching and figure contours that a scan leaves slightly gray (anti-aliased strokes) are pushed toward black, so words and drawings are easier to read. Broad mid-gray fills and whites stay as they were in cr-v70. The Inks button itself is unchanged. On iPad, each page is processed once when Inks is on, so Fit width scrolling stays smooth.

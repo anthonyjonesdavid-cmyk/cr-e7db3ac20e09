@@ -711,9 +711,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* cr-v69: ~15% darker midtones/fills than v68, whites stay near white, black lines stay crisp */
 /* cr-v70: darker toe only — scanned blacks (input ~0.05-0.2) go near-black; mid-grays stay at v69 */
 /* cr-v71: SVG filter also boosts thin dark strokes (local contrast). CSS cannot unsharp-mask;
-   the fallback stays the v70 tone-ish grayscale so mid-grays are not globally crushed. */
+   the fallback stays a v70-ish grayscale so mid-grays are not globally crushed.
+   cr-v72: contrast/brightness scale with the Inks strength slider (--inks-contrast / --inks-brightness). */
 #reader.inks #stage canvas,#reader.inks #stage img,#reader.inks #bagOpen .bag-issue img,#reader.inks #pgrid img,#reader.inks #pgrid canvas{
-  filter:grayscale(1) contrast(1.5) brightness(1.2);
+  filter:grayscale(1) contrast(var(--inks-contrast,1.5)) brightness(var(--inks-brightness,1.2));
   filter:url(#crInks);
 }
 #reader.inks #stage canvas.inks-baked{filter:none}
@@ -730,3 +731,14 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .tlp span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tlpc{flex:none;color:var(--mut);font-weight:500;font-variant-numeric:tabular-nums}
 .tlp.on .tlpc{color:#0009}
+
+/* cr-v72: Inks strength slider — slim row under the reader buttons, only when Inks is on.
+   Lives inside the top bar so it slides away with the other chrome. */
+#inksRow{display:flex;align-items:center;gap:8px;padding:0 12px 8px;width:min(440px,100%);margin:0 auto;box-sizing:border-box}
+#inksRow .inklbl{flex:none;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em;user-select:none}
+#rInksStrength{flex:1;min-width:0;margin:0;-webkit-appearance:none;appearance:none;background:transparent;height:32px}
+#rInksStrength::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(90deg,#fff var(--inks-pct,50%),#3a3a3c var(--inks-pct,50%))}
+#rInksStrength::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:0;margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#rInksStrength::-moz-range-track{height:3px;border-radius:2px;background:#3a3a3c}
+#rInksStrength::-moz-range-progress{height:3px;background:#fff}
+#rInksStrength::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:0}

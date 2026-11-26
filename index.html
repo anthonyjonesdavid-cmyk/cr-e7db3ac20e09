@@ -759,9 +759,10 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 /* cr-v69: ~15% darker midtones/fills than v68, whites stay near white, black lines stay crisp */
 /* cr-v70: darker toe only — scanned blacks (input ~0.05-0.2) go near-black; mid-grays stay at v69 */
 /* cr-v71: SVG filter also boosts thin dark strokes (local contrast). CSS cannot unsharp-mask;
-   the fallback stays the v70 tone-ish grayscale so mid-grays are not globally crushed. */
+   the fallback stays a v70-ish grayscale so mid-grays are not globally crushed.
+   cr-v72: contrast/brightness scale with the Inks strength slider (--inks-contrast / --inks-brightness). */
 #reader.inks #stage canvas,#reader.inks #stage img,#reader.inks #bagOpen .bag-issue img,#reader.inks #pgrid img,#reader.inks #pgrid canvas{
-  filter:grayscale(1) contrast(1.5) brightness(1.2);
+  filter:grayscale(1) contrast(var(--inks-contrast,1.5)) brightness(var(--inks-brightness,1.2));
   filter:url(#crInks);
 }
 #reader.inks #stage canvas.inks-baked{filter:none}
@@ -778,6 +779,17 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .tlp span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tlpc{flex:none;color:var(--mut);font-weight:500;font-variant-numeric:tabular-nums}
 .tlp.on .tlpc{color:#0009}
+
+/* cr-v72: Inks strength slider — slim row under the reader buttons, only when Inks is on.
+   Lives inside the top bar so it slides away with the other chrome. */
+#inksRow{display:flex;align-items:center;gap:8px;padding:0 12px 8px;width:min(440px,100%);margin:0 auto;box-sizing:border-box}
+#inksRow .inklbl{flex:none;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em;user-select:none}
+#rInksStrength{flex:1;min-width:0;margin:0;-webkit-appearance:none;appearance:none;background:transparent;height:32px}
+#rInksStrength::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(90deg,#fff var(--inks-pct,50%),#3a3a3c var(--inks-pct,50%))}
+#rInksStrength::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:0;margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#rInksStrength::-moz-range-track{height:3px;border-radius:2px;background:#3a3a3c}
+#rInksStrength::-moz-range-progress{height:3px;background:#fff}
+#rInksStrength::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:0}
 </style>
 </head>
 <body>
@@ -875,7 +887,13 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
     <button class="rbtn" id="rInks" aria-pressed="false" title="Line art view: crisp black-and-white inks" aria-label="Line art view"><svg class="i" viewBox="0 0 24 24"><path d="M16 3l5 5L9 20H4v-5z"/><path d="M14 5l5 5"/></svg><span class="w">Inks</span></button>
     <button class="rbtn" id="rMore" title="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
     <button class="rbtn" id="rGrid" title="All pages" aria-label="All pages"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
-  </div></div>
+  </div>
+    <div class="inkrow hidden" id="inksRow" aria-hidden="true">
+      <span class="inklbl" aria-hidden="true">Light</span>
+      <input type="range" id="rInksStrength" min="0" max="100" value="50" step="1" dir="ltr" aria-label="Inks strength">
+      <span class="inklbl" aria-hidden="true">Dark</span>
+    </div>
+  </div>
   <div class="rbar bot" id="rbot"><div class="brow">
     <div class="scrub"><input type="range" id="scrub" min="1" max="1" value="1" step="1" aria-label="Page"><div id="bubble" class="hidden"><div class="bt"><img alt=""></div><span></span></div></div>
     <span id="pgText">1 / 1</span>
@@ -919,7 +937,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=71',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=72',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -936,7 +954,7 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListene
 <svg id="crInksSvg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
   <filter id="crInks" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">
     <feColorMatrix type="saturate" values="0" result="g"/>
-    <!-- cr-v71: unsharp-style line boost. amount 4: unsharp=(1+a)*g - a*blur so alpha stays 1
+    <!-- cr-v71/v72: unsharp-style line boost. Default (strength 50) is amount 4: unsharp=(1+a)*g - a*blur so alpha stays 1
          (a straight blur-minus-g arithmetic zeros alpha in WebKit and goes black). feBlend darken
          keeps only the darkened side, so there are no light halos. A luma mask (g ≲ 0.5) limits the
          boost to already-dark strokes, so broad mid-gray fills and their edges stay at the v70 curve.
@@ -2548,9 +2566,36 @@ let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayo
 /* ================= v66: Line art view (crisp black-and-white inks) ================= */
 /* v71: bake the SVG line-boost into the page canvas once. A live feGaussianBlur over
    large Fit-width bitmaps is too slow to composite every scroll frame on WebKit. */
+/* v72: a strength slider (cr.inksStrength, 0–1, default 0.5) morphs the tone curve and
+   the boost amount. Mid (50) is exactly the v71 look. */
 const INKS_TONE=[0,0.02,0.04,0.08,0.18,0.36,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
+const INKS_TONE_STR='0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1';
+const INKS_TONE_LIGHT=[0,0.155,0.31,0.4,0.49,0.545,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
+const INKS_TONE_DARK=[0,0,0.005,0.02,0.05,0.14,0.36,0.48,0.56,0.62,0.68,0.74,0.79,0.84,0.89,0.92,0.95,0.965,0.98,0.99,1];
 const INKS_MASK=[1,1,1,1,0.67,0,0,0,0,0,0];
 function inksLerp(tbl,x,step,last){ x=x<0?0:x>1?1:x; const i=x/step, lo=Math.min(last,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }
+function inksFmt(n){ return String(Math.round(n*1000)/1000); }
+function inksMix(a,b,t){ return a.map((v,i)=>v+(b[i]-v)*t); }
+function inksClampStrength(s){ s=typeof s==='number'&&Number.isFinite(s)?s:0.5; return s<0?0:s>1?1:s; }
+function inksStrengthParams(s){
+  const pct=Math.round(inksClampStrength(s)*100);
+  if(pct===50) return {tone:INKS_TONE, toneStr:INKS_TONE_STR, amount:4, sigmaCss:1.2, contrast:1.5, brightness:1.2};
+  if(pct<50){ const t=pct/50, tone=inksMix(INKS_TONE_LIGHT,INKS_TONE,t);
+    return {tone, toneStr:tone.map(inksFmt).join(' '), amount:4*t, sigmaCss:1.2, contrast:1.25+0.25*t, brightness:1.28-0.08*t}; }
+  const t=(pct-50)/50, tone=inksMix(INKS_TONE,INKS_TONE_DARK,t);
+  return {tone, toneStr:tone.map(inksFmt).join(' '), amount:4+4*t, sigmaCss:1.2+0.3*t, contrast:1.5+0.4*t, brightness:1.2-0.12*t}; }
+function applyInksFilter(p){
+  const f=document.getElementById('crInks');
+  if(f){
+    const b=f.querySelector('feGaussianBlur'); if(b) b.setAttribute('stdDeviation', inksFmt(p.sigmaCss));
+    const u=f.querySelector('feComposite[result="unsharp"]');
+    if(u){ u.setAttribute('k2', inksFmt(1+p.amount)); u.setAttribute('k3', inksFmt(-p.amount)); }
+    f.querySelectorAll('feComponentTransfer[result="ink"] feFuncR, feComponentTransfer[result="ink"] feFuncG, feComponentTransfer[result="ink"] feFuncB')
+      .forEach(el=>el.setAttribute('tableValues', p.toneStr));
+  }
+  if(readerEl){ readerEl.style.setProperty('--inks-contrast', inksFmt(p.contrast)); readerEl.style.setProperty('--inks-brightness', inksFmt(p.brightness)); readerEl.style.setProperty('--inks-pct', (Math.round(inksClampStrength(Inks&&Inks.strength?Inks.strength():0.5)*100))+'%'); }
+}
+function dropInksCache(){ cache.forEach(e=>{ if(e.inks){ freeCanvas(e.inks); e.inks=null; e.inksKey=null; } }); }
 function inksParams(){ const f=document.getElementById('crInks'), u=f&&f.querySelector('feComposite[result="unsharp"]'), b=f&&f.querySelector('feGaussianBlur');
   const k3=u?parseFloat(u.getAttribute('k3')):-4, sig=b?parseFloat(String(b.getAttribute('stdDeviation')||'1.2').split(/\s+/)[0]):1.2;
   const r=f&&f.querySelector('feComponentTransfer[result="ink"] feFuncR');
@@ -2582,13 +2627,31 @@ function inksOf(ent,cssW){ const p=inksParams(), key=p.amount+'|'+p.sigmaCss+'|'
   if(ent.inks) freeCanvas(ent.inks);
   ent.inks=bakeInksCanvas(ent.canvas,cssW,p.amount,p.sigmaCss,inksToneFn(p)); ent.inksKey=key; return {canvas:ent.inks}; }
 const Inks={
+  _stT:0,
   want(){ return store.get('inks',false)===true; },
-  sync(){ const on=this.want(); readerEl.classList.toggle('inks',on); const b=$('#rInks'); if(!b) return; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); },
+  strength(){ return inksClampStrength(store.get('inksStrength',0.5)); },
+  sync(){ const on=this.want(), s=this.strength(), pct=Math.round(s*100);
+    readerEl.classList.toggle('inks',on);
+    const b=$('#rInks'); if(b){ b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); }
+    const row=$('#inksRow'); if(row){ row.classList.toggle('hidden',!on); row.setAttribute('aria-hidden',on?'false':'true'); }
+    const sl=$('#rInksStrength'); if(sl && Number(sl.value)!==pct) sl.value=String(pct);
+    applyInksFilter(inksStrengthParams(s)); },
   toggle(){ this.set(!this.want()); },
   set(on){ store.set('inks',!!on); this.sync(); this.refresh(); },
+  setStrength(s,immediate){ store.set('inksStrength', inksClampStrength(s)); this.sync();
+    const go=()=>{ this._stT=0; dropInksCache(); this.refresh(); };
+    clearTimeout(this._stT); if(immediate===false) this._stT=setTimeout(go,90); else go(); },
   refresh(){ if(!R.comic||!R.doc) return; if(Fit.on){ if(R.viewEl) R.viewEl.querySelectorAll('.pg').forEach(d=>{ delete d.dataset.w; delete d.dataset.h; }); Fit.fillVisible(); } else renderView(); }
 };
 Inks.sync();
+{
+  const sl=$('#rInksStrength');
+  if(sl){
+    sl.addEventListener('pointerdown',e=>{ e.stopPropagation(); clearTimeout(R.uiT); });
+    sl.addEventListener('input',()=>{ clearTimeout(R.uiT); Inks.setStrength(Number(sl.value)/100, false); });
+    sl.addEventListener('change',()=>{ Inks.setStrength(Number(sl.value)/100, true); });
+  }
+}
 
 /* ================= v63: Fit width (continuous vertical scroll) ================= */
 /* v67: 1-up splits a wide scanned two-page image into halves, each at full width */

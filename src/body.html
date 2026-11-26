@@ -93,7 +93,13 @@
     <button class="rbtn" id="rInks" aria-pressed="false" title="Line art view: crisp black-and-white inks" aria-label="Line art view"><svg class="i" viewBox="0 0 24 24"><path d="M16 3l5 5L9 20H4v-5z"/><path d="M14 5l5 5"/></svg><span class="w">Inks</span></button>
     <button class="rbtn" id="rMore" title="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg></button>
     <button class="rbtn" id="rGrid" title="All pages" aria-label="All pages"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg></button>
-  </div></div>
+  </div>
+    <div class="inkrow hidden" id="inksRow" aria-hidden="true">
+      <span class="inklbl" aria-hidden="true">Light</span>
+      <input type="range" id="rInksStrength" min="0" max="100" value="50" step="1" dir="ltr" aria-label="Inks strength">
+      <span class="inklbl" aria-hidden="true">Dark</span>
+    </div>
+  </div>
   <div class="rbar bot" id="rbot"><div class="brow">
     <div class="scrub"><input type="range" id="scrub" min="1" max="1" value="1" step="1" aria-label="Page"><div id="bubble" class="hidden"><div class="bt"><img alt=""></div><span></span></div></div>
     <span id="pgText">1 / 1</span>
@@ -137,7 +143,7 @@
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=71',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=72',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -154,7 +160,7 @@ if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListene
 <svg id="crInksSvg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
   <filter id="crInks" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">
     <feColorMatrix type="saturate" values="0" result="g"/>
-    <!-- cr-v71: unsharp-style line boost. amount 4: unsharp=(1+a)*g - a*blur so alpha stays 1
+    <!-- cr-v71/v72: unsharp-style line boost. Default (strength 50) is amount 4: unsharp=(1+a)*g - a*blur so alpha stays 1
          (a straight blur-minus-g arithmetic zeros alpha in WebKit and goes black). feBlend darken
          keeps only the darkened side, so there are no light halos. A luma mask (g ≲ 0.5) limits the
          boost to already-dark strokes, so broad mid-gray fills and their edges stay at the v70 curve.
