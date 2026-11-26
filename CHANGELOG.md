@@ -1,5 +1,11 @@
 # Comic Shelf: change log
 
+## cr-v73 — 2026-11-26
+
+- **Smoother Inks strength slider.** The thumb now follows your finger without hitching: dragging only updates a lightweight preview (a crossfade of pre-baked light, mid and dark versions of the page, or a contrast/brightness stand-in until those are ready). The full-quality bake runs after you release, or after a short pause, and is done in a background worker when the iPad supports it, then swapped in without rebuilding the page. The mid setting is still the same look as cr-v71 / cr-v72. Home is unchanged.
+- New suite `test/e2e_v73.py`.
+
+
 ## cr-v72 — 2026-11-26
 
 - **Inks strength slider.** When Inks is on, a small Light–Dark slider appears under the reader buttons so you can set how dark the line work is. The middle setting is the same look as cr-v71 (the v70 tone curve plus the line-work boost). Drag toward Light for something closer to the softer cr-v69 curve with little or no boost; drag toward Dark for blacker inks and a stronger boost. The setting is saved on this device (`cr.inksStrength`) and stays put the next time you open the app. The slider hides when Inks is off, and it slides away with the other reader bars. Pages are still processed once and cached; changing the slider redoes the visible pages after a short pause so dragging stays smooth. Home is unchanged.

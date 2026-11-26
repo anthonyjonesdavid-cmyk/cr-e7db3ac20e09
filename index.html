@@ -782,14 +782,23 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 /* cr-v72: Inks strength slider — slim row under the reader buttons, only when Inks is on.
    Lives inside the top bar so it slides away with the other chrome. */
-#inksRow{display:flex;align-items:center;gap:8px;padding:0 12px 8px;width:min(440px,100%);margin:0 auto;box-sizing:border-box}
-#inksRow .inklbl{flex:none;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em;user-select:none}
-#rInksStrength{flex:1;min-width:0;margin:0;-webkit-appearance:none;appearance:none;background:transparent;height:32px}
+#inksRow{display:flex;align-items:center;gap:8px;padding:0 12px 4px;width:min(440px,100%);margin:0 auto;box-sizing:border-box;touch-action:none;-webkit-user-select:none;user-select:none}
+#inksRow .inklbl{flex:none;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em;user-select:none;pointer-events:none}
+#rInksStrength{flex:1;min-width:0;margin:0;-webkit-appearance:none;appearance:none;background:transparent;height:44px;touch-action:none}
 #rInksStrength::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(90deg,#fff var(--inks-pct,50%),#3a3a3c var(--inks-pct,50%))}
-#rInksStrength::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:0;margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#rInksStrength::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:0;margin-top:-9.5px;box-shadow:0 1px 4px rgba(0,0,0,.5);touch-action:none}
 #rInksStrength::-moz-range-track{height:3px;border-radius:2px;background:#3a3a3c}
 #rInksStrength::-moz-range-progress{height:3px;background:#fff}
-#rInksStrength::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:0}
+#rInksStrength::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:0}
+/* v73: live preview while the slider is dragged — GPU contrast fallback, or a crossfade stack */
+#reader.inks.inks-dragging #stage canvas.inks-baked{filter:contrast(var(--inks-live-c,1)) brightness(var(--inks-live-b,1))}
+#reader.inks.inks-dragging #stage .pg.inks-live>canvas.inks-baked{filter:none;opacity:0}
+#reader.inks #stage .inks-prev canvas{filter:none}
+#reader.inks-dragging .inks-prev canvas.inks-b{will-change:opacity}
+.pg .inks-prev{position:absolute;inset:0;pointer-events:none;z-index:2}
+.pg .inks-prev canvas{position:absolute;display:block;pointer-events:none;background:#fff;box-shadow:none}
+.view .pg.inks-live{box-shadow:0 4px 24px rgba(0,0,0,.6)}
+#stage.fitw .view .pg.inks-live{box-shadow:none}
 </style>
 </head>
 <body>
@@ -937,7 +946,7 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 <script>
 // Promise.withResolvers polyfill for older iPadOS (pdf.js 4 uses it)
 if(!Promise.withResolvers){Promise.withResolvers=function(){let a,b;const p=new Promise((r,j)=>{a=r;b=j});return{promise:p,resolve:a,reject:b}}}
-if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=72',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
+if('serviceWorker' in navigator && location.protocol!=='file:'){ addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js?v=73',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}); }); const hadSW=!!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(hadSW&&!window.__crReloading){ /* update only: first install must not reload (it cut off a first import) */ window.__crReloading=1; location.reload(); } }); }
 </script>
   <section id="about" class="hidden" aria-label="About this issue"><header class="rkbar"><div class="tb-row rk-row">
     <button class="icbtn" id="abClose" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
@@ -2369,7 +2378,7 @@ let flip=null, animating=false, anim=null, drag=null, pinch=null, scrubbing=fals
 /* ---- bitmap LRU (pixel budget; evicted canvases are zeroed to release memory on iPad) ---- */
 const cache=new Map(); let cachePx=0;
 function cacheGet(k){ const e=cache.get(k); if(e){ cache.delete(k); cache.set(k,e); } return e; }
-function freeEntry(e){ if(!e) return; freeCanvas(e.canvas); if(e.inks){ freeCanvas(e.inks); e.inks=null; e.inksKey=null; } }
+function freeEntry(e){ if(!e) return; freeCanvas(e.canvas); if(e.inks){ freeCanvas(e.inks); e.inks=null; e.inksKey=null; } if(e.inksPrev){ for(const k in e.inksPrev) freeCanvas(e.inksPrev[k]); e.inksPrev=null; e.inksPrevKey=null; } }
 function cachePut(k,e){ if(cache.has(k)){ freeEntry(e); return cache.get(k); } cache.set(k,e); cachePx+=e.px;
   while(cachePx>CACHE_BUDGET&&cache.size>1){ const [ok,oe]=cache.entries().next().value; if(ok===k) break; cache.delete(ok); cachePx-=oe.px; freeEntry(oe); } return e; }
 function cacheAny(i){ const pre=i+'|'; let best=null; for(const [k,e] of cache) if(k.startsWith(pre)&&(!best||e.px>best.px)) best=e; return best; }
@@ -2462,7 +2471,7 @@ function halfCopy(ent,half){ const sw=ent.canvas.width, sh=ent.canvas.height, hw
 function copyOf(ent){ const c=document.createElement('canvas'); c.width=ent.canvas.width; c.height=ent.canvas.height; c.getContext('2d',{alpha:false}).drawImage(ent.canvas,0,0); return c; }
 // half: show one half of sheet i; the whole sheet is rendered at twice the width (shared by both halves) and that half is copied
 function fillPage(d,i,w,h,align,prio,half){ Object.assign(d.dataset,{p:i,w,h,a:align}); if(half) d.dataset.half=half; else delete d.dataset.half; const fw=half?w*2:w;
-  const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas,.phn').forEach(x=>x.remove()); const src=Inks.want()?inksOf(ent,half?w*2:w):ent; const c=half?halfCopy(src,half):copyOf(src); if(Inks.want()) c.classList.add('inks-baked'); placeCanvas(c,w,h,align); d.prepend(c); };
+  const show=ent=>{ d.classList.remove('loading'); d.querySelectorAll('canvas,.phn').forEach(x=>x.remove()); const src=Inks.want()?inksOf(ent,half?w*2:w):ent; const c=half?halfCopy(src,half):copyOf(src); if(Inks.want()){ c.classList.add('inks-baked'); placeCanvas(c,w,h,align); d.prepend(c); requestAnimationFrame(()=>Inks.prepareAnchors()); } else { placeCanvas(c,w,h,align); d.prepend(c); } };
   const e=cacheGet(keyFor(i,fw,h)); if(e){ show(e); return; }
   const any=cacheAny(i); if(any){ show(any); d.dataset.interim='1'; }
   else { d.classList.add('loading'); const ph=document.createElement('span'); ph.className='phn'; ph.textContent=i+1; d.prepend(ph); }
@@ -2568,6 +2577,10 @@ let rsT=0; new ResizeObserver(()=>{ clearTimeout(rsT); rsT=setTimeout(()=>relayo
    large Fit-width bitmaps is too slow to composite every scroll frame on WebKit. */
 /* v72: a strength slider (cr.inksStrength, 0–1, default 0.5) morphs the tone curve and
    the boost amount. Mid (50) is exactly the v71 look. */
+/* v73: the slider thumb stays on a cheap rAF path while dragging; visible pages get a
+   GPU preview (crossfade of light/mid/dark anchors, or a contrast/brightness fallback).
+   The full-quality bake runs after release (or 250ms idle), off the main thread when a
+   Worker is available, and swaps in without a refresh of the whole view. */
 const INKS_TONE=[0,0.02,0.04,0.08,0.18,0.36,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
 const INKS_TONE_STR='0 0.02 0.04 0.08 0.18 0.36 0.60 0.64 0.68 0.715 0.75 0.785 0.82 0.86 0.90 0.925 0.95 0.965 0.98 0.99 1';
 const INKS_TONE_LIGHT=[0,0.155,0.31,0.4,0.49,0.545,0.60,0.64,0.68,0.715,0.75,0.785,0.82,0.86,0.90,0.925,0.95,0.965,0.98,0.99,1];
@@ -2584,7 +2597,7 @@ function inksStrengthParams(s){
     return {tone, toneStr:tone.map(inksFmt).join(' '), amount:4*t, sigmaCss:1.2, contrast:1.25+0.25*t, brightness:1.28-0.08*t}; }
   const t=(pct-50)/50, tone=inksMix(INKS_TONE,INKS_TONE_DARK,t);
   return {tone, toneStr:tone.map(inksFmt).join(' '), amount:4+4*t, sigmaCss:1.2+0.3*t, contrast:1.5+0.4*t, brightness:1.2-0.12*t}; }
-function applyInksFilter(p){
+function applyInksFilter(p,pct){
   const f=document.getElementById('crInks');
   if(f){
     const b=f.querySelector('feGaussianBlur'); if(b) b.setAttribute('stdDeviation', inksFmt(p.sigmaCss));
@@ -2593,7 +2606,7 @@ function applyInksFilter(p){
     f.querySelectorAll('feComponentTransfer[result="ink"] feFuncR, feComponentTransfer[result="ink"] feFuncG, feComponentTransfer[result="ink"] feFuncB')
       .forEach(el=>el.setAttribute('tableValues', p.toneStr));
   }
-  if(readerEl){ readerEl.style.setProperty('--inks-contrast', inksFmt(p.contrast)); readerEl.style.setProperty('--inks-brightness', inksFmt(p.brightness)); readerEl.style.setProperty('--inks-pct', (Math.round(inksClampStrength(Inks&&Inks.strength?Inks.strength():0.5)*100))+'%'); }
+  if(readerEl){ readerEl.style.setProperty('--inks-contrast', inksFmt(p.contrast)); readerEl.style.setProperty('--inks-brightness', inksFmt(p.brightness)); readerEl.style.setProperty('--inks-pct', (pct==null?Math.round(inksClampStrength(Inks.strength())*100):pct)+'%'); }
 }
 function dropInksCache(){ cache.forEach(e=>{ if(e.inks){ freeCanvas(e.inks); e.inks=null; e.inksKey=null; } }); }
 function inksParams(){ const f=document.getElementById('crInks'), u=f&&f.querySelector('feComposite[result="unsharp"]'), b=f&&f.querySelector('feGaussianBlur');
@@ -2624,32 +2637,234 @@ function bakeInksCanvas(src,cssW,amount,sigmaCss,tone){ const w=src.width, h=src
   ctx.putImageData(img,0,0); return out; }
 function inksOf(ent,cssW){ const p=inksParams(), key=p.amount+'|'+p.sigmaCss+'|'+p.toneKey+'|'+cssW+'|'+ent.canvas.width+'x'+ent.canvas.height;
   if(ent.inks&&ent.inksKey===key) return {canvas:ent.inks};
+  if(Inks._deferBake) return ent.inks?{canvas:ent.inks}:ent;
   if(ent.inks) freeCanvas(ent.inks);
   ent.inks=bakeInksCanvas(ent.canvas,cssW,p.amount,p.sigmaCss,inksToneFn(p)); ent.inksKey=key; return {canvas:ent.inks}; }
+
+/* v73: process RGBA in a worker so a full-quality bake does not stall the slider */
+const INKS_PROCESS_SRC=String.raw`const INKS_MASK=[1,1,1,1,0.67,0,0,0,0,0,0];
+function inksLerp(tbl,x,step,last){ x=x<0?0:x>1?1:x; const i=x/step, lo=Math.min(last,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }
+function toneAt(tbl,x){ x=x<0?0:x>1?1:x; const last=tbl.length-1, i=x*last, lo=Math.min(last-1,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }
+function inksKernel(sigma){ const r=Math.max(1,Math.ceil(sigma*3)), k=new Float32Array(2*r+1), s2=2*sigma*sigma; let sum=0;
+  for(let i=-r,j=0;i<=r;i++,j++){ const v=Math.exp(-(i*i)/s2); k[j]=v; sum+=v; } for(let j=0;j<k.length;j++) k[j]/=sum; return {k,r}; }
+function inksBlur(src,dst,w,h,kern,horiz){ const {k,r}=kern;
+  if(horiz){ for(let y=0;y<h;y++){ const row=y*w; for(let x=0;x<w;x++){ let acc=0; for(let i=-r,j=0;i<=r;i++,j++){ let xx=x+i; if(xx<0)xx=0; else if(xx>=w)xx=w-1; acc+=src[row+xx]*k[j]; } dst[row+x]=acc; } } }
+  else { for(let x=0;x<w;x++){ for(let y=0;y<h;y++){ let acc=0; for(let i=-r,j=0;i<=r;i++,j++){ let yy=y+i; if(yy<0)yy=0; else if(yy>=h)yy=h-1; acc+=src[yy*w+x]*k[j]; } dst[y*w+x]=acc; } } } }
+function inksProcessRGBA(d,w,h,cssW,amount,sigmaCss,tone){
+  const n=w*h, g=new Float32Array(n), tmp=new Float32Array(n), blur=new Float32Array(n);
+  for(let i=0,p=0;p<n;i+=4,p++) g[p]=(0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])*(1/255);
+  const kern=inksKernel(sigmaCss*(cssW>0?w/cssW:1)); inksBlur(g,tmp,w,h,kern,true); inksBlur(tmp,blur,w,h,kern,false);
+  const a=amount, last=tone.length-1;
+  for(let p=0,i=0;p<n;p++,i+=4){ const gv=g[p], un=(1+a)*gv-a*blur[p], sharp=un<gv?un:gv, m=inksLerp(INKS_MASK,gv,0.1,9);
+    let v=m*sharp+(1-m)*gv; if(v<0)v=0; else if(v>1)v=1; const t=toneAt(tone,v)*255; d[i]=d[i+1]=d[i+2]=t; d[i+3]=255; }
+}
+function inksProcessJobs(src,w,h,cssW,jobs){
+  const n=w*h, g=new Float32Array(n), tmp=new Float32Array(n);
+  for(let i=0,p=0;p<n;i+=4,p++) g[p]=(0.2126*src[i]+0.7152*src[i+1]+0.0722*src[i+2])*(1/255);
+  const blurs={};
+  function blurFor(sig){ const k=String(sig); if(blurs[k]) return blurs[k]; const blur=new Float32Array(n), kern=inksKernel(sig*(cssW>0?w/cssW:1)); inksBlur(g,tmp,w,h,kern,true); inksBlur(tmp,blur,w,h,kern,false); blurs[k]=blur; return blur; }
+  const out=[];
+  for(let j=0;j<jobs.length;j++){
+    const job=jobs[j], blur=blurFor(job.sigmaCss), a=job.amount, tone=job.tone, d=new Uint8ClampedArray(src.length);
+    for(let p=0,i=0;p<n;p++,i+=4){ const gv=g[p], un=(1+a)*gv-a*blur[p], sharp=un<gv?un:gv, m=inksLerp(INKS_MASK,gv,0.1,9);
+      let v=m*sharp+(1-m)*gv; if(v<0)v=0; else if(v>1)v=1; const t=toneAt(tone,v)*255; d[i]=d[i+1]=d[i+2]=t; d[i+3]=255; }
+    out.push({k:job.k, buffer:d.buffer});
+  }
+  return out;
+}
+`;
+let inksWk=null, inksWkId=0, inksWkWait=new Map();
+function getInksWorker(){
+  if(inksWk) return inksWk;
+  if(typeof Worker!=='function') return null;
+  try{
+    const src=INKS_PROCESS_SRC+'\nself.onmessage=function(e){var m=e.data;try{var data=new Uint8ClampedArray(m.buffer);if(m.jobs){var parts=inksProcessJobs(data,m.width,m.height,m.cssW,m.jobs);self.postMessage({id:m.id,ok:true,parts:parts,width:m.width,height:m.height},parts.map(function(p){return p.buffer}));}else{inksProcessRGBA(data,m.width,m.height,m.cssW,m.amount,m.sigmaCss,m.tone);self.postMessage({id:m.id,ok:true,buffer:data.buffer,width:m.width,height:m.height},[data.buffer]);}}catch(err){self.postMessage({id:m.id,ok:false,error:String(err&&err.message||err)});}};';
+    const w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+    w.onmessage=e=>{ const j=inksWkWait.get(e.data.id); if(!j) return; inksWkWait.delete(e.data.id); e.data.ok?j.resolve(e.data):j.reject(new Error(e.data.error||'inks bake')); };
+    w.onerror=()=>{ inksWkWait.forEach(j=>j.reject(new Error('inks worker'))); inksWkWait.clear(); inksWk=null; };
+    inksWk=w; return w;
+  }catch(e){ return null; }
+}
+function readCanvasData(src){
+  let ctx=null; try{ ctx=src.getContext('2d',{willReadFrequently:true}); }catch(e){}
+  if(ctx) return ctx.getImageData(0,0,src.width,src.height);
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  const x=c.getContext('2d',{alpha:false,willReadFrequently:true}); x.drawImage(src,0,0);
+  const img=x.getImageData(0,0,c.width,c.height); freeCanvas(c); return img;
+}
+function afterFrame(){ return new Promise(r=>requestAnimationFrame(()=>r())); }
+function canvasFromBuf(buffer,width,height){
+  const out=document.createElement('canvas'); out.width=width; out.height=height;
+  out.getContext('2d',{alpha:false}).putImageData(new ImageData(new Uint8ClampedArray(buffer),width,height),0,0); return out;
+}
+function toneFn(tbl){ return x=>{ x=x<0?0:x>1?1:x; const last=tbl.length-1, i=x*last, lo=Math.min(last-1,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }; }
+function bakeInksAsync(src,cssW,amount,sigmaCss,toneArr){
+  return afterFrame().then(()=>{
+    const w=src.width, h=src.height, wk=getInksWorker();
+    if(wk){ const img=readCanvasData(src), id=++inksWkId;
+      return new Promise((resolve,reject)=>{ inksWkWait.set(id,{resolve,reject});
+        try{ wk.postMessage({id,width:w,height:h,buffer:img.data.buffer,cssW,amount,sigmaCss,tone:toneArr},[img.data.buffer]); }
+        catch(e){ inksWkWait.delete(id); reject(e); } })
+        .then(({buffer,width,height})=>canvasFromBuf(buffer,width,height)); }
+    return afterFrame().then(()=>bakeInksCanvas(src,cssW,amount,sigmaCss,toneFn(toneArr)));
+  });
+}
+function bakeInksManyAsync(src,cssW,jobs){
+  return afterFrame().then(()=>{
+    const w=src.width, h=src.height, wk=getInksWorker();
+    if(wk){ const img=readCanvasData(src), id=++inksWkId;
+      return new Promise((resolve,reject)=>{ inksWkWait.set(id,{resolve,reject});
+        try{ wk.postMessage({id,width:w,height:h,buffer:img.data.buffer,cssW,jobs},[img.data.buffer]); }
+        catch(e){ inksWkWait.delete(id); reject(e); } })
+        .then(msg=>(msg.parts||[]).map(p=>({k:p.k, c:canvasFromBuf(p.buffer,msg.width,msg.height)}))); }
+    return (async()=>{ const out=[]; for(const j of jobs){ await afterFrame(); out.push({k:j.k, c:bakeInksCanvas(src,cssW,j.amount,j.sigmaCss,toneFn(j.tone))}); } return out; })();
+  });
+}
+
 const Inks={
-  _stT:0,
+  _stT:0, _raf:0, _idleT:0, _live:null, _drag:false, _deferBake:false, _gen:0, _bakeP:null, _shownAt:0.5, _anchorQ:Promise.resolve(),
   want(){ return store.get('inks',false)===true; },
-  strength(){ return inksClampStrength(store.get('inksStrength',0.5)); },
+  strength(){ return this._live!=null?inksClampStrength(this._live):inksClampStrength(store.get('inksStrength',0.5)); },
+  dragging(){ return this._drag; },
+  whenSettled(){ return this._bakeP||Promise.resolve(); },
   sync(){ const on=this.want(), s=this.strength(), pct=Math.round(s*100);
     readerEl.classList.toggle('inks',on);
     const b=$('#rInks'); if(b){ b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); }
     const row=$('#inksRow'); if(row){ row.classList.toggle('hidden',!on); row.setAttribute('aria-hidden',on?'false':'true'); }
-    const sl=$('#rInksStrength'); if(sl && Number(sl.value)!==pct) sl.value=String(pct);
-    applyInksFilter(inksStrengthParams(s)); },
+    const sl=$('#rInksStrength'); if(sl && !this._drag && Number(sl.value)!==pct) sl.value=String(pct);
+    if(this._drag) readerEl.style.setProperty('--inks-pct', pct+'%');
+    else applyInksFilter(inksStrengthParams(s), pct);
+    if(!on) this.hidePreview(); },
   toggle(){ this.set(!this.want()); },
-  set(on){ store.set('inks',!!on); this.sync(); this.refresh(); },
-  setStrength(s,immediate){ store.set('inksStrength', inksClampStrength(s)); this.sync();
-    const go=()=>{ this._stT=0; dropInksCache(); this.refresh(); };
-    clearTimeout(this._stT); if(immediate===false) this._stT=setTimeout(go,90); else go(); },
-  refresh(){ if(!R.comic||!R.doc) return; if(Fit.on){ if(R.viewEl) R.viewEl.querySelectorAll('.pg').forEach(d=>{ delete d.dataset.w; delete d.dataset.h; }); Fit.fillVisible(); } else renderView(); }
+  set(on){ store.set('inks',!!on); this._deferBake=false; this.sync(); this.refresh(); if(on) requestAnimationFrame(()=>this.prepareAnchors()); },
+  live(s){ this._live=inksClampStrength(s); this._drag=true; this._deferBake=true; clearTimeout(R.uiT); clearTimeout(this._idleT);
+    if(!this._raf) this._raf=requestAnimationFrame(()=>this._tick()); },
+  _tick(){ this._raf=0; const s=this.strength(), pct=Math.round(s*100);
+    readerEl.style.setProperty('--inks-pct', pct+'%');
+    this.showPreview(s);
+    clearTimeout(this._idleT); this._idleT=setTimeout(()=>this.commitBake(),250); },
+  endDrag(){ if(!this._drag&&this._live==null) return; this._drag=false; clearTimeout(this._idleT); if(this._raf){ cancelAnimationFrame(this._raf); this._raf=0; }
+    const s=this.strength(); store.set('inksStrength',s); this._live=null; this.sync(); this.commitBake(); },
+  setStrength(s,immediate){ s=inksClampStrength(s); this._live=s;
+    const sl=$('#rInksStrength'); if(sl) sl.value=String(Math.round(s*100));
+    if(immediate===false){ this._drag=true; this._deferBake=true; clearTimeout(this._idleT);
+      if(!this._raf) this._raf=requestAnimationFrame(()=>this._tick());
+      this._idleT=setTimeout(()=>{ this._drag=false; this.endDrag(); },250); return this; }
+    this._drag=false; clearTimeout(this._idleT); store.set('inksStrength',s); this._live=null; this.sync(); this.commitBake(); return this; },
+  refresh(){ if(!R.comic||!R.doc) return; if(Fit.on){ if(R.viewEl) R.viewEl.querySelectorAll('.pg').forEach(d=>{ delete d.dataset.w; delete d.dataset.h; }); Fit.fillVisible(); } else renderView(); },
+  pageEls(){ return [...(R.viewEl||zoomer).querySelectorAll('.pg[data-p]')]; },
+  entryOf(d){ const i=+d.dataset.p; if(!Number.isFinite(i)) return null; const half=d.dataset.half, w=+d.dataset.w, h=+d.dataset.h, fw=half?w*2:w;
+    return (w&&h&&cacheGet(keyFor(i,fw,h)))||cacheAny(i); },
+  cssWOf(d){ const half=d.dataset.half, w=+d.dataset.w; return half?w*2:(w||d.clientWidth||0); },
+  showPreview(s){
+    if(!this.want()||!readerEl) return;
+    readerEl.classList.add('inks-dragging');
+    const p=inksStrengthParams(s), p0=inksStrengthParams(this._shownAt==null?0.5:this._shownAt);
+    const relC=(p0.contrast>0?p.contrast/p0.contrast:1), relB=(p0.brightness>0?p.brightness/p0.brightness:1);
+    readerEl.style.setProperty('--inks-live-c', inksFmt(relC));
+    readerEl.style.setProperty('--inks-live-b', inksFmt(relB));
+    const lo=s<=0.5?0:50, hi=s<=0.5?50:100, t=s<=0.5?s/0.5:(s-0.5)/0.5;
+    this.pageEls().forEach(d=>{
+      const layer=d.querySelector('.inks-prev');
+      if(layer&&layer.dataset.lo===String(lo)&&layer.dataset.hi===String(hi)){
+        const b=layer.querySelector('canvas.inks-b'); if(b) b.style.opacity=String(t); return;
+      }
+      const ent=this.entryOf(d), prev=ent&&ent.inksPrev, ready=prev&&prev[lo]&&prev[hi];
+      if(ready){ this.mountPreview(d, prev, lo, hi, t); d.classList.add('inks-live'); }
+      else d.classList.remove('inks-live');
+    }); },
+  mountPreview(d, prev, lo, hi, t){
+    const base=d.querySelector('canvas.inks-baked'); let layer=d.querySelector('.inks-prev');
+    if(!layer){ layer=document.createElement('div'); layer.className='inks-prev'; d.appendChild(layer); }
+    const paint=(c,src,half)=>{
+      const sw=src.width, sh=src.height;
+      if(half){ const hw=Math.ceil(sw/2); if(c.width!==hw||c.height!==sh){ c.width=hw; c.height=sh; } c.getContext('2d',{alpha:false}).drawImage(src,half==='R'?sw-hw:0,0,hw,sh,0,0,hw,sh); }
+      else { if(c.width!==sw||c.height!==sh){ c.width=sw; c.height=sh; } c.getContext('2d',{alpha:false}).drawImage(src,0,0); }
+      if(base){ c.style.left=base.style.left; c.style.top=base.style.top; c.style.width=base.style.width; c.style.height=base.style.height; }
+    };
+    let a=layer.querySelector('canvas.inks-a'), b=layer.querySelector('canvas.inks-b');
+    if(!a){ a=document.createElement('canvas'); a.className='inks-a'; layer.appendChild(a); }
+    if(!b){ b=document.createElement('canvas'); b.className='inks-b'; layer.appendChild(b); }
+    const half=d.dataset.half||null;
+    if(layer.dataset.lo!==String(lo)){ paint(a, prev[lo], half); layer.dataset.lo=String(lo); }
+    if(layer.dataset.hi!==String(hi)){ paint(b, prev[hi], half); layer.dataset.hi=String(hi); }
+    if(base){ a.style.left=b.style.left=base.style.left; a.style.top=b.style.top=base.style.top; a.style.width=b.style.width=base.style.width; a.style.height=b.style.height=base.style.height; }
+    a.style.opacity='1'; b.style.opacity=String(t);
+  },
+  hidePreview(){ if(!readerEl) return; readerEl.classList.remove('inks-dragging');
+    readerEl.style.removeProperty('--inks-live-c'); readerEl.style.removeProperty('--inks-live-b');
+    this.pageEls().forEach(d=>{ d.classList.remove('inks-live'); const layer=d.querySelector('.inks-prev'); if(layer) layer.remove();
+      d.querySelectorAll('canvas.inks-baked').forEach(c=>{ c.style.filter=''; c.style.opacity=''; }); }); },
+  prepareAnchors(){ if(!this.want()||!R.comic) return; this.pageEls().forEach(d=>this.prepareOne(d)); },
+  prepareOne(d){ const ent=this.entryOf(d); if(!ent||!ent.canvas||ent.inksPrevBusy) return; const cssW=this.cssWOf(d)||ent.canvas.width;
+    if(ent.inksPrev&&ent.inksPrevKey===cssW+'|'+ent.canvas.width+'x'+ent.canvas.height) return;
+    ent.inksPrevBusy=true;
+    this._anchorQ=this._anchorQ.catch(()=>{}).then(()=>this._bakeAnchors(ent,cssW)).finally(()=>{ ent.inksPrevBusy=false; }); },
+  async _bakeAnchors(ent,cssW){
+    const key=cssW+'|'+ent.canvas.width+'x'+ent.canvas.height;
+    if(ent.inksPrev&&ent.inksPrevKey===key) return;
+    await afterFrame();
+    if(ent.inksPrev&&ent.inksPrevKey===key) return;
+    const src=ent.canvas, max=720, scale=Math.min(1, max/Math.max(src.width,src.height));
+    let small=src, own=false;
+    if(scale<1){ small=document.createElement('canvas'); small.width=Math.max(1,Math.round(src.width*scale)); small.height=Math.max(1,Math.round(src.height*scale));
+      small.getContext('2d',{alpha:false}).drawImage(src,0,0,small.width,small.height); own=true; }
+    const prevCss=cssW*(small.width/src.width);
+    const jobs=[{k:0,s:0},{k:50,s:0.5},{k:100,s:1}].map(({k,s})=>{ const p=inksStrengthParams(s); return {k, amount:p.amount, sigmaCss:p.sigmaCss, tone:p.tone}; });
+    try{
+      const parts=await bakeInksManyAsync(small,prevCss,jobs);
+      if(own) freeCanvas(small);
+      if(ent.inksPrev){ for(const k in ent.inksPrev) freeCanvas(ent.inksPrev[k]); }
+      ent.inksPrev={}; parts.forEach(({k,c})=>{ ent.inksPrev[k]=c; }); ent.inksPrevKey=key;
+      if(this._drag||this._deferBake) requestAnimationFrame(()=>this.showPreview(this.strength()));
+    }catch(e){ if(own) freeCanvas(small); }
+  },
+  commitBake(){ const gen=++this._gen, s=this.strength(); this._deferBake=true;
+    const run=this._runBake(gen,s);
+    this._bakeP=run.then(()=>{ if(this._gen===gen){ this._deferBake=this._drag; if(!this._drag){ this._shownAt=s; this.hidePreview(); } } }).catch(()=>{});
+    return this._bakeP; },
+  async _runBake(gen,s){
+    await new Promise(r=>requestAnimationFrame(()=>r()));
+    if(this._gen!==gen) return;
+    const p=inksStrengthParams(s);
+    const els=this.pageEls().filter(d=>d.querySelector('canvas.inks-baked')&&d.dataset.p!=null&&+d.dataset.p<R.n);
+    for(const d of els){
+      if(this._gen!==gen) return;
+      const ent=this.entryOf(d); if(!ent||!ent.canvas) continue;
+      const cssW=this.cssWOf(d)||ent.canvas.width;
+      const key=p.amount+'|'+p.sigmaCss+'|tbl:'+p.toneStr+'|'+cssW+'|'+ent.canvas.width+'x'+ent.canvas.height;
+      if(!(ent.inks&&ent.inksKey===key)){
+        let baked=null;
+        try{ baked=await bakeInksAsync(ent.canvas,cssW,p.amount,p.sigmaCss,p.tone); }catch(e){ const tbl=p.tone; baked=bakeInksCanvas(ent.canvas,cssW,p.amount,p.sigmaCss,x=>{ x=x<0?0:x>1?1:x; const last=tbl.length-1, i=x*last, lo=Math.min(last-1,Math.floor(i)), t=i-lo; return tbl[lo]*(1-t)+tbl[lo+1]*t; }); }
+        if(this._gen!==gen){ if(baked) freeCanvas(baked); return; }
+        if(ent.inks) freeCanvas(ent.inks);
+        ent.inks=baked; ent.inksKey=key;
+      }
+      if(!this._drag) this.swapPage(d, ent, cssW);
+    }
+  },
+  swapPage(d,ent,cssW){
+    const half=d.dataset.half||null, w=+d.dataset.w, h=+d.dataset.h, align=d.dataset.a||'c';
+    const src={canvas:ent.inks||ent.canvas};
+    const c=half?halfCopy(src,half):copyOf(src); c.classList.add('inks-baked');
+    placeCanvas(c,w||d.clientWidth,h||d.clientHeight,align);
+    const old=d.querySelector('canvas.inks-baked');
+    d.prepend(c);
+    if(old&&old!==c){ old.remove(); freeCanvas(old); }
+  }
 };
 Inks.sync();
 {
-  const sl=$('#rInksStrength');
+  const sl=$('#rInksStrength'), row=$('#inksRow');
+  const peek=e=>{ e.stopPropagation(); clearTimeout(R.uiT); };
+  if(row){ row.addEventListener('pointerdown',peek); row.addEventListener('touchstart',peek,{passive:true}); }
   if(sl){
-    sl.addEventListener('pointerdown',e=>{ e.stopPropagation(); clearTimeout(R.uiT); });
-    sl.addEventListener('input',()=>{ clearTimeout(R.uiT); Inks.setStrength(Number(sl.value)/100, false); });
-    sl.addEventListener('change',()=>{ Inks.setStrength(Number(sl.value)/100, true); });
+    sl.addEventListener('pointerdown',e=>{ peek(e); Inks._drag=true; Inks._deferBake=true; });
+    sl.addEventListener('touchstart',peek,{passive:true});
+    sl.addEventListener('input',()=>{ Inks.live(Number(sl.value)/100); });
+    sl.addEventListener('change',()=>Inks.endDrag());
+    sl.addEventListener('pointerup',()=>Inks.endDrag());
+    sl.addEventListener('pointercancel',()=>Inks.endDrag());
   }
 }
 

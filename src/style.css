@@ -734,11 +734,20 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 
 /* cr-v72: Inks strength slider — slim row under the reader buttons, only when Inks is on.
    Lives inside the top bar so it slides away with the other chrome. */
-#inksRow{display:flex;align-items:center;gap:8px;padding:0 12px 8px;width:min(440px,100%);margin:0 auto;box-sizing:border-box}
-#inksRow .inklbl{flex:none;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em;user-select:none}
-#rInksStrength{flex:1;min-width:0;margin:0;-webkit-appearance:none;appearance:none;background:transparent;height:32px}
+#inksRow{display:flex;align-items:center;gap:8px;padding:0 12px 4px;width:min(440px,100%);margin:0 auto;box-sizing:border-box;touch-action:none;-webkit-user-select:none;user-select:none}
+#inksRow .inklbl{flex:none;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em;user-select:none;pointer-events:none}
+#rInksStrength{flex:1;min-width:0;margin:0;-webkit-appearance:none;appearance:none;background:transparent;height:44px;touch-action:none}
 #rInksStrength::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:linear-gradient(90deg,#fff var(--inks-pct,50%),#3a3a3c var(--inks-pct,50%))}
-#rInksStrength::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:0;margin-top:-6px;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+#rInksStrength::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:0;margin-top:-9.5px;box-shadow:0 1px 4px rgba(0,0,0,.5);touch-action:none}
 #rInksStrength::-moz-range-track{height:3px;border-radius:2px;background:#3a3a3c}
 #rInksStrength::-moz-range-progress{height:3px;background:#fff}
-#rInksStrength::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:0}
+#rInksStrength::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:0}
+/* v73: live preview while the slider is dragged — GPU contrast fallback, or a crossfade stack */
+#reader.inks.inks-dragging #stage canvas.inks-baked{filter:contrast(var(--inks-live-c,1)) brightness(var(--inks-live-b,1))}
+#reader.inks.inks-dragging #stage .pg.inks-live>canvas.inks-baked{filter:none;opacity:0}
+#reader.inks #stage .inks-prev canvas{filter:none}
+#reader.inks-dragging .inks-prev canvas.inks-b{will-change:opacity}
+.pg .inks-prev{position:absolute;inset:0;pointer-events:none;z-index:2}
+.pg .inks-prev canvas{position:absolute;display:block;pointer-events:none;background:#fff;box-shadow:none}
+.view .pg.inks-live{box-shadow:0 4px 24px rgba(0,0,0,.6)}
+#stage.fitw .view .pg.inks-live{box-shadow:none}
